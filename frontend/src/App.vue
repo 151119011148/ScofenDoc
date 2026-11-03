@@ -167,6 +167,43 @@ function onEditorReady(ed: unknown) {
 const currentDoc = computed(() => docs.value.find((d) => d.id === currentDocId.value) ?? null)
 const currentSpace = computed(() => workspaces.value.find((w) => w.id === currentSpaceId.value) ?? null)
 
+/* ---------- 移动端：左栏改为滑出抽屉 ---------- */
+
+/**
+ * 768px 以下走手机布局：左栏不再是常驻分栏，而是从左侧滑出的抽屉。
+ * 用 matchMedia 而非纯 CSS，是因为「什么时候关抽屉」需要 JS 参与
+ * （选完空间/文档、切导航、点遮罩都要关）。
+ */
+const isMobile = ref(false)
+const navOpen = ref(false)
+let viewportMq: MediaQueryList | undefined
+
+function syncViewport(e?: MediaQueryListEvent) {
+  isMobile.value = e ? e.matches : !!viewportMq?.matches
+  // 回到桌面宽度时收掉抽屉，避免下次变窄时莫名其妙是开着的
+  if (!isMobile.value) navOpen.value = false
+}
+
+/** 手机上没有「折叠成窄条」这回事，永远是完整抽屉 */
+const railCollapsed = computed(() => sidebarCollapsed.value && !isMobile.value)
+
+/** 手机顶栏标题：优先当前文档，其次空间名 */
+const mobileTitle = computed(() => currentDoc.value?.title || currentSpace.value?.name || 'scofenDoc')
+
+function closeNav() {
+  if (isMobile.value) navOpen.value = false
+}
+
+function onToggleCollapse() {
+  if (isMobile.value) navOpen.value = false
+  else sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+/** 抽屉打开时锁住背景滚动，否则手指滑的是背后的正文 */
+watch(navOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
 /* ---------- 中间栏：文章大纲（宽度可拖） ---------- */
 
 const OUTLINE_MIN = 170
@@ -324,6 +361,7 @@ async function ensureCollabToken(doc: Doc | null) {
 
 /* ---------- 交互 ---------- */
 function selectSpace(id: number) {
+  closeNav()
   view.value = 'doc'
   searchQuery.value = ''
   searchResults.value = []
@@ -337,6 +375,7 @@ function selectSpace(id: number) {
 }
 
 function selectDoc(doc: Doc) {
+  closeNav()
   currentDocId.value = doc.id
   titleDraft.value = doc.title
   // 从搜索/主页点进来时，要回到文档视图
@@ -349,6 +388,7 @@ function selectDoc(doc: Doc) {
 /* ---------- 导航切换 ---------- */
 
 function goNav(target: NavKey) {
+  closeNav()
   searchQuery.value = ''
   searchResults.value = []
   if (target === 'home') {
@@ -417,6 +457,7 @@ async function loadRecent() {
 
 /** 从搜索结果 / 最近更新打开一篇文档 */
 async function openHit(hit: DocHit) {
+  closeNav()
   view.value = 'doc'
   searchQuery.value = ''
   searchResults.value = []
@@ -673,10 +714,18 @@ function onGlobalKeydown(e: KeyboardEvent) {
     })
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+  viewportMq = window.matchMedia('(max-width: 768px)')
+  syncViewport()
+  viewportMq.addEventListener('change', syncViewport)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
+  viewportMq?.removeEventListener('change', syncViewport)
   window.clearTimeout(noticeTimer)
+  // 抽屉锁滚动是直接写 body 上的，卸载时得还回去，否则整页再也滚不动
+  document.body.style.overflow = ''
 })
 
 function showError(e: unknown) {
@@ -743,23 +792,41 @@ boot()
   <LoginView v-if="!session" @success="onLoggedIn" />
 
   <div v-else class="app">
+    <!-- 手机顶栏：只在 768px 以下出现，桌面端由 CSS 隐藏 -->
+    <header class="m-topbar">
+      <button class="m-menu" title="打开菜单" @click="navOpen = true">☰</button>
+      <span class="m-title">{{ mobileTitle }}</span>
+      <button
+        v-if="canWrite && view === 'doc' && currentSpace"
+        class="m-new"
+        title="新建根文档"
+        @click="createDoc(null)"
+      >
+        ＋
+      </button>
+    </header>
+
     <div class="layout">
+      <!-- 抽屉遮罩：点一下收菜单 -->
+      <div v-if="navOpen" class="nav-mask" @click="navOpen = false" />
+
       <!-- 最左：导航 + 空间 + 当前空间的文档树（飞书式的单栏导航） -->
       <NavRail
         ref="navRailEl"
-        :class="{ resizing }"
-        :style="sidebarStyle"
+        :class="{ resizing, 'drawer-open': navOpen }"
+        :style="isMobile ? undefined : sidebarStyle"
         :active="nav"
         :user="session.user"
         :search="searchQuery"
         :spaces="workspaces"
         :current-space-id="currentSpaceId"
-        :collapsed="sidebarCollapsed"
+        :collapsed="railCollapsed"
+        :drawer="isMobile"
         @navigate="goNav"
         @select-space="selectSpace($event.id)"
         @new-space="newSpace"
         @open-members="openMembers"
-        @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
+        @toggle-collapse="onToggleCollapse"
         @search="onSearchInput"
         @change-password="showChangePwd = true"
         @admin-users="showAdminUsers = true"
@@ -798,7 +865,7 @@ boot()
 
       <!-- 左栏右边界：hover 变双向箭头，拖动调宽，双击复位 -->
       <div
-        v-if="!sidebarCollapsed"
+        v-if="!sidebarCollapsed && !isMobile"
         :class="['resize-handle', { active: resizing }]"
         title="拖动调整宽度，双击复位"
         @mousedown="startResize"

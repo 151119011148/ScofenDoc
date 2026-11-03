@@ -23,6 +23,8 @@ const props = defineProps<{
   spaces: Workspace[]
   currentSpaceId: number | null
   collapsed: boolean
+  /** 移动端抽屉模式：收起按钮变成关闭，不再做「折叠成窄条」 */
+  drawer?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -67,10 +69,10 @@ const shownSpaces = computed(() => (shownKind.value === 'KB' ? kbSpaces.value : 
       <span class="nav-brand-name">scofenDoc</span>
       <button
         class="nav-collapse"
-        :title="props.collapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="props.drawer ? '关闭菜单' : props.collapsed ? '展开侧边栏' : '收起侧边栏'"
         @click="emit('toggle-collapse')"
       >
-        {{ props.collapsed ? '»' : '«' }}
+        {{ props.drawer ? '✕' : props.collapsed ? '»' : '«' }}
       </button>
     </div>
 

@@ -1745,3 +1745,262 @@ body {
 @media (max-width: 900px) {
   .home-stats, .home-actions { grid-template-columns: 1fr; }
 }
+
+/* ============================================================================
+   移动端适配（<= 768px）
+   ----------------------------------------------------------------------------
+   桌面是「左栏 + 大纲栏 + 正文」三栏并排，手机宽度放不下，也不该硬塞：
+     · 左栏      → 从左侧滑出的抽屉，顶栏 ☰ 唤起，点遮罩 / 选中文档即收回
+     · 大纲栏    → 直接不占位，正文优先
+     · 正文      → 通栏，去掉卡片边框，行内元素一律不横向溢出
+     · 弹窗      → 全屏；斜杠菜单 → 贴在底部的半屏面板（避开键盘遮挡）
+   触屏没有 hover，所以行内 + 按钮隐藏、文档树的操作按钮常驻。
+   固定定位的元素都带上 safe-area，避开 iPhone 刘海和底部横条。
+   ============================================================================ */
+
+/* 手机顶栏、抽屉遮罩：桌面端不参与布局 */
+.m-topbar { display: none; }
+
+.nav-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 30, 0.45);
+  z-index: 310;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS 动态地址栏：用 dvh 让 100% 高度贴合可视区，老浏览器回落到 100% */
+@supports (height: 100dvh) {
+  html, body, #app { height: 100dvh; }
+}
+
+@media (max-width: 768px) {
+  html { -webkit-text-size-adjust: 100%; }
+
+  /* ---------- 顶栏 ---------- */
+  .m-topbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    height: calc(48px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 6px 0;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    z-index: 300;
+  }
+  .m-menu,
+  .m-new {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .m-menu:active,
+  .m-new:active { background: #eef0f3; }
+  .m-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- 左栏 → 抽屉 ---------- */
+  .nav-rail,
+  .nav-rail.collapsed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 320;
+    flex: 0 0 auto;
+    width: min(86vw, 320px);
+    padding: calc(10px + env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));
+    border-right: 1px solid var(--line);
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    /* 抽屉里滚到底时不要拽着背后的正文一起弹 */
+    overscroll-behavior: contain;
+  }
+  .nav-rail.drawer-open { transform: translateX(0); }
+  .nav-rail.resizing { transition: transform 0.25s ease; }
+
+  /* 抽屉里触摸目标放大，行高按手指尺寸给 */
+  .nav-brand { padding-bottom: 12px; }
+  .nav-search { height: 38px; }
+  .nav-search input { font-size: 16px; } /* 16px 以下 iOS 聚焦会自动放大页面 */
+  .nav-kbd { display: none; }
+  .nav-item { height: 42px; font-size: 14px; }
+  .space-item { height: 38px; font-size: 14px; margin-left: 12px; }
+  .tree-row { height: 38px; font-size: 14px; }
+  .tree-row .actions { display: flex; } /* 触屏没有 hover，操作按钮常驻 */
+  .tree-row .actions button { height: 26px; min-width: 26px; }
+  .nav-collapse { font-size: 15px; padding: 6px 8px; }
+  .nav-user-actions button { height: 32px; font-size: 13px; }
+
+  /* 宽度拖拽、大纲栏在手机上都不需要 */
+  .resize-handle,
+  .outline-col { display: none; }
+
+  /* ---------- 正文 ---------- */
+  .main {
+    padding: 0 12px calc(28px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .doc-head { margin-bottom: 8px; }
+  .crumb {
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .crumb::-webkit-scrollbar { display: none; }
+  .crumb .sep { flex: 0 0 auto; }
+  .crumb-link { max-width: 46vw; flex: 0 0 auto; }
+  .title-input { font-size: 20px; padding-bottom: 8px; }
+  .doc-actions { gap: 6px; }
+  .doc-actions button { height: 32px; }
+
+  /* 编辑区通栏：去掉卡片的边框和圆角，正文占满整屏 */
+  .collab {
+    max-width: none;
+    margin: 0 -12px;
+    border: none;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .collab .bar {
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .collab .bar::-webkit-scrollbar { display: none; }
+  .collab .bar button {
+    flex: 0 0 auto;
+    min-width: 34px;
+    height: 32px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .collab .bar .status,
+  .collab .bar .bar-sep { flex: 0 0 auto; }
+  .collab .bar .slash-tip { display: none; } /* 手机没有键盘，「输入 / 」的提示没意义 */
+  .collab .content { padding: 16px 14px 56px; }
+
+  /* 正文排版：手机上 16px 起步，标题收一档，长内容一律可横向滚动 */
+  .ProseMirror {
+    font-size: 16px;
+    line-height: 1.75;
+    min-height: 50vh;
+    word-wrap: break-word;
+  }
+  .ProseMirror h1 { font-size: 22px; }
+  .ProseMirror h2 { font-size: 19px; }
+  .ProseMirror h3 { font-size: 16.5px; }
+  .ProseMirror blockquote { padding: 8px 12px; }
+  .ProseMirror pre {
+    padding: 12px;
+    font-size: 13px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ProseMirror img,
+  .ProseMirror svg { max-width: 100%; height: auto; }
+  .ProseMirror .tableWrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ProseMirror table { min-width: 100%; }
+
+  .collab-skeleton {
+    max-width: none;
+    margin: 0 -12px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .hint { margin: 48px auto; padding: 0 12px; }
+
+  /* ---------- 斜杠菜单 → 贴底半屏面板 ---------- */
+  .slash-menu {
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: auto !important;
+    max-height: 58vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 400;
+  }
+  .slash-list {
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .slash-item { padding: 10px 8px; } /* 手指点得准 */
+  .slash-foot { display: none; }     /* ↑↓ / Enter 这套快捷键手机上不存在 */
+
+  /* 行内 + 按钮靠 hover 触发，触屏上没有 hover，直接不显示 */
+  .plus-dot { display: none; }
+
+  /* ---------- 弹窗 → 全屏 ---------- */
+  .modal-mask { align-items: stretch; justify-content: stretch; }
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+  }
+  .modal-body { flex: 1; }
+  .modal-foot { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .field input,
+  .invite input,
+  .invite select,
+  .admin-create input { height: 38px; font-size: 16px; }
+
+  /* ---------- 提示条 / 登录页 ---------- */
+  .toast {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    max-width: none;
+    text-align: center;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+  .toast.error + .toast.notice { bottom: calc(74px + env(safe-area-inset-bottom)); }
+
+  .auth { padding: 16px; }
+  .auth-card { padding: 22px 18px 18px; border-radius: 12px; }
+  .auth-form input { height: 40px; font-size: 16px; }
+  .auth-submit { height: 42px; }
+
+  /* 图表放大层：留出边距，避免贴边无法拖动 */
+  .diagram-lightbox { padding: 8px; }
+}
