@@ -425,6 +425,8 @@ body {
   max-width: 100%;
 }
 .mermaid-block .mermaid-svg svg { max-width: 100%; height: auto; }
+.mermaid-block .mermaid-svg.zoomable { cursor: zoom-in; }
+.mermaid-block .mermaid-svg.zoomable:hover { opacity: 0.92; }
 .mermaid-block pre {
   margin: 0;
   text-align: left;
@@ -452,6 +454,8 @@ body {
   max-width: 100%;
 }
 .plantuml-block .plantuml-svg svg { max-width: 100%; height: auto; }
+.plantuml-block .plantuml-svg { cursor: zoom-in; }
+.plantuml-block .plantuml-svg:hover { opacity: 0.92; }
 .plantuml-block .plantuml-loading {
   color: var(--text-secondary, #999);
   font-size: 13px;
@@ -1106,6 +1110,92 @@ body {
   font-size: 12px;
   color: var(--text-2);
   white-space: nowrap;
+}
+
+/* ============ 图表放大预览（lightbox） ============ */
+.diagram-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 18, 24, 0.92);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+.dlb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  color: #e8eaed;
+  flex-shrink: 0;
+}
+.dlb-title {
+  font-size: 13px;
+  margin-right: auto;
+  color: #c7cbd1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dlb-zoom {
+  font-size: 12px;
+  color: #9aa0a6;
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dlb-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8eaed;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  line-height: 1.4;
+}
+.dlb-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.dlb-close { border-color: transparent; background: transparent; }
+.dlb-close:hover { background: rgba(255, 255, 255, 0.14); }
+.dlb-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dlb-viewport:active { cursor: grabbing; }
+.dlb-stage {
+  flex-shrink: 0;
+  transform-origin: center center;
+  will-change: transform;
+}
+.dlb-stage svg {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  display: block;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+.dlb-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #9aa0a6;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 12px;
+  border-radius: 12px;
+  pointer-events: none;
 }
 
 @media (max-width: 900px) {

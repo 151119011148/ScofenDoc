@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
 import plantumlEncoder from 'plantuml-encoder'
+import DiagramLightbox from './DiagramLightbox.vue'
 
 /**
  * PlantUML 渲染视图：把源码 deflate+encode 成 kroki.io URL，请求 SVG 渲染。
@@ -16,6 +17,7 @@ const props = defineProps<NodeViewProps>()
 const svg = ref('')
 const err = ref('')
 const loading = ref(false)
+const lightbox = ref(false)
 
 function encode(src: string): string {
   return plantumlEncoder.encode(src)
@@ -48,6 +50,10 @@ async function draw(src?: string) {
   }
 }
 
+function openLightbox() {
+  if (svg.value) lightbox.value = true
+}
+
 onMounted(() => draw(props.node?.attrs?.code))
 watch(
   () => props.node?.attrs?.code,
@@ -58,10 +64,23 @@ watch(
 <template>
   <NodeViewWrapper class="plantuml-block" :data-code="node?.attrs?.code || ''">
     <div v-if="loading" class="plantuml-loading">渲染中…</div>
-    <div v-else-if="svg" class="plantuml-svg" v-html="svg" />
+    <div
+      v-else-if="svg"
+      class="plantuml-svg"
+      title="点击放大查看"
+      @click="openLightbox"
+      v-html="svg"
+    />
     <pre v-else-if="err" class="plantuml-error"><code>{{ node?.attrs?.code }}
 
 ⚠ {{ err }}</code></pre>
     <pre v-else class="plantuml-source"><code>{{ node?.attrs?.code }}</code></pre>
+
+    <DiagramLightbox
+      v-if="lightbox"
+      :svg="svg"
+      title="PlantUML 图"
+      @close="lightbox = false"
+    />
   </NodeViewWrapper>
 </template>
