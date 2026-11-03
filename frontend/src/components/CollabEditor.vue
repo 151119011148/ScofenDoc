@@ -123,6 +123,18 @@ const slashTo = ref(0)
 const slashQuery = ref('')
 const slashIndex = ref(0)
 
+/* ---------------- 行内 + 按钮 / 块菜单 ---------------- */
+
+/** 菜单来源：'slash' 由 / 触发（选中后替换 /xxx），'plus' 由行内 + 触发（在当前块后插入） */
+const menuSource = ref<'slash' | 'plus'>('slash')
+/** 块菜单要在「当前块之后」插入，记录目标块的起止 pos */
+const plusBlockFrom = ref(0)
+const plusBlockTo = ref(0)
+/** 行内 + 按钮本身的位置（相对正文容器） */
+const plusDotX = ref(0)
+const plusDotY = ref(0)
+const plusDotVisible = ref(false)
+
 /** 无查询时按分组返回；有查询时跨分组扁平搜索（含子菜单项），并按匹配强度排序 */
 const filtered = computed(() => {
   const q = slashQuery.value.trim().toLowerCase()
@@ -156,17 +168,30 @@ const activeChildren = computed(() => {
 function syncSlash() {
   const ed = editor.value
   if (!ed || ed.isDestroyed) return
-  if (!props.editable) return
+  if (!props.editable) {
+    plusDotVisible.value = false
+    return
+  }
   const { state } = ed
-  if (!state.selection.empty) return closeSlash()
+  if (!state.selection.empty) {
+    plusDotVisible.value = false
+    return closeSlash()
+  }
 
   const { $from } = state.selection
   // 代码块里打 / 不应该弹菜单
-  if ($from.parent.type.name === 'codeBlock') return closeSlash()
+  if ($from.parent.type.name === 'codeBlock') {
+    plusDotVisible.value = false
+    return closeSlash()
+  }
 
   const before = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc')
   const matched = /^\/([^\s/]*)$/.exec(before)
-  if (!matched) return closeSlash()
+  if (!matched) {
+    // 非斜杠输入：刷新行内 + 按钮位置
+    if (!slashOpen.value) syncPlusDot()
+    return closeSlash()
+  }
 
   const prevQuery = slashQuery.value
   const query = matched[1]
@@ -185,15 +210,65 @@ function syncSlash() {
   slashFrom.value = $from.pos - before.length
   slashTo.value = $from.pos
   slashQuery.value = query
+  menuSource.value = 'slash'
+  plusDotVisible.value = false
   slashOpen.value = true
 }
 
 function closeSlash() {
-  if (!slashOpen.value) return
   slashOpen.value = false
   slashQuery.value = ''
   slashIndex.value = 0
   submenuOf.value = ''
+}
+
+/** 定位行内 + 按钮：取当前光标所在块的左侧位置 */
+function syncPlusDot() {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed) {
+    plusDotVisible.value = false
+    return
+  }
+  if (!props.editable) {
+    plusDotVisible.value = false
+    return
+  }
+  const { state } = ed
+  const { $from } = state.selection
+  // 根文档或空文档不显示 + 按钮
+  if ($from.depth === 0 && $from.parent.type.name === 'doc' && $from.parent.childCount === 0) {
+    plusDotVisible.value = false
+    return
+  }
+  // 取块起点坐标，+ 按钮放在块左侧
+  const blockStart = $from.before($from.depth)
+  const coords = ed.view.coordsAtPos(blockStart)
+  plusBlockFrom.value = blockStart
+  plusBlockTo.value = $from.after($from.depth)
+  // + 按钮固定在正文内容左侧，与块首行垂直对齐
+  plusDotX.value = coords.left - 26
+  plusDotY.value = coords.top
+  plusDotVisible.value = true
+}
+
+/** 点击行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
+function openPlusMenu() {
+  const ed = editor.value
+  if (!ed) return
+  menuSource.value = 'plus'
+  slashQuery.value = ''
+  submenuOf.value = ''
+  slashIndex.value = 0
+  const coords = ed.view.coordsAtPos(plusBlockFrom.value)
+  const menuW = 280
+  const menuH = 360
+  slashX.value = Math.max(8, Math.min(coords.left, window.innerWidth - menuW - 8))
+  slashY.value =
+    coords.bottom + menuH > window.innerHeight
+      ? Math.max(8, coords.top - menuH - 6)
+      : coords.bottom + 6
+  slashOpen.value = true
+  plusDotVisible.value = false
 }
 
 /** 键盘导航用的扁平项列表：展开子菜单时用子项，否则用过滤结果扁平化 */
@@ -213,11 +288,17 @@ function flatIndexOf(item: SlashItem) {
 function applySlash(item: SlashItem) {
   const ed = editor.value
   if (!ed) return
-  const from = slashFrom.value
-  const to = slashTo.value
+  const source = menuSource.value
+  const from = source === 'plus' ? plusBlockTo.value : slashFrom.value
+  const to = source === 'plus' ? plusBlockTo.value : slashTo.value
   closeSlash()
-  // 先删掉输入的 "/xxx"，再执行块转换
-  item.run(ed.chain().focus().deleteRange({ from, to })).run()
+  if (source === 'plus') {
+    // 行内 + 触发：在当前块之后插入新块
+    item.run(ed.chain().focus().insertContentAt(from, { type: 'paragraph' })).run()
+  } else {
+    // 斜杠触发：先删掉输入的 "/xxx"，再执行块转换
+    item.run(ed.chain().focus().deleteRange({ from, to })).run()
+  }
 }
 
 function openSubmenu(item: SlashItem) {
@@ -334,6 +415,9 @@ onMounted(() => {
   emit('editor-ready', editor.value)
 
   document.addEventListener('scroll', onAnyScroll, true)
+
+  // 编辑器就绪后定位一次行内 + 按钮（协同内容异步加载，延迟一点再定位）
+  setTimeout(() => syncPlusDot(), 300)
 })
 
 onBeforeUnmount(() => {
@@ -352,11 +436,13 @@ watch(
 )
 
 function onAnyScroll(e: Event) {
-  if (!slashOpen.value) return
-  // 菜单自身滚动时不关闭
-  const el = e.target as HTMLElement | null
-  if (el && el.classList && el.classList.contains('slash-list')) return
-  closeSlash()
+  // 滚动时：若斜杠菜单开着则关闭（菜单自身滚动除外），并刷新 + 按钮位置
+  if (slashOpen.value) {
+    const el = e.target as HTMLElement | null
+    if (el && el.classList && el.classList.contains('slash-list')) return
+    closeSlash()
+  }
+  syncPlusDot()
 }
 </script>
 
@@ -480,5 +566,18 @@ function onAnyScroll(e: Event) {
 
       <div class="slash-foot">↑↓ 选择 · Enter 确认 · Esc 关闭</div>
     </div>
+
+    <!-- 行内 + 按钮：光标所在块左侧，hover 出 + 弹出块菜单 -->
+    <button
+      v-if="plusDotVisible && editable"
+      class="plus-dot"
+      :style="{ left: plusDotX + 'px', top: plusDotY + 'px' }"
+      title="插入区块"
+      @mousedown.prevent
+      @mouseenter="openPlusMenu"
+      @click="openPlusMenu"
+    >
+      ＋
+    </button>
   </div>
 </template>

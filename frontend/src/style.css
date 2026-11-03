@@ -722,6 +722,31 @@ body {
   color: var(--text-3);
 }
 
+/* ============ 行内 + 按钮 ============ */
+.plus-dot {
+  position: fixed;
+  z-index: 190;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.35);
+  padding: 0;
+  transition: transform 0.12s ease;
+}
+.plus-dot:hover {
+  transform: scale(1.15);
+  background: #2a60e0;
+}
+
 .collab-skeleton {
   max-width: 820px;
   margin: 0 auto;
