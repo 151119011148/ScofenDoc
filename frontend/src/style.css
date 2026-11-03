@@ -1849,7 +1849,11 @@ body {
   .nav-item { height: 42px; font-size: 14px; }
   .space-item { height: 38px; font-size: 14px; margin-left: 12px; }
   .tree-row { height: 38px; font-size: 14px; }
-  .tree-row .actions { display: flex; } /* 触屏没有 hover，操作按钮常驻 */
+  /* 触屏没有 hover：操作按钮只在当前行/选中行露出。
+     常驻会把标题挤成「1-章…」，320px 宽的抽屉里更明显。 */
+  .tree-row .actions { display: none; }
+  .tree-row.active .actions,
+  .tree-row.selected .actions { display: flex; }
   .tree-row .actions button { height: 26px; min-width: 26px; }
   .nav-collapse { font-size: 15px; padding: 6px 8px; }
   .nav-user-actions button { height: 32px; font-size: 13px; }
