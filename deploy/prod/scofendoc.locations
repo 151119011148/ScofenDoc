@@ -75,3 +75,16 @@ location /scofendoc/collab/ {
     proxy_send_timeout    3600s;
     proxy_read_timeout    3600s;
 }
+
+# ----------------------------------------------------------------------------
+# 旧路径兼容：/lightdoc/ → /scofendoc/
+# 产品更名后保留旧地址，避免历史书签/收藏夹 404。
+# WebSocket 端点不在此重定向（客户端不跟随 301），新版本前端已改用新地址。
+# ----------------------------------------------------------------------------
+location = /lightdoc {
+    return 301 /scofendoc/;
+}
+
+location /lightdoc/ {
+    rewrite ^/lightdoc/(.*)$ /scofendoc/$1 permanent;
+}
