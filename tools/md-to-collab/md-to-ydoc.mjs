@@ -28,6 +28,7 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
+import { MermaidBlock } from './mermaid-block.mjs'
 import { generateJSON } from '@tiptap/html'
 import * as Y from 'yjs'
 import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from 'y-prosemirror'
@@ -43,6 +44,7 @@ function buildExtensions() {
     TableRow,
     TableHeader,
     TableCell,
+    MermaidBlock,
   ]
 }
 

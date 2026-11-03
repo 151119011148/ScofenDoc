@@ -11,6 +11,8 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
+import MermaidBlock from '../extensions/MermaidBlock'
+import HeadingFold from '../extensions/HeadingFold'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { COLLAB_URL } from '../config'
@@ -38,6 +40,11 @@ const props = withDefaults(
 
 const editor = ref<Editor>()
 let provider: HocuspocusProvider | null = null
+
+const emit = defineEmits<{
+  /** 编辑器实例就绪后上报，供大纲/折叠等外部面板使用 */
+  (e: 'editor-ready', editor: Editor): void
+}>()
 const connected = ref(false)
 const peers = ref(0)
 const authError = ref('')
@@ -65,6 +72,7 @@ const ALL_ITEMS: SlashItem[] = [
   { key: 'code', label: '代码块', hint: '等宽字体代码', icon: '</>', keywords: 'daima code codeblock', run: (c) => c.toggleCodeBlock() },
   { key: 'table', label: '表格', hint: '3 行 3 列，可增删行列', icon: '▦', keywords: 'biaoge table grid liebiao', run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
   { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
+  { key: 'mermaid', label: 'Mermaid 图', hint: 'flowchart / sequence 流程图', icon: '🖼', keywords: 'mermaid liucheng tu flowchart sequence graph 图', run: (c) => c.insertContent({ type: 'mermaid', attrs: { code: 'graph TD\n  A[开始] --> B[结束]' } }) },
 ]
 
 /* ---------------- 斜杠菜单状态 ---------------- */
@@ -190,6 +198,8 @@ onMounted(() => {
       TableRow,
       TableHeader,
       TableCell,
+      MermaidBlock,
+      HeadingFold,
       Collaboration.configure({ document: ydoc }),
       CollaborationCursor.configure({
         provider,
@@ -225,6 +235,8 @@ onMounted(() => {
     onSelectionUpdate: syncSlash,
     onBlur: closeSlash,
   })
+
+  emit('editor-ready', editor.value)
 
   document.addEventListener('scroll', onAnyScroll, true)
 })

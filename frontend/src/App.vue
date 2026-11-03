@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import CollabEditor from './components/CollabEditor.vue'
 import DocTree from './components/DocTree.vue'
+import OutlinePanel from './components/OutlinePanel.vue'
 import LoginView from './components/LoginView.vue'
 import AdminUsersModal from './components/AdminUsersModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
@@ -45,6 +46,23 @@ const showCreateSpace = ref(false)
 const showMembers = ref(false)
 const showChangePwd = ref(false)
 const showAdminUsers = ref(false)
+
+/* 大纲面板：需要拿到正文编辑器实例与滚动容器（.main），标题变化时重扫 */
+const mainScroller = ref<HTMLElement | null>(null)
+const outlineEditor = ref<{ view?: { dom?: HTMLElement } } | null>(null)
+const outlineRefresh = ref(0)
+
+function onEditorReady(ed: unknown) {
+  outlineEditor.value = ed as { view?: { dom?: HTMLElement } } | null
+  // 正文是 Yjs 协同、Tiptap 渲染，Vue 无法感知其标题变化；挂一个轻量 observer
+  const dom = (ed as { view?: { dom?: HTMLElement } } | null)?.view?.dom
+  if (dom) {
+    const mo = new MutationObserver(() => {
+      outlineRefresh.value++
+    })
+    mo.observe(dom, { childList: true, subtree: true, characterData: true })
+  }
+}
 
 const currentDoc = computed(() => docs.value.find((d) => d.id === currentDocId.value) ?? null)
 const currentSpace = computed(() => workspaces.value.find((w) => w.id === currentSpaceId.value) ?? null)
@@ -380,7 +398,7 @@ boot()
         </div>
       </aside>
 
-      <main class="main">
+      <main ref="mainScroller" class="main">
         <div v-if="loading" class="hint">加载中…</div>
 
         <template v-else-if="currentDoc">
@@ -426,8 +444,16 @@ boot()
             :user-name="session.user.displayName"
             :user-color="session.user.color"
             :editable="canWrite"
+            @editor-ready="onEditorReady"
           />
         </template>
+
+        <OutlinePanel
+          v-if="currentDoc"
+          :scroller="mainScroller"
+          :editor="outlineEditor"
+          :refresh="outlineRefresh"
+        />
 
         <div v-else class="hint">
           左侧选择一篇文档，或点「＋」新建。<br />
