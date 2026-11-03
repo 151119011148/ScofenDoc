@@ -106,6 +106,8 @@ install -m 644 /opt/scofendoc/deploy/scofendoc-collab.service /etc/systemd/syste
 install -m 644 /opt/scofendoc/deploy/scofendoc.locations /etc/nginx/conf.d/scofendoc.locations
 mkdir -p /opt/scofendoc/collab/data
 systemctl daemon-reload
+# enable 后才能扛住服务器重启，否则重启一次站点就再也起不来
+systemctl enable scofendoc-backend scofendoc-collab >/dev/null 2>&1 || true
 systemctl restart scofendoc-collab scofendoc-backend
 nginx -t
 systemctl reload nginx
