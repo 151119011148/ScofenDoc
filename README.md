@@ -1,8 +1,8 @@
-# 轻量协同文档（light-doc）
+# scofenDoc · 轻量协同文档
 
 类飞书文档的**轻量自托管**实现（Demo 阶段）。前端 Vue3 + Tiptap + Yjs，实时协同走 Node(Hocuspocus)，业务后端 Java(Spring Boot) + JPA + MySQL。
 
-**线上地址：http://47.117.110.143/lightdoc/**
+**线上地址：http://47.117.110.143/scofendoc/**
 
 > 实例当前是「0 账号」状态：**第一个打开并注册的人就是管理员**，并接管已有的「我的空间 / 团队空间」。
 > 注册完成后入口自动关闭，后续成员由管理员在「账号管理」里创建，建号后再按用户名邀请进团队空间。
@@ -34,7 +34,7 @@
 
 ### 注册策略
 
-`lightdoc.auth.registration-mode`（环境变量 `REGISTRATION_MODE`）控制：
+`scofendoc.auth.registration-mode`（环境变量 `REGISTRATION_MODE`）控制：
 
 | 值 | 行为 |
 |---|---|
@@ -68,8 +68,8 @@
 后端与 Node 协同服务共用同一个 `JWT_SECRET`，两边都对它做一次 SHA-256 得到 HS256 密钥。
 **任意长度的字符串都可以，但两端必须完全相同**，否则协同连接会全部被判为签名无效。
 
-- 生产由 `deploy/prod/deploy.sh` 的 `ensure_env` 首次生成后写入 `/opt/lightdoc/app/jwt.secret`（600 权限），
-  再同步写入 `/opt/lightdoc/app/backend.env` 与 `/opt/lightdoc/collab/collab.env`，**不会每次发布重生成**。
+- 生产由 `deploy/prod/deploy.sh` 的 `ensure_env` 首次生成后写入 `/opt/scofendoc/app/jwt.secret`（600 权限），
+  再同步写入 `/opt/scofendoc/app/backend.env` 与 `/opt/scofendoc/collab/collab.env`，**不会每次发布重生成**。
 - 主动更换密钥的后果：所有人被强制重新登录、已签发的协同 token 立即失效（客户端刷新即可恢复）。
   操作方式：删掉 `jwt.secret` 后重跑一次发布脚本，并重启两个服务。
 
@@ -167,7 +167,7 @@ cd frontend
 npm install
 npm run dev        # http://localhost:5173
 ```
-> 开发态前端默认请求 `localhost:8080/lightdoc/api`，若端口不同请设 `VITE_API_BASE` / `VITE_COLLAB_URL`。
+> 开发态前端默认请求 `localhost:8080/scofendoc/api`，若端口不同请设 `VITE_API_BASE` / `VITE_COLLAB_URL`。
 
 ### 4) 验证
 - 打开 http://localhost:5173，**先注册**（首个账号会接管已有空间）
@@ -178,21 +178,21 @@ npm run dev        # http://localhost:5173
 
 ## 生产环境（已部署）
 
-**访问地址：http://47.117.110.143/lightdoc/**
+**访问地址：http://47.117.110.143/scofendoc/**
 
 服务器实际情况：阿里云 Linux 3 / 2C1.8G，已有 MySQL 8、Redis、Nginx 和另一个 Java 服务（占 8080）。
 因此**没有走 Docker Compose**（服务器未装 Docker，1.8G 内存也不适合再叠一层），改为 systemd 直跑 + Nginx 路径挂载：
 
 | 组件 | 位置 | 运行方式 | 端口 |
 |---|---|---|---|
-| 前端静态 | `/var/www/lightdoc` | Nginx 直接托管，挂在 `/lightdoc/` | 80 |
-| Java 后端 | `/opt/lightdoc/app/light-doc-backend.jar` | `lightdoc-backend.service`（JVM 上限 320M） | 127.0.0.1:8081 |
-| 协同服务 | `/opt/lightdoc/collab` | `lightdoc-collab.service`（Node 20） | 127.0.0.1:1234 |
-| 文档持久化 | `/opt/lightdoc/collab/data/*.bin` | ydoc 全量态落盘 | — |
-| 数据库 | MySQL 8 `light_doc`（账号 `lightdoc`） | 复用服务器现有 MySQL | 3306 |
+| 前端静态 | `/var/www/scofendoc` | Nginx 直接托管，挂在 `/scofendoc/` | 80 |
+| Java 后端 | `/opt/scofendoc/app/scofen-doc-backend.jar` | `scofendoc-backend.service`（JVM 上限 320M） | 127.0.0.1:8081 |
+| 协同服务 | `/opt/scofendoc/collab` | `scofendoc-collab.service`（Node 20） | 127.0.0.1:1234 |
+| 文档持久化 | `/opt/scofendoc/collab/data/*.bin` | ydoc 全量态落盘 | — |
+| 数据库 | MySQL 8 `scofen_doc`（账号 `scofendoc`） | 复用服务器现有 MySQL | 3306 |
 
 关键设计：**不新增监听端口、不改现有站点根路径**——只在 `emotion-web.conf` 的 server 块里 include 一个
-`/etc/nginx/conf.d/lightdoc.locations`，提供 `/lightdoc/`、`/lightdoc/api/`、`/lightdoc/collab` 三个 location。
+`/etc/nginx/conf.d/scofendoc.locations`，提供 `/scofendoc/`、`/scofendoc/api/`、`/scofendoc/collab` 三个 location。
 所以现有 emotion 站点完全不受影响，也不需要动云服务器安全组。
 
 ### 发布 / 回滚
@@ -204,11 +204,11 @@ npm run dev        # http://localhost:5173
 ./deploy/prod/deploy.sh collab     # 只发协同服务
 ```
 
-脚本做的事：写入/校验 JWT 密钥与数据库环境变量 → 本地构前端（`VITE_BASE=/lightdoc/`）→ rsync 产物 →
+脚本做的事：写入/校验 JWT 密钥与数据库环境变量 → 本地构前端（`VITE_BASE=/scofendoc/`）→ rsync 产物 →
 服务器上 Maven 打包 → 强制覆盖 systemd 单元 → 重启服务 → `nginx -t` 后 reload → 健康检查。
 
 回滚：`git checkout <上一个提交> && ./deploy/prod/deploy.sh`。
-Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-lightdoc-*`，回滚只需还原该文件并删掉 include 行。
+Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-scofendoc-*`，回滚只需还原该文件并删掉 include 行。
 
 ### 数据库迁移（Flyway）
 
@@ -217,7 +217,7 @@ Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-lightdoc-*`，回�
 
 - `V1__baseline.sql`：固化四张表结构（app_user / workspace / workspace_member / doc）。
 - `V2__fix_doc_hierarchy.sql`：修复导入拍平导致的父子关系（X.Y.Z 挂回 X.Y）。
-- `V3__doc_chapter_hierarchy.sql`：按「第一~六章」在导入根（技术栈）下新建一级章，把拍平的编号子文档按章重挂；幂等可重复执行（2026-11-03 已对线上执行，执行前备份在服务器 `/opt/lightdoc/backup/doc_20261103_hierarchy.sql.gz`）。
+- `V3__doc_chapter_hierarchy.sql`：按「第一~六章」在导入根（技术栈）下新建一级章，把拍平的编号子文档按章重挂；幂等可重复执行（2026-11-03 已对线上执行，执行前备份在服务器 `/opt/scofendoc/backup/doc_20261103_hierarchy.sql.gz`）。
 
 线上已有库的接入方式：`spring.flyway.baseline-on-migrate: true` + `baseline-version: 1`，
 后端首次升级启动时会自动把非空 schema baseline 到 V1（跳过 V1 建表），再执行 V1 之后的迁移。
@@ -229,9 +229,9 @@ Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-lightdoc-*`，回�
 ### 运维命令
 
 ```bash
-systemctl status  lightdoc-backend lightdoc-collab
-journalctl -u lightdoc-collab -f          # 协同日志
-tail -f /opt/lightdoc/logs/backend.log    # 后端日志
+systemctl status  scofendoc-backend scofendoc-collab
+journalctl -u scofendoc-collab -f          # 协同日志
+tail -f /opt/scofendoc/logs/backend.log    # 后端日志
 ```
 
 ### 可选：Docker Compose 方式

@@ -2,9 +2,9 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_DATABASE: light_doc
-      MYSQL_USER: lightdoc
-      MYSQL_PASSWORD: lightdoc
+      MYSQL_DATABASE: scofen_doc
+      MYSQL_USER: scofendoc
+      MYSQL_PASSWORD: scofendoc
       MYSQL_ROOT_PASSWORD: root
     ports:
       - "3306:3306"

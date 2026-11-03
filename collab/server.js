@@ -17,7 +17,7 @@ const HOST = process.env.COLLAB_HOST || '127.0.0.1'
 // 与 Java 后端共享的 JWT 密钥。
 // Java 侧对 JWT_SECRET 做一次 SHA-256 得到 HS256 密钥，这里必须用同样方式派生，
 // 否则两边算出的密钥不同，所有协同连接都会被判为签名无效。
-const JWT_SECRET = process.env.JWT_SECRET || 'lightdoc-dev-only-secret-change-me'
+const JWT_SECRET = process.env.JWT_SECRET || 'scofendoc-dev-only-secret-change-me'
 const JWT_KEY = crypto.createHash('sha256').update(JWT_SECRET).digest()
 
 /**

@@ -52,8 +52,8 @@ export interface Session {
 
 /* ---------------- 会话存储 ---------------- */
 
-const TOKEN_KEY = 'lightdoc.token'
-const USER_KEY = 'lightdoc.user'
+const TOKEN_KEY = 'scofendoc.token'
+const USER_KEY = 'scofendoc.user'
 
 export function loadSession(): Session | null {
   const token = localStorage.getItem(TOKEN_KEY)

@@ -1,0 +1,21 @@
+[Unit]
+Description=scofenDoc Collab Server (Hocuspocus/Yjs, ws://127.0.0.1:1234)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/scofendoc/collab
+Environment=NODE_ENV=production
+Environment=COLLAB_PORT=1234
+Environment=COLLAB_HOST=127.0.0.1
+# JWT_SECRET 必须与 Java 后端一致（两边都用 SHA-256 派生 HS256 密钥校验协同 token）
+EnvironmentFile=-/opt/scofendoc/collab/collab.env
+ExecStart=/usr/bin/node /opt/scofendoc/collab/server.js
+Restart=always
+RestartSec=3
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

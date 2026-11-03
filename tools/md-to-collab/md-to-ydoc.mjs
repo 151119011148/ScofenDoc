@@ -3,7 +3,7 @@
  * Markdown → 协同文档（Yjs 二进制）导入器
  * ---------------------------------------------------------------------------
  * 正文在 MySQL 里没有副本：一篇文档的正文就是 Hocuspocus 房间里那份 Yjs 文档，
- * 由 Node 协同服务落盘成 /opt/lightdoc/collab/data/{collabKey}.bin。
+ * 由 Node 协同服务落盘成 /opt/scofendoc/collab/data/{collabKey}.bin。
  * 所以「导入一篇 Markdown」= 构造出与前端编辑器同构的 Yjs 初始状态，再投放到对应房间。
  *
  * 链路：

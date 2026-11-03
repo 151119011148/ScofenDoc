@@ -15,10 +15,10 @@ const browser = await puppeteer.launch({
   defaultViewport: { width: 1440, height: 900 },
 })
 const page = await browser.newPage()
-await page.goto('http://47.117.110.143/lightdoc/', { waitUntil: 'networkidle2' })
+await page.goto('http://47.117.110.143/scofendoc/', { waitUntil: 'networkidle2' })
 await page.evaluate((t) => {
-  localStorage.setItem('lightdoc.token', t)
-  localStorage.setItem('lightdoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
+  localStorage.setItem('scofendoc.token', t)
+  localStorage.setItem('scofendoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
 }, token)
 await page.reload({ waitUntil: 'networkidle2' })
 await new Promise((r) => setTimeout(r, 1200))

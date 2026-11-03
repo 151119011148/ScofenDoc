@@ -7,7 +7,7 @@
 #   ./tools/publish-md.sh <a.md> "<文档标题>" --space 2        # 发到某个空间（默认 1 = 我的空间）
 #
 # 为什么需要脚本：正文不在 MySQL，而是 Yjs 文档，由协同服务落盘成
-# /opt/lightdoc/collab/data/{collabKey}.bin。所以发布 = 造出与前端同构的
+# /opt/scofendoc/collab/data/{collabKey}.bin。所以发布 = 造出与前端同构的
 # Yjs 初始状态 + 建一条 doc 记录 + 把 bin 放进房间。
 #
 # 顺序提醒：**先发前端，再投数据**。旧版编辑器不认识新节点（比如表格），
@@ -16,10 +16,10 @@
 set -euo pipefail
 
 HOST="${HOST:-root@47.117.110.143}"
-DB="${DB:-light_doc}"
-DB_USER="${DB_USER:-lightdoc}"
-DB_PASS="${DB_PASS:-LightDoc@2026}"
-DATA_DIR="${DATA_DIR:-/opt/lightdoc/collab/data}"
+DB="${DB:-scofen_doc}"
+DB_USER="${DB_USER:-scofendoc}"
+DB_PASS="${DB_PASS:-ScofenDoc@2026}"
+DATA_DIR="${DATA_DIR:-/opt/scofendoc/collab/data}"
 
 MD_FILE="${1:-}"
 TITLE="${2:-}"
@@ -46,7 +46,7 @@ fi
 [ -f "$MD_FILE" ] || { echo "文件不存在：$MD_FILE" >&2; exit 1; }
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP_BIN="$(mktemp -t lightdoc-import).bin"
+TMP_BIN="$(mktemp -t scofendoc-import).bin"
 
 sql() {
   ssh -o BatchMode=yes "$HOST" "mysql -u$DB_USER -p'$DB_PASS' $DB -N -B -e \"$1\"" 2>/dev/null
@@ -102,10 +102,10 @@ scp -q "$TMP_BIN" "$HOST:$DATA_DIR/$COLLAB_KEY.bin"
 
 if [ "$RESTART" = "1" ]; then
   echo "==> 重启协同服务（让房间以新文件为准）"
-  ssh -o BatchMode=yes "$HOST" 'systemctl restart lightdoc-collab'
+  ssh -o BatchMode=yes "$HOST" 'systemctl restart scofendoc-collab'
   sleep 2
-  ssh -o BatchMode=yes "$HOST" 'systemctl is-active lightdoc-collab' >/dev/null || {
-    echo "协同服务未起来，请查 journalctl -u lightdoc-collab" >&2; exit 1; }
+  ssh -o BatchMode=yes "$HOST" 'systemctl is-active scofendoc-collab' >/dev/null || {
+    echo "协同服务未起来，请查 journalctl -u scofendoc-collab" >&2; exit 1; }
 fi
 
 echo "==> 4/4 回读校验（确认线上文件可解析且结构完整）"
@@ -114,4 +114,4 @@ node "$PROJECT_ROOT/tools/md-to-collab/read-ydoc.mjs" "$TMP_BIN"
 rm -f "$TMP_BIN"
 
 echo
-echo "完成：http://47.117.110.143/lightdoc/   文档 id=${DOC_ID}  《${TITLE}》"
+echo "完成：http://47.117.110.143/scofendoc/   文档 id=${DOC_ID}  《${TITLE}》"

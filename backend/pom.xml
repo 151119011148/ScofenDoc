@@ -11,10 +11,10 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.lightdoc</groupId>
-  <artifactId>light-doc-backend</artifactId>
+  <groupId>com.scofendoc</groupId>
+  <artifactId>scofen-doc-backend</artifactId>
   <version>0.1.0</version>
-  <name>light-doc-backend</name>
+  <name>scofen-doc-backend</name>
 
   <properties>
     <java.version>17</java.version>

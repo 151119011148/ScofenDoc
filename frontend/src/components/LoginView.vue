@@ -73,7 +73,7 @@ async function submit() {
     <div class="auth-card">
       <div class="auth-brand">
         <span class="auth-logo">📄</span>
-        <h1>轻量协同文档</h1>
+        <h1>scofenDoc</h1>
         <p class="auth-sub">自托管的多人实时协作文档</p>
       </div>
 

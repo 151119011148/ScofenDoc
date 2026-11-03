@@ -32,7 +32,7 @@ fi
 [ -d "$DIR" ] || { echo "目录不存在：$DIR" >&2; exit 1; }
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG="$(mktemp -t lightdoc-publish)"
+LOG="$(mktemp -t scofendoc-publish)"
 : > "$LOG"   # 每篇追加写，失败时可回溯是第几篇
 
 # macOS 自带 bash 3.2 没有 mapfile，这里用 while read 收集（顺序由 sort 保证）

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 一键发布「轻量协同文档」到生产环境
+# 一键发布「scofenDoc」到生产环境
 #
 # 用法（在本机项目根目录执行）：
 #   ./deploy/prod/deploy.sh             # 全量发布
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 HOST="${HOST:-root@47.117.110.143}"
-PUBLIC_BASE="${PUBLIC_BASE:-/lightdoc/}"
+PUBLIC_BASE="${PUBLIC_BASE:-/scofendoc/}"
 SSH="ssh -o BatchMode=yes"
 TARGET="${1:-all}"
 
@@ -26,31 +26,31 @@ deploy_frontend() {
   log "构建前端（base=${PUBLIC_BASE}）"
   ( cd frontend && VITE_BASE="${PUBLIC_BASE}" npm run build )
 
-  log "上传静态产物到 /var/www/lightdoc"
-  rsync -az --delete -e "$SSH" frontend/dist/ "$HOST:/var/www/lightdoc/"
+  log "上传静态产物到 /var/www/scofendoc"
+  rsync -az --delete -e "$SSH" frontend/dist/ "$HOST:/var/www/scofendoc/"
 }
 
 deploy_collab() {
   log "上传协同服务源码"
-  rsync -az --exclude node_modules --exclude data -e "$SSH" collab/ "$HOST:/opt/lightdoc/collab/"
+  rsync -az --exclude node_modules --exclude data -e "$SSH" collab/ "$HOST:/opt/scofendoc/collab/"
 
   log "安装协同服务依赖"
-  $SSH "$HOST" 'cd /opt/lightdoc/collab && npm install --omit=dev --registry=https://registry.npmmirror.com 2>&1 | tail -3'
+  $SSH "$HOST" 'cd /opt/scofendoc/collab && npm install --omit=dev --registry=https://registry.npmmirror.com 2>&1 | tail -3'
 }
 
 deploy_backend() {
   log "上传后端源码"
-  rsync -az --exclude target -e "$SSH" backend/ "$HOST:/opt/lightdoc/src-backend/"
+  rsync -az --exclude target -e "$SSH" backend/ "$HOST:/opt/scofendoc/src-backend/"
 
   log "服务器上构建 JAR（跳过测试）"
   $SSH "$HOST" 'bash -s' <<'EOS'
 set -e
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.20.0.8-1.1.0.2.1.al8.x86_64
 export PATH=$JAVA_HOME/bin:/opt/maven/bin:$PATH
-cd /opt/lightdoc/src-backend
+cd /opt/scofendoc/src-backend
 MAVEN_OPTS="-Xmx400m -XX:MaxMetaspaceSize=192m" mvn -q -B -DskipTests clean package
-cp target/light-doc-backend-0.1.0.jar /opt/lightdoc/app/light-doc-backend.jar
-ls -lh /opt/lightdoc/app/light-doc-backend.jar
+cp target/scofen-doc-backend-0.1.0.jar /opt/scofendoc/app/scofen-doc-backend.jar
+ls -lh /opt/scofendoc/app/scofen-doc-backend.jar
 EOS
 }
 
@@ -60,9 +60,9 @@ ensure_env() {
   log "校验运行时环境（JWT 密钥 / 数据库配置）"
   $SSH "$HOST" 'bash -s' <<'EOS'
 set -e
-mkdir -p /opt/lightdoc/app /opt/lightdoc/collab /opt/lightdoc/logs
+mkdir -p /opt/scofendoc/app /opt/scofendoc/collab /opt/scofendoc/logs
 
-SECRET_FILE=/opt/lightdoc/app/jwt.secret
+SECRET_FILE=/opt/scofendoc/app/jwt.secret
 if [ ! -s "$SECRET_FILE" ]; then
   # 只保留字母数字，避免 systemd EnvironmentFile 对特殊字符的解析歧义
   head -c 48 /dev/urandom | base64 | tr -d '\n=+/' > "$SECRET_FILE"
@@ -73,22 +73,22 @@ else
 fi
 SECRET=$(cat "$SECRET_FILE")
 
-BE=/opt/lightdoc/app/backend.env
+BE=/opt/scofendoc/app/backend.env
 touch "$BE"
 grep -q '^JAVA_HOME='   "$BE" || echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.20.0.8-1.1.0.2.1.al8.x86_64" >> "$BE"
 grep -q '^SERVER_PORT=' "$BE" || echo "SERVER_PORT=8081" >> "$BE"
-grep -q '^DB_URL='      "$BE" || echo "DB_URL=jdbc:mysql://127.0.0.1:3306/light_doc?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true" >> "$BE"
-grep -q '^DB_USER='     "$BE" || echo "DB_USER=lightdoc" >> "$BE"
-grep -q '^DB_PASSWORD=' "$BE" || echo "DB_PASSWORD=LightDoc@2026" >> "$BE"
+grep -q '^DB_URL='      "$BE" || echo "DB_URL=jdbc:mysql://127.0.0.1:3306/scofen_doc?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true" >> "$BE"
+grep -q '^DB_USER='     "$BE" || echo "DB_USER=scofendoc" >> "$BE"
+grep -q '^DB_PASSWORD=' "$BE" || echo "DB_PASSWORD=ScofenDoc@2026" >> "$BE"
 grep -q '^DB_POOL_SIZE=' "$BE" || echo "DB_POOL_SIZE=5" >> "$BE"
-grep -q '^LOG_FILE='    "$BE" || echo "LOG_FILE=/opt/lightdoc/logs/backend.log" >> "$BE"
+grep -q '^LOG_FILE='    "$BE" || echo "LOG_FILE=/opt/scofendoc/logs/backend.log" >> "$BE"
 # 密钥每次都按密钥文件重写，确保后端与协同服务用的是同一个
 sed -i '/^JWT_SECRET=/d' "$BE"
 echo "JWT_SECRET=$SECRET" >> "$BE"
 chmod 600 "$BE"
 
-printf 'JWT_SECRET=%s\n' "$SECRET" > /opt/lightdoc/collab/collab.env
-chmod 600 /opt/lightdoc/collab/collab.env
+printf 'JWT_SECRET=%s\n' "$SECRET" > /opt/scofendoc/collab/collab.env
+chmod 600 /opt/scofendoc/collab/collab.env
 echo "环境变量就绪"
 EOS
 }
@@ -97,16 +97,16 @@ install_units_and_restart() {
   log "安装 systemd 单元与 Nginx 片段"  # -I（--ignore-times）：配置文件必须每次强制覆盖。
   # 默认 rsync 只比 size+mtime，曾出现过改了单元文件却没同步过去、
   # 导致协同服务拿不到 JWT_SECRET 的事故。
-  rsync -azI -e "$SSH" deploy/prod/lightdoc-backend.service deploy/prod/lightdoc-collab.service deploy/prod/lightdoc.locations "$HOST:/opt/lightdoc/deploy/"
+  rsync -azI -e "$SSH" deploy/prod/scofendoc-backend.service deploy/prod/scofendoc-collab.service deploy/prod/scofendoc.locations "$HOST:/opt/scofendoc/deploy/"
 
   $SSH "$HOST" 'bash -s' <<'EOS'
 set -e
-install -m 644 /opt/lightdoc/deploy/lightdoc-backend.service /etc/systemd/system/
-install -m 644 /opt/lightdoc/deploy/lightdoc-collab.service /etc/systemd/system/
-install -m 644 /opt/lightdoc/deploy/lightdoc.locations /etc/nginx/conf.d/lightdoc.locations
-mkdir -p /opt/lightdoc/collab/data
+install -m 644 /opt/scofendoc/deploy/scofendoc-backend.service /etc/systemd/system/
+install -m 644 /opt/scofendoc/deploy/scofendoc-collab.service /etc/systemd/system/
+install -m 644 /opt/scofendoc/deploy/scofendoc.locations /etc/nginx/conf.d/scofendoc.locations
+mkdir -p /opt/scofendoc/collab/data
 systemctl daemon-reload
-systemctl restart lightdoc-collab lightdoc-backend
+systemctl restart scofendoc-collab scofendoc-backend
 nginx -t
 systemctl reload nginx
 EOS
@@ -122,11 +122,11 @@ for i in $(seq 1 45); do
   sleep 2
 done
 echo -n "后端 /api/health : "; curl -sS --max-time 8 http://127.0.0.1:8081/api/health; echo
-echo -n "协同端点        : "; curl -sS -o /dev/null -w '%{http_code}\n' --max-time 8 http://127.0.0.1/lightdoc/collab
-echo -n "前端首页        : "; curl -sS -o /dev/null -w '%{http_code}\n' --max-time 8 http://127.0.0.1/lightdoc/
+echo -n "协同端点        : "; curl -sS -o /dev/null -w '%{http_code}\n' --max-time 8 http://127.0.0.1/scofendoc/collab
+echo -n "前端首页        : "; curl -sS -o /dev/null -w '%{http_code}\n' --max-time 8 http://127.0.0.1/scofendoc/
 # 接上 JWT 后这个接口应该返回 401 —— 401 恰恰说明权限已生效
 echo -n "空间接口(应401) : "; curl -sS -o /dev/null -w '%{http_code}\n' --max-time 8 http://127.0.0.1:8081/api/workspaces
-systemctl is-active lightdoc-backend lightdoc-collab nginx | paste -sd' '
+systemctl is-active scofendoc-backend scofendoc-collab nginx | paste -sd' '
 EOS
 }
 

@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 // base 由环境变量控制：
 //   本地开发/预览：不设置 → '/'
-//   生产部署（挂在 /lightdoc/ 前缀下）：VITE_BASE=/lightdoc/ npm run build
+//   生产部署（挂在 /scofendoc/ 前缀下）：VITE_BASE=/scofendoc/ npm run build
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
   plugins: [vue()],

@@ -20,14 +20,14 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e)))
-await page.goto('http://47.117.110.143/lightdoc/', { waitUntil: 'networkidle2' })
+await page.goto('http://47.117.110.143/scofendoc/', { waitUntil: 'networkidle2' })
 await page.evaluate((t) => {
-  localStorage.setItem('lightdoc.token', t)
-  localStorage.setItem('lightdoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
+  localStorage.setItem('scofendoc.token', t)
+  localStorage.setItem('scofendoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
 }, token)
 
 // ?space=2 = 团队空间，App 启动时按 URL 参数选空间
-await page.goto('http://47.117.110.143/lightdoc/?space=2', { waitUntil: 'networkidle2' })
+await page.goto('http://47.117.110.143/scofendoc/?space=2', { waitUntil: 'networkidle2' })
 await page.waitForFunction(() => document.querySelectorAll('.tree .title, .tree .rename-input').length > 0, { timeout: 30000 })
 await new Promise((r) => setTimeout(r, 1200))
 

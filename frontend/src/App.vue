@@ -346,7 +346,7 @@ boot()
 
   <div v-else class="app">
     <header class="topbar">
-      <span class="logo">📄 轻量协同文档</span>
+      <span class="logo">📄 scofenDoc</span>
       <span class="spacer" />
 
       <button v-if="session.user.admin" class="top-action" @click="showAdminUsers = true">

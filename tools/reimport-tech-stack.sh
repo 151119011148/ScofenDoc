@@ -7,19 +7,19 @@
 # 原理：与 publish-md.sh 一致，但把「转换→上传→重启」合并成批处理，
 # 只重启一次协同服务（而不是每篇重启一次）。
 #
-# 前置：已备份线上 bin（见 /tmp/lightdoc-backup-*）
+# 前置：已备份线上 bin（见 /tmp/scofendoc-backup-*）
 # ============================================================================
 set -euo pipefail
 
 HOST="${HOST:-root@47.117.110.143}"
-DB="${DB:-light_doc}"
-DB_USER="${DB_USER:-lightdoc}"
-DB_PASS="${DB_PASS:-LightDoc@2026}"
-DATA_DIR="${DATA_DIR:-/opt/lightdoc/collab/data}"
+DB="${DB:-scofen_doc}"
+DB_USER="${DB_USER:-scofendoc}"
+DB_PASS="${DB_PASS:-ScofenDoc@2026}"
+DATA_DIR="${DATA_DIR:-/opt/scofendoc/collab/data}"
 MD_DIR="${MD_DIR:-../技术栈}"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP_DIR="$(mktemp -d -t lightdoc-reimport)"
+TMP_DIR="$(mktemp -d -t scofendoc-reimport)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 sql() {
@@ -82,10 +82,10 @@ UPLOADED=$(ls "$TMP_DIR"/*.bin | wc -l | tr -d ' ')
 echo "    上传 $UPLOADED 个 bin"
 
 echo "==> 3/3 重启协同服务（让房间以新文件为准）"
-ssh -o BatchMode=yes "$HOST" 'systemctl restart lightdoc-collab'
+ssh -o BatchMode=yes "$HOST" 'systemctl restart scofendoc-collab'
 sleep 2
-ssh -o BatchMode=yes "$HOST" 'systemctl is-active lightdoc-collab' | grep -q active || {
-  echo "协同服务未起来，请查 journalctl -u lightdoc-collab" >&2; exit 1; }
+ssh -o BatchMode=yes "$HOST" 'systemctl is-active scofendoc-collab' | grep -q active || {
+  echo "协同服务未起来，请查 journalctl -u scofendoc-collab" >&2; exit 1; }
 echo "    协同服务已重启并 active"
 
 echo

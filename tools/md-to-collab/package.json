@@ -1,5 +1,5 @@
 {
-  "name": "lightdoc-md-to-collab",
+  "name": "scofendoc-md-to-collab",
   "private": true,
   "type": "module",
   "description": "把 Markdown 转成协同文档（Tiptap/Yjs）的初始状态文件，供导入到 Hocuspocus 房间",

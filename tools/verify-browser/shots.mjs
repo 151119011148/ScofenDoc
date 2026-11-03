@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import fs from 'fs'
 
-const [secret, userId, keyword, outDir = '/tmp/lightdoc-shots'] = process.argv.slice(2)
+const [secret, userId, keyword, outDir = '/tmp/scofendoc-shots'] = process.argv.slice(2)
 const key = crypto.createHash('sha256').update(secret).digest()
 const token = jwt.sign(
   { sub: String(userId), typ: 'auth', pv: 0, uname: 'gaofeng', dn: 'gaofeng', color: '#3370ff' },
@@ -25,10 +25,10 @@ const browser = await puppeteer.launch({
   defaultViewport: { width: 1440, height: 900 },
 })
 const page = await browser.newPage()
-await page.goto('http://47.117.110.143/lightdoc/', { waitUntil: 'networkidle2' })
+await page.goto('http://47.117.110.143/scofendoc/', { waitUntil: 'networkidle2' })
 await page.evaluate((t) => {
-  localStorage.setItem('lightdoc.token', t)
-  localStorage.setItem('lightdoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
+  localStorage.setItem('scofendoc.token', t)
+  localStorage.setItem('scofendoc.user', JSON.stringify({ id: 5, username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
 }, token)
 await page.reload({ waitUntil: 'networkidle2' })
 await new Promise((r) => setTimeout(r, 1200))

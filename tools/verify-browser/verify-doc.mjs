@@ -29,7 +29,7 @@ const token = jwt.sign(
   { algorithm: 'HS256', expiresIn: '20m' },
 )
 
-const BASE = process.env.BASE_URL || 'http://47.117.110.143/lightdoc/'
+const BASE = process.env.BASE_URL || 'http://47.117.110.143/scofendoc/'
 
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -52,8 +52,8 @@ await page.goto(BASE, { waitUntil: 'networkidle2' })
 // 先落地登录态，再刷新让应用以已登录身份启动
 await page.evaluate(
   (t, u) => {
-    localStorage.setItem('lightdoc.token', t)
-    localStorage.setItem('lightdoc.user', JSON.stringify({ id: Number(u), username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
+    localStorage.setItem('scofendoc.token', t)
+    localStorage.setItem('scofendoc.user', JSON.stringify({ id: Number(u), username: 'gaofeng', displayName: 'gaofeng', color: '#3370ff', admin: true }))
   },
   token,
   userId,
