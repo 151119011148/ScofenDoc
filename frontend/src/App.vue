@@ -429,7 +429,6 @@ boot()
                 👥 成员 {{ currentSpace?.memberCount ?? 0 }}
               </button>
               <button v-if="canWrite" @click="createDoc(currentDoc.id)">＋ 子文档</button>
-              <button v-if="canWrite" class="danger" @click="removeDoc(currentDoc)">删除</button>
             </div>
           </div>
 

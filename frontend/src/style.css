@@ -289,7 +289,6 @@ body {
   cursor: pointer;
 }
 .doc-actions button:hover { color: var(--brand); border-color: var(--brand); }
-.doc-actions button.danger:hover { color: var(--danger); border-color: var(--danger); }
 
 .hint {
   max-width: 520px;
@@ -437,6 +436,38 @@ body {
 }
 .mermaid-block pre code { background: none; padding: 0; color: inherit; }
 .mermaid-block .mermaid-error pre { background: #fff1f0; color: var(--danger); }
+
+/* ============ PlantUML 图块 ============ */
+.plantuml-block {
+  margin: 18px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 10px;
+  background: #fcfdfe;
+  overflow-x: auto;
+  text-align: center;
+}
+.plantuml-block .plantuml-svg {
+  display: inline-block;
+  max-width: 100%;
+}
+.plantuml-block .plantuml-svg svg { max-width: 100%; height: auto; }
+.plantuml-block .plantuml-loading {
+  color: var(--text-secondary, #999);
+  font-size: 13px;
+  padding: 8px 0;
+}
+.plantuml-block pre {
+  margin: 0;
+  text-align: left;
+  background: #f6f8fa;
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.plantuml-block pre code { background: none; padding: 0; color: inherit; }
+.plantuml-block .plantuml-error pre { background: #fff1f0; color: var(--danger); }
 
 /* ============ 标题折叠 ============ */
 .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { position: relative; }

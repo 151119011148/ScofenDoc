@@ -12,6 +12,7 @@ import TableCell from '@tiptap/extension-table-cell'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import MermaidBlock from '../extensions/MermaidBlock'
+import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import HeadingFold from '../extensions/HeadingFold'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
@@ -73,6 +74,7 @@ const ALL_ITEMS: SlashItem[] = [
   { key: 'table', label: '表格', hint: '3 行 3 列，可增删行列', icon: '▦', keywords: 'biaoge table grid liebiao', run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
   { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
   { key: 'mermaid', label: 'Mermaid 图', hint: 'flowchart / sequence 流程图', icon: '🖼', keywords: 'mermaid liucheng tu flowchart sequence graph 图', run: (c) => c.insertContent({ type: 'mermaid', attrs: { code: 'graph TD\n  A[开始] --> B[结束]' } }) },
+  { key: 'plantuml', label: 'PlantUML 图', hint: '时序图/类图/用例图', icon: '🌱', keywords: 'plantuml puml uml shixu tu sequence class usecase 图', run: (c) => c.insertContent({ type: 'plantuml', attrs: { code: '@startuml\nAlice -> Bob: Hello\n@enduml' } }) },
 ]
 
 /* ---------------- 斜杠菜单状态 ---------------- */
@@ -199,6 +201,7 @@ onMounted(() => {
       TableHeader,
       TableCell,
       MermaidBlock,
+      PlantUMLBlock,
       HeadingFold,
       Collaboration.configure({ document: ydoc }),
       CollaborationCursor.configure({
