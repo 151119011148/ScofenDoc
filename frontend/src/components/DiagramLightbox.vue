@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
  * 图表放大预览层（全屏 lightbox）。
@@ -7,8 +7,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
  * Mermaid / PlantUML 图在正文里受容器宽度限制，很多大图缩得很小看不清。
  * 点击图块后在这里放大查看，支持滚轮缩放、拖拽平移、双击复位、ESC 关闭。
  *
- * 交互实现走原生 DOM（不依赖库）：缩放用 scale，平移用 translate，
- * 组合成 transform；滚轮缩放以鼠标位置为锚点，体验接近看图软件。
+ * 关键坑：mermaid 输出的 SVG 带 width="100%"（useMaxWidth），在未定宽的
+ * flex 容器里会塌缩成 0（宽度 100% 相对一个宽度由内容决定的容器 → 循环依赖）。
+ * 所以这里从 viewBox 读回原始宽高，给 SVG 一个明确的像素尺寸再渲染。
  */
 const props = defineProps<{
   svg: string
@@ -31,6 +32,35 @@ let lastY = 0
 
 const MIN_SCALE = 0.1
 const MAX_SCALE = 8
+
+// 从 SVG 字符串解析出原始宽高（优先 viewBox，其次 width/height 属性）
+function parseSvgSize(svgStr: string): { w: number; h: number } {
+  const el = document.createElement('div')
+  el.innerHTML = svgStr
+  const svgEl = el.querySelector('svg')
+  if (!svgEl) return { w: 800, h: 600 }
+
+  const vb = svgEl.getAttribute('viewBox')
+  if (vb) {
+    const parts = vb.trim().split(/[\s,]+/).map(Number)
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { w: parts[2], h: parts[3] }
+    }
+  }
+
+  const parseLen = (v: string | null) => {
+    if (!v) return 0
+    const n = parseFloat(v)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+  const w = parseLen(svgEl.getAttribute('width'))
+  const h = parseLen(svgEl.getAttribute('height'))
+  if (w > 0 && h > 0) return { w, h }
+
+  return { w: 800, h: 600 }
+}
+
+const svgSize = ref({ w: 800, h: 600 })
 
 function clampScale(v: number) {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, v))
@@ -56,7 +86,6 @@ function onWheel(e: WheelEvent) {
 }
 
 function onPointerDown(e: PointerEvent) {
-  // 只响应左键 / 单指
   if (e.button !== 0) return
   dragging = true
   lastX = e.clientX
@@ -94,10 +123,36 @@ function onKeydown(e: KeyboardEvent) {
   else if (e.key === '0') reset()
 }
 
+// 打开时：解析尺寸，并按「初始缩放」适配视口（大图缩到能完整看到）
+function initSize() {
+  svgSize.value = parseSvgSize(props.svg)
+  fitToViewport()
+}
+
+function fitToViewport() {
+  const vp = viewportRef.value
+  if (!vp) return
+  const vw = vp.clientWidth
+  const vh = vp.clientHeight
+  if (vw <= 0 || vh <= 0) return
+  const { w, h } = svgSize.value
+  // 留出边距，避免贴边
+  const fit = Math.min(vw / w, vh / h, 1)
+  scale.value = clampScale(fit)
+  tx.value = 0
+  ty.value = 0
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   document.body.style.overflow = 'hidden'
+  initSize()
 })
+
+watch(
+  () => props.svg,
+  () => initSize(),
+)
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -116,6 +171,7 @@ const zoomPct = () => Math.round(scale.value * 100)
         <span class="dlb-zoom">{{ zoomPct() }}%</span>
         <button class="dlb-btn" title="缩小" @click="zoomBy(1 / 1.2)">−</button>
         <button class="dlb-btn" title="放大" @click="zoomBy(1.2)">＋</button>
+        <button class="dlb-btn" title="适合窗口" @click="fitToViewport">适应</button>
         <button class="dlb-btn" title="复位" @click="reset">1:1</button>
         <button class="dlb-btn dlb-close" title="关闭 (Esc)" @click="emit('close')">✕</button>
       </div>
@@ -133,7 +189,11 @@ const zoomPct = () => Math.round(scale.value * 100)
         <div
           ref="stageRef"
           class="dlb-stage"
-          :style="{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }"
+          :style="{
+            width: svgSize.w + 'px',
+            height: svgSize.h + 'px',
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+          }"
           v-html="svg"
         />
       </div>
