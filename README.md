@@ -24,7 +24,7 @@
 | 文档操作 | 新建（根/子）、行内重命名、双击重命名、删除（级联子树软删） |
 | 块编辑器 | 输入 `/` 弹出块菜单（标题/列表/待办/引用/代码块/**表格**/分割线），支持方向键、拼音搜索 |
 | 表格 | 单元格可编辑、表头行、光标在表格内时出现「+行/+列/-行/-列/删表」 |
-| Markdown 导入 | `tools/publish-md.sh` 把 md 直接发布成协同文档（见「导入已有 Markdown 文档」） |
+| Markdown 导入 | `tools/publish-md.sh` 单篇、`publish-dir.sh` 整目录批量，支持挂父节点（见「导入已有 Markdown 文档」） |
 | 多文档协同 | 每篇文档独立 `collabKey`（Yjs 房间），切文档自动换房间，内容互不串档 |
 | 实时协同 | 多人同编、彩色光标（显示真实昵称+专属颜色）、在线人数、断线重连 |
 | 协同鉴权 | 每次切文档向后端申请 2 小时有效的单文档协同 token；无效/越权 token 直接断开 |
@@ -233,6 +233,12 @@ docker compose -f deploy/docker-compose.yml up --build
 # 新建一篇（默认进 1 号空间「我的空间」）
 ./tools/publish-md.sh "../个人履历详解.md" "个人履历详解（2014.07 — 2026.10）"
 
+# 挂到某个父文档下（父文档所属空间优先，避免父子跨空间）
+./tools/publish-md.sh "../技术栈/2.4-ZooKeeper分布式协调.md" "2.4-ZooKeeper分布式协调" --parent 17
+
+# 整个目录批量发布到某个父文档下（同级顺序＝文件名排序）
+./tools/publish-dir.sh "../技术栈" --parent 17
+
 # 覆盖某一篇的正文（会丢弃该文档上的在线编辑记录，慎用）
 ./tools/publish-md.sh "../个人履历详解.md" "个人履历详解（2014.07 — 2026.10）" --doc-id 13
 ```
@@ -244,9 +250,10 @@ docker compose -f deploy/docker-compose.yml up --build
 cd tools/md-to-collab && npm i
 node md-to-ydoc.mjs a.md /tmp/a.bin --drop-first-h1   # 转换 + 结构统计
 node read-ydoc.mjs /tmp/a.bin                          # 回读校验
+node batch-verify.mjs <md目录> map.tsv <bin目录>        # 批量逐篇比对表格/标题/代码块数
 ```
 
-四条踩过的坑：
+六条踩过的坑：
 
 1. **扩展集必须与 `CollabEditor.vue` 逐项一致**。少一个节点类型（比如 table），
    客户端会静默丢掉那类内容——它不会报错，只是表格变没了。
@@ -254,8 +261,12 @@ node read-ydoc.mjs /tmp/a.bin                          # 回读校验
 3. **中文加粗贴着标点不满足 CommonMark 规则**：`**"记账服务＝分录模板"**，` 里开头的 `**`
    后面紧跟引号、前面是汉字，既不算 left-flanking 也不算 right-flanking，解析器只能输出裸星号。
    转换器先把这类 `**…**` 改写成 `<strong>…</strong>` 再解析（代码块/行内代码里的星号不动）。
-4. **表格是编辑器新增能力**：StarterKit 本身不含 table，`/` 菜单可插入表格，
+4. **相对链接会被降级成纯文字**：md 里指向 `1.1-xxx.md`、`CSDN存档/xxx.html` 的链接搬到线上必然 404，
+   而文档站没有可按 doc id 拼的 URL，所以默认去壳留字；要保留原样加 `--keep-local-links`。
+5. **表格是编辑器新增能力**：StarterKit 本身不含 table，`/` 菜单可插入表格，
    光标落在表格内时工具栏会多出「+行 / +列 / -行 / -列 / 删表」。
+6. **shell 里 `$VAR` 后面紧跟中文标点会被当成变量名的一部分**（macOS bash 3.2 直接报
+   `unbound variable`）。脚本里一律写 `${VAR}`；另外 `set -e` 下别用 `[ cond ] && cmd` 的短路写法。
 
 ## 已知边界 / 下一步
 

@@ -124,8 +124,12 @@ function preNormalizeStrong(markdown) {
       })
 
       const stars = (protectedLine.match(/\*\*/g) || []).length
+      // 开头的 ** 后面偶有一个误敲的空格（`** fencing token…**`）：CommonMark 里紧跟空白
+      // 也不能开粗体，这里允许并吃掉这一个空格，避免整段退化成裸星号
       const converted =
-        stars >= 2 ? protectedLine.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>') : protectedLine
+        stars >= 2
+          ? protectedLine.replace(/\*\*[ \t]?(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>')
+          : protectedLine
 
       return converted.replace(/\u0001(\d+)\u0001/g, (_m, i) => codeSpans[Number(i)])
     })

@@ -33,6 +33,7 @@ fi
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG="$(mktemp -t lightdoc-publish)"
+: > "$LOG"   # 每篇追加写，失败时可回溯是第几篇
 
 # macOS 自带 bash 3.2 没有 mapfile，这里用 while read 收集（顺序由 sort 保证）
 FILES=()
@@ -49,8 +50,8 @@ for f in "${FILES[@]}"; do
   TITLE="$(basename "$f")"
   TITLE="${TITLE%.*}"
   printf '[%2d/%2d] %-42s ' "$IDX" "$TOTAL" "$TITLE"
-  if "$PROJECT_ROOT/tools/publish-md.sh" "$f" "$TITLE" --space "$SPACE_ID" --parent "$PARENT_ID" >"$LOG" 2>&1; then
-    DOC="$(grep -o '文档 id=[0-9]*' "$LOG" | head -1 | cut -d= -f2)"
+  if "$PROJECT_ROOT/tools/publish-md.sh" "$f" "$TITLE" --space "$SPACE_ID" --parent "$PARENT_ID" >>"$LOG" 2>&1; then
+    DOC="$(grep -o '文档 id=[0-9]*' "$LOG" | tail -1 | cut -d= -f2)"
     echo "ok  (id=${DOC:-?})"
     OK=$((OK + 1))
   else
