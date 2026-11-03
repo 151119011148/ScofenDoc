@@ -167,6 +167,58 @@ function onEditorReady(ed: unknown) {
 const currentDoc = computed(() => docs.value.find((d) => d.id === currentDocId.value) ?? null)
 const currentSpace = computed(() => workspaces.value.find((w) => w.id === currentSpaceId.value) ?? null)
 
+/* ---------- 中间栏：文章大纲（宽度可拖） ---------- */
+
+const OUTLINE_MIN = 170
+const OUTLINE_MAX = 420
+const OUTLINE_DEFAULT = 216
+const OUTLINE_KEY = 'scofendoc.outlineWidth'
+
+const outlineWidth = ref(Number(localStorage.getItem(OUTLINE_KEY)) || OUTLINE_DEFAULT)
+const outlineCollapsed = ref(false)
+const outlineResizing = ref(false)
+
+/** 只有打开某篇文档时才需要大纲；主页/搜索/空态都不占这一栏 */
+const hasOutline = computed(() => view.value === 'doc' && !!currentDoc.value)
+
+const outlineStyle = computed(() =>
+  outlineCollapsed.value
+    ? { width: '32px', flexBasis: '32px' }
+    : { width: `${outlineWidth.value}px`, flexBasis: `${outlineWidth.value}px` },
+)
+
+function startOutlineResize(e: MouseEvent) {
+  if (outlineCollapsed.value) return
+  e.preventDefault()
+  outlineResizing.value = true
+  const startX = e.clientX
+  const startW = outlineWidth.value
+  const prevCursor = document.body.style.cursor
+  const prevSelect = document.body.style.userSelect
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+
+  const onMove = (ev: MouseEvent) => {
+    const next = startW + ev.clientX - startX
+    outlineWidth.value = Math.min(OUTLINE_MAX, Math.max(OUTLINE_MIN, next))
+  }
+  const onUp = () => {
+    outlineResizing.value = false
+    document.body.style.cursor = prevCursor
+    document.body.style.userSelect = prevSelect
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    localStorage.setItem(OUTLINE_KEY, String(outlineWidth.value))
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+function resetOutlineWidth() {
+  outlineWidth.value = OUTLINE_DEFAULT
+  localStorage.setItem(OUTLINE_KEY, String(OUTLINE_DEFAULT))
+}
+
 /**
  * 权限来自「我在这个空间里的角色」：
  *   VIEWER 只能看 —— 隐藏所有写入口、编辑器设为只读、禁用拖拽；
@@ -692,69 +744,29 @@ boot()
 
   <div v-else class="app">
     <div class="layout">
-      <!-- 最左：产品导航（主页 / 文档库 / 知识库 + 全局搜索） -->
+      <!-- 最左：导航 + 空间 + 当前空间的文档树（飞书式的单栏导航） -->
       <NavRail
         ref="navRailEl"
+        :class="{ resizing }"
+        :style="sidebarStyle"
         :active="nav"
         :user="session.user"
         :search="searchQuery"
-        :doc-count="docSpaces.length"
-        :kb-count="kbSpaces.length"
+        :spaces="workspaces"
+        :current-space-id="currentSpaceId"
+        :collapsed="sidebarCollapsed"
         @navigate="goNav"
+        @select-space="selectSpace($event.id)"
+        @new-space="newSpace"
+        @open-members="openMembers"
+        @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
         @search="onSearchInput"
         @change-password="showChangePwd = true"
         @admin-users="showAdminUsers = true"
         @logout="logout"
-      />
-
-      <!-- 中间：空间 + 文档树，宽度可拖 -->
-      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, resizing }" :style="sidebarStyle">
-        <!-- 折叠态只留一个展开按钮 -->
-        <div v-if="sidebarCollapsed" class="sidebar-mini">
-          <button class="sidebar-collapse" title="展开侧边栏" @click="sidebarCollapsed = false">»</button>
-        </div>
-
-        <template v-else>
-          <div class="sidebar-top">
-            <span class="sidebar-title">{{ nav === 'kb' ? '知识库' : '文档库' }}</span>
-            <div class="sidebar-top-actions">
-              <button
-                class="mini"
-                :title="nav === 'kb' ? '新建知识库' : '新建文档库'"
-                @click="newSpace(nav === 'kb' ? 'KB' : 'DOC')"
-              >
-                ＋
-              </button>
-              <button class="sidebar-collapse" title="折叠侧边栏" @click="sidebarCollapsed = true">«</button>
-            </div>
-          </div>
-
-          <div class="space-list">
-            <div
-              v-for="w in visibleSpaces"
-              :key="w.id"
-              :class="['space-item', { active: w.id === currentSpaceId }]"
-              @click="selectSpace(w.id)"
-            >
-              <span class="space-icon">{{ w.type === 'PERSONAL' ? '👤' : '👥' }}</span>
-              <span class="space-name">{{ w.name }}</span>
-
-              <!-- 共享空间：直接露出人数，点进去管成员 -->
-              <button
-                v-if="w.type === 'TEAM'"
-                class="space-members"
-                :title="w.role === 'OWNER' ? '管理成员' : '查看成员'"
-                @click.stop="openMembers(w)"
-              >
-                {{ w.memberCount }}
-              </button>
-              <span v-if="w.role === 'VIEWER'" class="space-role">只读</span>
-            </div>
-
-            <div v-if="visibleSpaces.length === 0" class="tree-empty">{{ emptySpaceHint }}</div>
-          </div>
-
-          <div class="section-label docs-label">
+      >
+        <template #tree>
+          <div class="tree-head">
             <span>文档</span>
             <button
               v-if="canWrite && currentSpace"
@@ -765,30 +777,26 @@ boot()
               ＋
             </button>
           </div>
-
-          <div class="tree-wrap">
-            <DocTree
-              :docs="docs"
-              :current-id="currentDocId"
-              :disabled="moving"
-              :readonly="!canWrite"
-              @select="selectDoc"
-              @create-child="createDoc($event.id)"
-              @rename="renameDoc"
-              @remove="removeDoc"
-              @remove-many="removeManyDocs"
-              @move="moveDocs"
-            />
-          </div>
-
-          <div class="sidebar-foot">
-            <template v-if="canWrite">拖动文档可调整层级与顺序 · Ctrl+Z 撤销</template>
+          <DocTree
+            :docs="docs"
+            :current-id="currentDocId"
+            :disabled="moving"
+            :readonly="!canWrite"
+            @select="selectDoc"
+            @create-child="createDoc($event.id)"
+            @rename="renameDoc"
+            @remove="removeDoc"
+            @remove-many="removeManyDocs"
+            @move="moveDocs"
+          />
+          <div class="tree-tip">
+            <template v-if="canWrite">拖动可调整层级与顺序 · Ctrl+Z 撤销</template>
             <template v-else>你在此空间只有查看权限</template>
           </div>
         </template>
-      </aside>
+      </NavRail>
 
-      <!-- 目录树右边界：hover 变双向箭头，拖动调宽，双击复位 -->
+      <!-- 左栏右边界：hover 变双向箭头，拖动调宽，双击复位 -->
       <div
         v-if="!sidebarCollapsed"
         :class="['resize-handle', { active: resizing }]"
@@ -797,7 +805,40 @@ boot()
         @dblclick="resetSidebarWidth"
       />
 
-      <main ref="mainScroller" :class="['main', { 'no-outline': view !== 'doc' }]">
+      <!-- 中间：当前文档的文章大纲 -->
+      <aside
+        v-if="hasOutline"
+        :class="['outline-col', { mini: outlineCollapsed, resizing: outlineResizing }]"
+        :style="outlineStyle"
+      >
+        <div class="outline-col-head">
+          <span v-if="!outlineCollapsed" class="outline-col-title">文章大纲</span>
+          <button
+            class="outline-toggle"
+            :title="outlineCollapsed ? '展开大纲' : '收起大纲'"
+            @click="outlineCollapsed = !outlineCollapsed"
+          >
+            {{ outlineCollapsed ? '»' : '«' }}
+          </button>
+        </div>
+        <div v-if="outlineCollapsed" class="outline-mini-label">大纲</div>
+        <OutlinePanel
+          v-else
+          :scroller="mainScroller"
+          :editor="outlineEditor"
+          :refresh="outlineRefresh"
+        />
+      </aside>
+
+      <div
+        v-if="hasOutline && !outlineCollapsed"
+        :class="['resize-handle', { active: outlineResizing }]"
+        title="拖动调整大纲宽度，双击复位"
+        @mousedown="startOutlineResize"
+        @dblclick="resetOutlineWidth"
+      />
+
+      <main ref="mainScroller" class="main">
         <!-- 主页 -->
         <HomeView
           v-if="view === 'home'"
@@ -890,13 +931,6 @@ boot()
             </template>
           </div>
         </template>
-
-        <OutlinePanel
-          v-if="view === 'doc' && currentDoc"
-          :scroller="mainScroller"
-          :editor="outlineEditor"
-          :refresh="outlineRefresh"
-        />
       </main>
     </div>
 

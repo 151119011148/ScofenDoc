@@ -120,8 +120,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside class="outline-panel">
-    <div class="outline-head">大纲</div>
+  <!-- 只负责列表本身：外框、标题、拖拽宽度都由 App 的中间栏控制 -->
+  <div class="outline-body">
     <div v-if="empty" class="outline-empty">本文档暂无标题</div>
     <ul v-else class="outline-list">
       <li
@@ -133,5 +133,5 @@ onBeforeUnmount(() => {
         {{ item.text }}
       </li>
     </ul>
-  </aside>
+  </div>
 </template>
