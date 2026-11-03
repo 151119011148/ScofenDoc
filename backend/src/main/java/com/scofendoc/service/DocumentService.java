@@ -2,6 +2,7 @@ package com.scofendoc.service;
 
 import com.scofendoc.dto.CollabTokenDto;
 import com.scofendoc.dto.DocDto;
+import com.scofendoc.dto.DocHitDto;
 import com.scofendoc.dto.WorkspaceDto;
 import com.scofendoc.entity.Doc;
 import com.scofendoc.entity.Workspace;
@@ -80,12 +81,14 @@ public class DocumentService {
     /**
      * 新建空间。type=TEAM 即团队空间（可邀请成员共享）；
      * PERSONAL 是纯私人空间，成员接口会拒绝，保持"个人空间"的语义不被打穿。
+     * kind 决定它出现在「文档库」还是「知识库」入口下，两者权限模型完全一致。
      */
     @Transactional
-    public WorkspaceDto createWorkspace(String name, Workspace.Type type, AuthUser owner) {
+    public WorkspaceDto createWorkspace(String name, Workspace.Type type, Workspace.Kind kind, AuthUser owner) {
         Workspace w = new Workspace();
         w.setName(name == null || name.isBlank() ? "未命名空间" : name.trim());
         w.setType(type == null ? Workspace.Type.PERSONAL : type);
+        w.setKind(kind == null ? Workspace.Kind.DOC : kind);
         w.setOwnerId(owner.id());
         w.setOwnerName(owner.displayName());
         w.setSortOrder((int) memberRepo.countByUserId(owner.id()));
@@ -105,6 +108,36 @@ public class DocumentService {
 
     public DocDto getDoc(Long id, Long userId) {
         return toDto(requireDoc(id, userId, false));
+    }
+
+    /**
+     * 跨空间搜索文档标题。q 为空时退化成"最近更新"，主页直接复用这个接口。
+     *
+     * 只搜索「我加入的空间」，权限判定和列表一致，不会因为搜索绕过成员表。
+     * 正文是 Yjs 二进制，没有全文索引，所以这里只匹配标题 —— 与其做个搜不到
+     * 正文的假全文搜索，不如把标题搜索做准。
+     */
+    public List<DocHitDto> searchDocs(String q, int limit, Long userId) {
+        List<Long> ids = memberRepo.findByUserId(userId).stream()
+                .map(WorkspaceMember::getWorkspaceId)
+                .toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+
+        String kw = q == null ? "" : q.trim().toLowerCase();
+        int cap = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 50));
+
+        var nameOf = new java.util.HashMap<Long, String>();
+        workspaceRepo.findAllById(ids).forEach(w -> nameOf.put(w.getId(), w.getName()));
+
+        return docRepo.findByWorkspaceIdInAndDeletedFalseOrderByUpdatedAtDesc(ids).stream()
+                .filter(d -> kw.isEmpty() || (d.getTitle() != null && d.getTitle().toLowerCase().contains(kw)))
+                .limit(cap)
+                .map(d -> new DocHitDto(
+                        d.getId(), d.getTitle(), d.getWorkspaceId(),
+                        nameOf.getOrDefault(d.getWorkspaceId(), ""), d.getParentId(), d.getUpdatedAt()))
+                .toList();
     }
 
     /**
@@ -294,7 +327,7 @@ public class DocumentService {
     }
 
     private WorkspaceDto toDto(Workspace w, WorkspaceMember.Role role, long memberCount) {
-        return new WorkspaceDto(w.getId(), w.getName(), w.getType().name(), w.getOwnerName(),
-                role == null ? null : role.name(), memberCount);
+        return new WorkspaceDto(w.getId(), w.getName(), w.getType().name(), w.getKind().name(),
+                w.getOwnerName(), role == null ? null : role.name(), memberCount);
     }
 }

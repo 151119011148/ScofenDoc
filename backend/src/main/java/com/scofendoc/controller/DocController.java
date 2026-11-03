@@ -2,6 +2,7 @@ package com.scofendoc.controller;
 
 import com.scofendoc.dto.CollabTokenDto;
 import com.scofendoc.dto.DocDto;
+import com.scofendoc.dto.DocHitDto;
 import com.scofendoc.dto.WorkspaceDto;
 import com.scofendoc.entity.Workspace;
 import com.scofendoc.security.AuthUser;
@@ -36,13 +37,25 @@ public class DocController {
         return service.listWorkspaces(CurrentUser.id());
     }
 
-    /** 新建空间：type=TEAM 才能邀请成员共享，PERSONAL 是纯私人空间 */
+    /** 新建空间：type=TEAM 才能邀请成员共享；kind 决定归入文档库还是知识库 */
     @PostMapping("/workspaces")
     public WorkspaceDto createWorkspace(@RequestBody Map<String, Object> body) {
         String name = body.get("name") == null ? null : String.valueOf(body.get("name"));
         Workspace.Type type = "TEAM".equalsIgnoreCase(String.valueOf(body.get("type")))
                 ? Workspace.Type.TEAM : Workspace.Type.PERSONAL;
-        return service.createWorkspace(name, type, CurrentUser.get());
+        Workspace.Kind kind = "KB".equalsIgnoreCase(String.valueOf(body.get("kind")))
+                ? Workspace.Kind.KB : Workspace.Kind.DOC;
+        return service.createWorkspace(name, type, kind, CurrentUser.get());
+    }
+
+    /**
+     * 跨空间搜索文档标题；q 为空即"最近更新"（主页用）。
+     * limit 默认 20，服务端封顶 50。
+     */
+    @GetMapping("/docs/search")
+    public List<DocHitDto> search(@RequestParam(required = false) String q,
+                                  @RequestParam(defaultValue = "20") int limit) {
+        return service.searchDocs(q, limit, CurrentUser.id());
     }
 
     /* ---------------- 文档 ---------------- */

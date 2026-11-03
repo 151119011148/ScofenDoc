@@ -4,6 +4,9 @@ import CollabEditor from './components/CollabEditor.vue'
 import DocTree from './components/DocTree.vue'
 import OutlinePanel from './components/OutlinePanel.vue'
 import LoginView from './components/LoginView.vue'
+import NavRail from './components/NavRail.vue'
+import HomeView from './components/HomeView.vue'
+import SearchView from './components/SearchView.vue'
 import AdminUsersModal from './components/AdminUsersModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import CreateSpaceModal from './components/CreateSpaceModal.vue'
@@ -14,6 +17,7 @@ import {
   loadSession,
   setUnauthorizedHandler,
   type Doc,
+  type DocHit,
   type Session,
   type Workspace,
 } from './api'
@@ -50,6 +54,98 @@ const showAdminUsers = ref(false)
 
 /* 侧边栏折叠 */
 const sidebarCollapsed = ref(false)
+
+/* ---------- 导航 / 视图 ---------- */
+
+/**
+ * 三个产品入口：主页、文档库、知识库。
+ * 文档库与知识库的差别只在 space.kind（入口归组），底层仍是同一套空间/文档/权限模型。
+ */
+type NavKey = 'home' | 'docs' | 'kb'
+/** home=主页，doc=文档编辑，search=搜索结果 */
+type View = 'home' | 'doc' | 'search'
+
+const view = ref<View>('home')
+const searchQuery = ref('')
+const searchResults = ref<DocHit[]>([])
+const recentDocs = ref<DocHit[]>([])
+const hitsLoading = ref(false)
+/** 新建空间弹窗默认落在哪个分类：从知识库入口点进来就是 KB */
+const spaceKindDraft = ref<'DOC' | 'KB'>('DOC')
+let searchTimer: number | undefined
+
+const docSpaces = computed(() => workspaces.value.filter((w) => w.kind === 'DOC'))
+const kbSpaces = computed(() => workspaces.value.filter((w) => w.kind === 'KB'))
+
+/** 当前所在分类：主页时按当前空间的分类归属，避免高亮跳来跳去 */
+const nav = computed<NavKey>(() => {
+  if (view.value === 'home') return 'home'
+  return currentSpace.value?.kind === 'KB' ? 'kb' : 'docs'
+})
+
+/** 中间栏展示的空间列表：跟着导航分类走 */
+const visibleSpaces = computed(() => (nav.value === 'kb' ? kbSpaces.value : docSpaces.value))
+
+const emptySpaceHint = computed(() =>
+  nav.value === 'kb' ? '还没有知识库，点右上角「＋」新建一个' : '还没有文档库，点右上角「＋」新建一个',
+)
+
+/* ---------- 分栏宽度（可拖拽，记住上次的） ---------- */
+
+const SIDEBAR_MIN = 200
+const SIDEBAR_MAX = 560
+const SIDEBAR_DEFAULT = 264
+const SIDEBAR_KEY = 'scofendoc.sidebarWidth'
+
+const sidebarWidth = ref(Number(localStorage.getItem(SIDEBAR_KEY)) || SIDEBAR_DEFAULT)
+const resizing = ref(false)
+
+/** 导航栏实例，用于 Ctrl+K 把焦点丢进搜索框 */
+const navRailEl = ref<{ focusSearch: () => void }>()
+
+const sidebarStyle = computed(() =>
+  sidebarCollapsed.value
+    ? undefined
+    : { width: `${sidebarWidth.value}px`, flexBasis: `${sidebarWidth.value}px` },
+)
+
+/**
+ * 拖动目录树右边界调整宽度。
+ * mousemove/mouseup 挂在 window 上而不是元素上：鼠标一快就会拖出元素范围，
+ * 只在元素上监听会「拖着拖着断掉」。
+ */
+function startResize(e: MouseEvent) {
+  if (sidebarCollapsed.value) return
+  e.preventDefault()
+  resizing.value = true
+  const startX = e.clientX
+  const startW = sidebarWidth.value
+  const prevCursor = document.body.style.cursor
+  const prevSelect = document.body.style.userSelect
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+
+  const onMove = (ev: MouseEvent) => {
+    const next = startW + ev.clientX - startX
+    sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, next))
+  }
+  const onUp = () => {
+    resizing.value = false
+    document.body.style.cursor = prevCursor
+    document.body.style.userSelect = prevSelect
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarWidth.value))
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+/** 双击分隔条复位 */
+function resetSidebarWidth() {
+  sidebarWidth.value = SIDEBAR_DEFAULT
+  localStorage.setItem(SIDEBAR_KEY, String(SIDEBAR_DEFAULT))
+}
 
 /* 大纲面板：需要拿到正文编辑器实例与滚动容器（.main），标题变化时重扫 */
 const mainScroller = ref<HTMLElement | null>(null)
@@ -119,10 +215,12 @@ async function loadWorkspaces() {
   }
   const fromUrl = Number(new URLSearchParams(location.search).get('space'))
   const exists = workspaces.value.some((w) => w.id === fromUrl)
-  // 被移出当前空间后，原 id 会失效，这里回落到第一个可见空间
+  // 被移出当前空间后，原 id 会失效，这里回落到「当前分类下的第一个空间」
   const stillHasCurrent = workspaces.value.some((w) => w.id === currentSpaceId.value)
   if (!stillHasCurrent) {
-    currentSpaceId.value = exists ? fromUrl : workspaces.value[0].id
+    const wantKind = nav.value === 'kb' ? 'KB' : 'DOC'
+    const fallback = workspaces.value.find((w) => w.kind === wantKind) ?? workspaces.value[0]
+    currentSpaceId.value = exists ? fromUrl : fallback.id
   }
 }
 
@@ -147,7 +245,8 @@ async function loadDocs(spaceId: number, preferDocId?: number | null) {
 function syncUrl() {
   const params = new URLSearchParams()
   if (currentSpaceId.value) params.set('space', String(currentSpaceId.value))
-  if (currentDocId.value) params.set('doc', String(currentDocId.value))
+  // 主页不带 doc 参数：否则刷新一下就又跳回某篇文档，回不到主页
+  if (currentDocId.value && view.value !== 'home') params.set('doc', String(currentDocId.value))
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
 }
@@ -173,6 +272,9 @@ async function ensureCollabToken(doc: Doc | null) {
 
 /* ---------- 交互 ---------- */
 function selectSpace(id: number) {
+  view.value = 'doc'
+  searchQuery.value = ''
+  searchResults.value = []
   if (id === currentSpaceId.value) return
   currentSpaceId.value = id
   currentDocId.value = null
@@ -185,7 +287,100 @@ function selectSpace(id: number) {
 function selectDoc(doc: Doc) {
   currentDocId.value = doc.id
   titleDraft.value = doc.title
+  // 从搜索/主页点进来时，要回到文档视图
+  view.value = 'doc'
+  searchQuery.value = ''
+  searchResults.value = []
   syncUrl()
+}
+
+/* ---------- 导航切换 ---------- */
+
+function goNav(target: NavKey) {
+  searchQuery.value = ''
+  searchResults.value = []
+  if (target === 'home') {
+    view.value = 'home'
+    loadRecent()
+    syncUrl()
+    return
+  }
+  const wantKind: 'DOC' | 'KB' = target === 'kb' ? 'KB' : 'DOC'
+  spaceKindDraft.value = wantKind
+  view.value = 'doc'
+  const list = wantKind === 'KB' ? kbSpaces.value : docSpaces.value
+  if (list.length === 0) {
+    // 该分类下还没有空间：清空中间栏，主区给引导文案
+    currentSpaceId.value = null
+    currentDocId.value = null
+    docs.value = []
+    return
+  }
+  if (currentSpace.value?.kind !== wantKind) selectSpace(list[0].id)
+  else syncUrl()
+}
+
+/* ---------- 搜索 ---------- */
+
+/**
+ * 输入即搜（220ms 防抖）。
+ * 关键词一清空就退回文档视图 —— 空搜索框还停在结果页会让人以为卡住了。
+ */
+function onSearchInput(value: string) {
+  searchQuery.value = value
+  window.clearTimeout(searchTimer)
+  const kw = value.trim()
+  if (!kw) {
+    searchResults.value = []
+    if (view.value === 'search') view.value = 'doc'
+    return
+  }
+  view.value = 'search'
+  hitsLoading.value = true
+  searchTimer = window.setTimeout(async () => {
+    const res = await api.searchDocs(kw, 30).catch((e) => {
+      showError(e)
+      return [] as DocHit[]
+    })
+    // 期间可能又输入了新词，丢弃过期结果
+    if (searchQuery.value.trim() === kw) {
+      searchResults.value = res
+      hitsLoading.value = false
+    }
+  }, 220)
+}
+
+/* ---------- 主页 ---------- */
+
+async function loadRecent() {
+  hitsLoading.value = true
+  try {
+    recentDocs.value = await api.searchDocs('', 12)
+  } catch (e) {
+    showError(e)
+  } finally {
+    hitsLoading.value = false
+  }
+}
+
+/** 从搜索结果 / 最近更新打开一篇文档 */
+async function openHit(hit: DocHit) {
+  view.value = 'doc'
+  searchQuery.value = ''
+  searchResults.value = []
+  if (currentSpaceId.value !== hit.workspaceId) {
+    currentSpaceId.value = hit.workspaceId
+    collabToken.value = ''
+    collabKeyOfToken.value = ''
+    clearUndo()
+  }
+  await loadDocs(hit.workspaceId, hit.id)
+}
+
+/** 新建空间：带上当前导航分类，知识库入口建出来的就是知识库 */
+function newSpace(kind: 'DOC' | 'KB') {
+  spaceKindDraft.value = kind
+  showCreateSpace.value = true
 }
 
 function onSpaceCreated(space: Workspace) {
@@ -399,6 +594,14 @@ function isTypingTarget(el: EventTarget | null): boolean {
 function onGlobalKeydown(e: KeyboardEvent) {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return
   const key = e.key.toLowerCase()
+
+  // Ctrl/Cmd+K 聚焦搜索框（业界惯例，用户会本能去按）
+  if (key === 'k') {
+    e.preventDefault()
+    navRailEl.value?.focusSearch()
+    return
+  }
+
   if (key !== 'z' && key !== 'y') return
   // 正文有 Yjs 自己的撤销栈（按文档、跨端一致），这里只管文档树这类元数据操作
   if (isTypingTarget(e.target)) return
@@ -449,12 +652,20 @@ function logout() {
 /* ---------- 启动 ---------- */
 async function boot() {
   if (!session.value) return
+  // 先按 URL 定视图，再加载数据：loadDocs 里的 syncUrl 会看当前 view 决定是否保留 doc 参数，
+  // 顺序反了会把 ?doc= 冲掉，分享链接就退回主页了
+  const wantsDoc = !!new URLSearchParams(location.search).get('doc')
+  view.value = wantsDoc ? 'doc' : 'home'
   try {
     loading.value = true
     // 校验本地 token 是否还有效，同时拿到最新用户信息（含 admin 标识）
     session.value = { ...session.value, user: await api.me() }
     await loadWorkspaces()
     if (currentSpaceId.value) await loadDocs(currentSpaceId.value)
+    if (!wantsDoc) {
+      syncUrl()
+      loadRecent()
+    }
   } catch (e) {
     if (session.value) showError(e)
   } finally {
@@ -480,165 +691,222 @@ boot()
   <LoginView v-if="!session" @success="onLoggedIn" />
 
   <div v-else class="app">
-    <header class="topbar">
-      <span class="logo">📄 scofenDoc</span>
-      <span class="spacer" />
-
-      <button v-if="session.user.admin" class="top-action" @click="showAdminUsers = true">
-        账号管理
-      </button>
-      <button class="top-action" @click="showChangePwd = true">修改密码</button>
-
-      <span class="avatar" :style="{ background: session.user.color }">
-        {{ session.user.displayName.slice(0, 1) }}
-      </span>
-      <span class="user">
-        {{ session.user.displayName }}
-        <em v-if="session.user.admin">管理员</em>
-      </span>
-      <button class="logout" @click="logout">退出</button>
-    </header>
-
     <div class="layout">
-      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-        <button
-          class="sidebar-collapse"
-          :title="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-        >
-          {{ sidebarCollapsed ? '»' : '«' }}
-        </button>
+      <!-- 最左：产品导航（主页 / 文档库 / 知识库 + 全局搜索） -->
+      <NavRail
+        ref="navRailEl"
+        :active="nav"
+        :user="session.user"
+        :search="searchQuery"
+        :doc-count="docSpaces.length"
+        :kb-count="kbSpaces.length"
+        @navigate="goNav"
+        @search="onSearchInput"
+        @change-password="showChangePwd = true"
+        @admin-users="showAdminUsers = true"
+        @logout="logout"
+      />
 
-        <div class="section-label">
-          <span>空间</span>
-          <button class="mini" title="新建空间" @click="showCreateSpace = true">＋</button>
+      <!-- 中间：空间 + 文档树，宽度可拖 -->
+      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, resizing }" :style="sidebarStyle">
+        <!-- 折叠态只留一个展开按钮 -->
+        <div v-if="sidebarCollapsed" class="sidebar-mini">
+          <button class="sidebar-collapse" title="展开侧边栏" @click="sidebarCollapsed = false">»</button>
         </div>
 
-        <div
-          v-for="w in workspaces"
-          :key="w.id"
-          :class="['space-item', { active: w.id === currentSpaceId }]"
-          @click="selectSpace(w.id)"
-        >
-          <span class="space-icon">{{ w.type === 'PERSONAL' ? '👤' : '👥' }}</span>
-          <span class="space-name">{{ w.name }}</span>
-
-          <!-- 共享空间：直接露出人数，点进去管成员 -->
-          <button
-            v-if="w.type === 'TEAM'"
-            class="space-members"
-            :title="w.role === 'OWNER' ? '管理成员' : '查看成员'"
-            @click.stop="openMembers(w)"
-          >
-            {{ w.memberCount }}
-          </button>
-          <span v-if="w.role === 'VIEWER'" class="space-role">只读</span>
-        </div>
-
-        <div v-if="workspaces.length === 0" class="tree-empty">
-          还没有空间，点右上角「＋」新建一个
-        </div>
-
-        <div class="section-label docs-label">
-          <span>文档</span>
-          <button v-if="canWrite" class="mini" title="新建根文档" @click="createDoc(null)">＋</button>
-        </div>
-
-        <div class="tree-wrap">
-          <DocTree
-            :docs="docs"
-            :current-id="currentDocId"
-            :disabled="moving"
-            :readonly="!canWrite"
-            @select="selectDoc"
-            @create-child="createDoc($event.id)"
-            @rename="renameDoc"
-            @remove="removeDoc"
-            @remove-many="removeManyDocs"
-            @move="moveDocs"
-          />
-        </div>
-
-        <div class="sidebar-foot">
-          <template v-if="canWrite">拖动文档可调整层级与顺序 · Ctrl+Z 撤销</template>
-          <template v-else>你在此空间只有查看权限</template>
-        </div>
-      </aside>
-
-      <main ref="mainScroller" class="main">
-        <div v-if="loading" class="hint">加载中…</div>
-
-        <template v-else-if="currentDoc">
-          <div class="doc-head">
-            <div class="crumb">
-              <button class="crumb-link" :class="{ last: !breadcrumb.length }" @click="breadcrumb.length ? selectDoc(breadcrumb[0]) : null">
-                {{ currentSpace?.name }}
-              </button>
-              <template v-for="node in breadcrumb" :key="node.id">
-                <span class="sep">/</span>
-                <button
-                  class="crumb-link"
-                  :class="{ last: node.id === currentDoc.id }"
-                  :disabled="node.id === currentDoc.id"
-                  @click="selectDoc(node)"
-                >
-                  {{ node.title }}
-                </button>
-              </template>
-              <span v-if="!canWrite" class="crumb-ro">仅查看</span>
-            </div>
-            <input
-              v-model="titleDraft"
-              class="title-input"
-              placeholder="无标题文档"
-              :disabled="!canWrite"
-              @blur="saveTitle"
-              @keyup.enter="($event.target as HTMLInputElement).blur()"
-            />
-            <div class="doc-actions">
+        <template v-else>
+          <div class="sidebar-top">
+            <span class="sidebar-title">{{ nav === 'kb' ? '知识库' : '文档库' }}</span>
+            <div class="sidebar-top-actions">
               <button
-                v-if="isTeam"
-                class="ghost-btn"
-                :title="canManageMembers ? '管理成员' : '查看成员'"
-                @click="showMembers = true"
+                class="mini"
+                :title="nav === 'kb' ? '新建知识库' : '新建文档库'"
+                @click="newSpace(nav === 'kb' ? 'KB' : 'DOC')"
               >
-                👥 成员 {{ currentSpace?.memberCount ?? 0 }}
+                ＋
               </button>
-              <button v-if="canWrite" @click="createDoc(currentDoc.id)">＋ 子文档</button>
+              <button class="sidebar-collapse" title="折叠侧边栏" @click="sidebarCollapsed = true">«</button>
             </div>
           </div>
 
-          <!-- 拿到协同 token 后才挂载编辑器：provider 需要它完成握手 -->
-          <div v-if="!collabReady" class="collab-skeleton">正在申请协同权限…</div>
-          <!-- key 用 collabKey：切文档时销毁旧 provider，接入新房间 -->
-          <CollabEditor
-            v-else
-            :key="currentDoc.collabKey"
-            :doc-name="currentDoc.collabKey"
-            :collab-token="collabToken"
-            :user-name="session.user.displayName"
-            :user-color="session.user.color"
-            :editable="canWrite"
-            @editor-ready="onEditorReady"
-          />
+          <div class="space-list">
+            <div
+              v-for="w in visibleSpaces"
+              :key="w.id"
+              :class="['space-item', { active: w.id === currentSpaceId }]"
+              @click="selectSpace(w.id)"
+            >
+              <span class="space-icon">{{ w.type === 'PERSONAL' ? '👤' : '👥' }}</span>
+              <span class="space-name">{{ w.name }}</span>
+
+              <!-- 共享空间：直接露出人数，点进去管成员 -->
+              <button
+                v-if="w.type === 'TEAM'"
+                class="space-members"
+                :title="w.role === 'OWNER' ? '管理成员' : '查看成员'"
+                @click.stop="openMembers(w)"
+              >
+                {{ w.memberCount }}
+              </button>
+              <span v-if="w.role === 'VIEWER'" class="space-role">只读</span>
+            </div>
+
+            <div v-if="visibleSpaces.length === 0" class="tree-empty">{{ emptySpaceHint }}</div>
+          </div>
+
+          <div class="section-label docs-label">
+            <span>文档</span>
+            <button
+              v-if="canWrite && currentSpace"
+              class="mini"
+              title="新建根文档"
+              @click="createDoc(null)"
+            >
+              ＋
+            </button>
+          </div>
+
+          <div class="tree-wrap">
+            <DocTree
+              :docs="docs"
+              :current-id="currentDocId"
+              :disabled="moving"
+              :readonly="!canWrite"
+              @select="selectDoc"
+              @create-child="createDoc($event.id)"
+              @rename="renameDoc"
+              @remove="removeDoc"
+              @remove-many="removeManyDocs"
+              @move="moveDocs"
+            />
+          </div>
+
+          <div class="sidebar-foot">
+            <template v-if="canWrite">拖动文档可调整层级与顺序 · Ctrl+Z 撤销</template>
+            <template v-else>你在此空间只有查看权限</template>
+          </div>
+        </template>
+      </aside>
+
+      <!-- 目录树右边界：hover 变双向箭头，拖动调宽，双击复位 -->
+      <div
+        v-if="!sidebarCollapsed"
+        :class="['resize-handle', { active: resizing }]"
+        title="拖动调整宽度，双击复位"
+        @mousedown="startResize"
+        @dblclick="resetSidebarWidth"
+      />
+
+      <main ref="mainScroller" :class="['main', { 'no-outline': view !== 'doc' }]">
+        <!-- 主页 -->
+        <HomeView
+          v-if="view === 'home'"
+          :user="session.user"
+          :workspaces="workspaces"
+          :hits="recentDocs"
+          :loading="hitsLoading"
+          :current-doc-count="docs.length"
+          @open="openHit"
+          @new-space="newSpace"
+        />
+
+        <!-- 搜索结果 -->
+        <SearchView
+          v-else-if="view === 'search'"
+          :keyword="searchQuery"
+          :hits="searchResults"
+          :loading="hitsLoading"
+          @open="openHit"
+          @clear="onSearchInput('')"
+        />
+
+        <!-- 文档编辑 -->
+        <template v-else>
+          <div v-if="loading" class="hint">加载中…</div>
+
+          <template v-else-if="currentDoc">
+            <div class="doc-head">
+              <div class="crumb">
+                <button class="crumb-link" :class="{ last: !breadcrumb.length }" @click="breadcrumb.length ? selectDoc(breadcrumb[0]) : null">
+                  {{ currentSpace?.name }}
+                </button>
+                <template v-for="node in breadcrumb" :key="node.id">
+                  <span class="sep">/</span>
+                  <button
+                    class="crumb-link"
+                    :class="{ last: node.id === currentDoc.id }"
+                    :disabled="node.id === currentDoc.id"
+                    @click="selectDoc(node)"
+                  >
+                    {{ node.title }}
+                  </button>
+                </template>
+                <span v-if="!canWrite" class="crumb-ro">仅查看</span>
+              </div>
+              <input
+                v-model="titleDraft"
+                class="title-input"
+                placeholder="无标题文档"
+                :disabled="!canWrite"
+                @blur="saveTitle"
+                @keyup.enter="($event.target as HTMLInputElement).blur()"
+              />
+              <div class="doc-actions">
+                <button
+                  v-if="isTeam"
+                  class="ghost-btn"
+                  :title="canManageMembers ? '管理成员' : '查看成员'"
+                  @click="showMembers = true"
+                >
+                  👥 成员 {{ currentSpace?.memberCount ?? 0 }}
+                </button>
+                <button v-if="canWrite" @click="createDoc(currentDoc.id)">＋ 子文档</button>
+              </div>
+            </div>
+
+            <!-- 拿到协同 token 后才挂载编辑器：provider 需要它完成握手 -->
+            <div v-if="!collabReady" class="collab-skeleton">正在申请协同权限…</div>
+            <!-- key 用 collabKey：切文档时销毁旧 provider，接入新房间 -->
+            <CollabEditor
+              v-else
+              :key="currentDoc.collabKey"
+              :doc-name="currentDoc.collabKey"
+              :collab-token="collabToken"
+              :user-name="session.user.displayName"
+              :user-color="session.user.color"
+              :editable="canWrite"
+              @editor-ready="onEditorReady"
+            />
+          </template>
+
+          <div v-else class="hint">
+            <template v-if="visibleSpaces.length === 0">
+              {{ emptySpaceHint }}<br />
+              建好空间后，就能在里面写第一篇文档了。
+            </template>
+            <template v-else>
+              左侧选择一篇文档，或点「＋」新建。<br />
+              同一篇文档的链接复制给他人，即可实时同编。
+            </template>
+          </div>
         </template>
 
         <OutlinePanel
-          v-if="currentDoc"
+          v-if="view === 'doc' && currentDoc"
           :scroller="mainScroller"
           :editor="outlineEditor"
           :refresh="outlineRefresh"
         />
-
-        <div v-else class="hint">
-          左侧选择一篇文档，或点「＋」新建。<br />
-          同一篇文档的链接复制给他人，即可实时同编。
-        </div>
       </main>
     </div>
 
     <!-- 弹窗 -->
-    <CreateSpaceModal v-if="showCreateSpace" @close="showCreateSpace = false" @created="onSpaceCreated" />
+    <CreateSpaceModal
+      v-if="showCreateSpace"
+      :default-kind="spaceKindDraft"
+      @close="showCreateSpace = false"
+      @created="onSpaceCreated"
+    />
 
     <MembersModal
       v-if="showMembers && currentSpace"

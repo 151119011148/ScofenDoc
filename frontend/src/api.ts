@@ -6,6 +6,8 @@ export interface Workspace {
   id: number
   name: string
   type: 'PERSONAL' | 'TEAM'
+  /** 文档库（DOC）/ 知识库（KB） */
+  kind: 'DOC' | 'KB'
   ownerName: string | null
   /** 我在这个空间里的角色 */
   role: Role | null
@@ -19,6 +21,16 @@ export interface Doc {
   title: string
   collabKey: string
   sortOrder: number
+  updatedAt: string
+}
+
+/** 搜索结果 / 最近文档条目：比 Doc 多带空间名，方便跨空间展示 */
+export interface DocHit {
+  id: number
+  title: string
+  workspaceId: number
+  workspaceName: string
+  parentId: number | null
   updatedAt: string
 }
 
@@ -165,10 +177,10 @@ export const api = {
   /* 空间 */
   listWorkspaces: () => request<Workspace[]>('/workspaces'),
 
-  createWorkspace: (name: string, type: 'PERSONAL' | 'TEAM' = 'PERSONAL') =>
+  createWorkspace: (name: string, type: 'PERSONAL' | 'TEAM' = 'PERSONAL', kind: 'DOC' | 'KB' = 'DOC') =>
     request<Workspace>('/workspaces', {
       method: 'POST',
-      body: JSON.stringify({ name, type }),
+      body: JSON.stringify({ name, type, kind }),
     }),
 
   /* 成员 */
@@ -193,6 +205,10 @@ export const api = {
 
   /* 文档 */
   listDocs: (workspaceId: number) => request<Doc[]>(`/workspaces/${workspaceId}/docs`),
+
+  /** 跨空间搜索文档标题；q 为空即「最近更新」，主页直接用它 */
+  searchDocs: (q: string, limit = 20) =>
+    request<DocHit[]>(`/docs/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
   getDoc: (id: number) => request<Doc>(`/docs/${id}`),
 

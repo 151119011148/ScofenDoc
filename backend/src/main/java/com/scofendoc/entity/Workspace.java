@@ -19,6 +19,14 @@ public class Workspace {
 
     public enum Type { PERSONAL, TEAM }
 
+    /**
+     * 空间所属的产品分类：
+     *   DOC = 文档库（个人/团队的日常文档，当前所有存量空间都是这个）
+     *   KB  = 知识库（沉淀性的长期内容，独立入口）
+     * 分类只影响入口与导航归组，不影响权限模型——权限仍然由成员表决定。
+     */
+    public enum Kind { DOC, KB }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,6 +37,10 @@ public class Workspace {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Type type = Type.PERSONAL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Kind kind = Kind.DOC;
 
     @Column(length = 64)
     private String ownerName;
@@ -51,6 +63,9 @@ public class Workspace {
 
     public Type getType() { return type; }
     public void setType(Type type) { this.type = type; }
+
+    public Kind getKind() { return kind; }
+    public void setKind(Kind kind) { this.kind = kind; }
 
     public String getOwnerName() { return ownerName; }
     public void setOwnerName(String ownerName) { this.ownerName = ownerName; }

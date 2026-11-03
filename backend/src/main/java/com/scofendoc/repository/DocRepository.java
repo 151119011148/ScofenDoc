@@ -20,4 +20,7 @@ public interface DocRepository extends JpaRepository<Doc, Long> {
 
     /** 含已软删除的整空间文档，供「撤销删除」把子树捞回来 */
     List<Doc> findByWorkspaceId(Long workspaceId);
+
+    /** 跨空间搜索 / 最近更新：只看我加入的空间，按更新时间倒序 */
+    List<Doc> findByWorkspaceIdInAndDeletedFalseOrderByUpdatedAtDesc(List<Long> workspaceIds);
 }
