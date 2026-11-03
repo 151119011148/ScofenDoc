@@ -1,0 +1,26 @@
+# 依赖
+node_modules/
+
+# 构建产物
+frontend/dist/
+backend/target/
+
+# 运行时数据（协同服务落盘）
+collab/data/
+
+# 日志
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 系统
+.DS_Store
+
+# 项目数据目录
+.workbuddy/
+
+# TypeScript 构建缓存
+*.tsbuildinfo

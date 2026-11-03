@@ -1,0 +1,24 @@
+{
+  "name": "lightdoc-md-to-collab",
+  "private": true,
+  "type": "module",
+  "description": "把 Markdown 转成协同文档（Tiptap/Yjs）的初始状态文件，供导入到 Hocuspocus 房间",
+  "scripts": {
+    "convert": "node md-to-ydoc.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "^2.27.3",
+    "@tiptap/extension-table": "^2.27.3",
+    "@tiptap/extension-table-cell": "^2.27.3",
+    "@tiptap/extension-table-header": "^2.27.3",
+    "@tiptap/extension-table-row": "^2.27.3",
+    "@tiptap/extension-task-item": "^2.27.3",
+    "@tiptap/extension-task-list": "^2.27.3",
+    "@tiptap/html": "^2.27.3",
+    "@tiptap/starter-kit": "^2.27.3",
+    "marked": "^12.0.2",
+    "prosemirror-model": "^1.25.12",
+    "y-prosemirror": "^1.3.7",
+    "yjs": "^13.6.33"
+  }
+}

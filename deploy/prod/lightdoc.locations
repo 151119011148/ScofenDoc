@@ -1,0 +1,77 @@
+# ============================================================================
+# lightdoc.locations —— 轻量协同文档的 Nginx 片段
+#
+# 该文件不是独立 server 块（不被 conf.d/*.conf 通配加载），
+# 而是通过 emotion-web.conf 中的 include 引入到已有的 80 端口 server 内。
+# 这样：不改动现有站点根路径、不新增监听端口、不需要改安全组。
+#
+# 访问入口：http://<IP>/lightdoc/
+# ============================================================================
+
+# 省略尾斜杠时补上，保证相对路径解析正确
+location = /lightdoc {
+    return 301 /lightdoc/;
+}
+
+# 前端静态资源（Vite 构建时 base=/lightdoc/）
+location /lightdoc/ {
+    root /var/www;
+    try_files $uri $uri/ /lightdoc/index.html;
+}
+
+# 带 hash 的产物可长缓存
+location /lightdoc/assets/ {
+    root /var/www;
+    expires 7d;
+    add_header Cache-Control "public, max-age=604800";
+}
+
+# 入口 HTML 不缓存，避免发版后拿到旧入口
+location = /lightdoc/index.html {
+    root /var/www;
+    add_header Cache-Control "no-store";
+}
+
+# Java 后端：/lightdoc/api/xxx -> 127.0.0.1:8081/api/xxx（剥掉前缀）
+location /lightdoc/api/ {
+    proxy_pass          http://127.0.0.1:8081/api/;
+    proxy_http_version  1.1;
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header    X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout    30s;
+}
+
+# Yjs 协同：WebSocket 升级 + 长连接（read_timeout 必须放大，否则空闲即断）
+#
+# 注意：Hocuspocus v2 的文档名走协议消息，不走 URL 路径，
+# 客户端固定连 /lightdoc/collab 这个端点。
+# 而 Nginx 对以 / 结尾的 prefix location 会把 /lightdoc/collab 301 到 /lightdoc/collab/，
+# WebSocket 客户端不跟随 301，因此这里用精确匹配兜住不带斜杠的形式。
+location = /lightdoc/collab {
+    proxy_pass          http://127.0.0.1:1234/;
+    proxy_http_version  1.1;
+    proxy_set_header    Upgrade           $http_upgrade;
+    proxy_set_header    Connection        "upgrade";
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout    3600s;
+    proxy_read_timeout    3600s;
+}
+
+location /lightdoc/collab/ {
+    proxy_pass          http://127.0.0.1:1234/;
+    proxy_http_version  1.1;
+    proxy_set_header    Upgrade           $http_upgrade;
+    proxy_set_header    Connection        "upgrade";
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_connect_timeout 5s;
+    proxy_send_timeout    3600s;
+    proxy_read_timeout    3600s;
+}

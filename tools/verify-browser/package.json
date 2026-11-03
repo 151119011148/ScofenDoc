@@ -1,0 +1,1 @@
+{"name":"lightdoc-verify-browser","private":true,"type":"module","dependencies":{"jsonwebtoken":"^9.0.3","puppeteer-core":"^23.11.1"}}

@@ -1,0 +1,59 @@
+server:
+  # 生产由 systemd 传 SERVER_PORT=8081（8080 已被同机另一个服务占用）
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: light-doc-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/light_doc?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DB_USER:lightdoc}
+    password: ${DB_PASSWORD:lightdoc}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 小内存机器（2C1.8G）限制连接数，避免把 MySQL 连接打满
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+
+logging:
+  file:
+    name: ${LOG_FILE:/opt/lightdoc/logs/backend.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+  level:
+    root: INFO
+
+lightdoc:
+  # 注册策略：closed（默认，仅管理员开号）| open（允许自助注册）
+  # 例外：库里一个账号都没有时永远允许注册，第一个注册者自动成为管理员，
+  # 否则新实例关闭注册后就没人能进系统了。
+  auth:
+    registration-mode: ${REGISTRATION_MODE:closed}
+  jwt:
+    # 签名密钥。生产必须在 backend.env + collab.env 里配成同一个随机串，
+    # Java 与 Node 都对它做一次 SHA-256 得到 HS256 密钥，长度不限但务必一致。
+    secret: ${JWT_SECRET:lightdoc-dev-only-secret-change-me}
+    # 登录态有效期：7 天
+    ttl-seconds: ${JWT_TTL_SECONDS:604800}
+    # 协同 token 有效期：2 小时（前端每次切文档重新申请）
+    collab-ttl-seconds: ${JWT_COLLAB_TTL_SECONDS:7200}
+
+# 说明：本地无 MySQL 时，可临时改用 H2 以便直接启动后端（仅 Demo）：
+# spring:
+#   datasource:
+#     url: jdbc:h2:mem:light_doc;DB_CLOSE_DELAY=-1
+#     driver-class-name: org.h2.Driver
+#     username: sa
+#     password:
+#   jpa:
+#     hibernate:
+#       ddl-auto: create
+# 并在 pom 中加入 spring-boot-starter-data-jpa 已包含 H2？需显式加 h2 依赖。
