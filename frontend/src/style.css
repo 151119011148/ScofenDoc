@@ -146,6 +146,37 @@ body {
 }
 .tree-row:hover { background: var(--bg); }
 .tree-row.active { background: #eaf1ff; color: var(--brand); }
+.tree-row.selected { background: #dbe7ff; }
+
+/* ---- 多选批量工具栏 ---- */
+.tree-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px;
+  padding: 6px 8px;
+  background: #eaf1ff;
+  border: 1px solid #bcd4ff;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.tree-batch-bar .batch-count {
+  flex: 1;
+  color: var(--brand);
+  font-weight: 500;
+}
+.tree-batch-bar .batch-btn {
+  border: 1px solid #bcd4ff;
+  background: #fff;
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.tree-batch-bar .batch-btn:hover { background: var(--brand); color: #fff; }
+.tree-batch-bar .batch-btn:last-child { color: var(--text-2); border-color: #d5d8de; }
+.tree-batch-bar .batch-btn:last-child:hover { background: #f2f3f5; color: var(--text); }
 
 /* ---- 拖拽反馈：上/下边缘显示插入线，中间显示"成为子文档"的高亮 ---- */
 .tree-row.dragging { opacity: 0.4; }

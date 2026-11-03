@@ -250,6 +250,26 @@ async function removeDoc(doc: Doc) {
   }
 }
 
+/** 批量删除：逐篇调用删除接口，失败即中止并提示 */
+async function removeManyDocs(list: Doc[]) {
+  if (!canWrite.value || list.length === 0) return
+  const names = list.slice(0, 8).map((d) => d.title).join('、')
+  const suffix = list.length > 8 ? ` 等 ${list.length} 篇` : ''
+  if (!confirm(`确定删除选中的 ${list.length} 篇文档吗？（${names}${suffix}）\n其中含子文档的会连同子文档一起删除，此操作不可恢复。`)) return
+  moving.value = true
+  try {
+    for (const doc of list) {
+      await api.deleteDoc(doc.id)
+    }
+    await loadDocs(currentSpaceId.value!, null)
+  } catch (e) {
+    showError(e)
+    await loadDocs(currentSpaceId.value!, null)
+  } finally {
+    moving.value = false
+  }
+}
+
 /** 拖拽改层级 / 改顺序 */
 async function moveDoc(payload: { doc: Doc; parentId: number | null; index: number | null }) {
   if (!currentSpaceId.value || !canWrite.value) return
@@ -388,6 +408,7 @@ boot()
             @create-child="createDoc($event.id)"
             @rename="renameDoc"
             @remove="removeDoc"
+            @remove-many="removeManyDocs"
             @move="moveDoc"
           />
         </div>

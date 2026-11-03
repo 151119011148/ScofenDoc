@@ -161,6 +161,30 @@ onBeforeUnmount(() => {
 })
 
 const zoomPct = () => Math.round(scale.value * 100)
+
+/** 下载 SVG 为文件 */
+function downloadSvg() {
+  const { w, h } = svgSize.value
+  // 克隆并规整尺寸：确保下载的 SVG 自带明确的宽高（不依赖 viewBox 之外的运行时样式）
+  const el = document.createElement('div')
+  el.innerHTML = props.svg
+  const svgEl = el.querySelector('svg')
+  if (!svgEl) return
+  svgEl.setAttribute('width', String(w))
+  svgEl.setAttribute('height', String(h))
+  svgEl.removeAttribute('style') // 去掉可能干扰的运行时内联样式
+  const xml = new XMLSerializer().serializeToString(svgEl)
+  const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const base = (props.title || 'diagram').replace(/[\\/:*?"<>|]/g, '_')
+  a.href = url
+  a.download = `${base}.svg`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -173,6 +197,7 @@ const zoomPct = () => Math.round(scale.value * 100)
         <button class="dlb-btn" title="放大" @click="zoomBy(1.2)">＋</button>
         <button class="dlb-btn" title="适合窗口" @click="fitToViewport">适应</button>
         <button class="dlb-btn" title="复位" @click="reset">1:1</button>
+        <button class="dlb-btn" title="下载 SVG" @click="downloadSvg">⭳ 下载</button>
         <button class="dlb-btn dlb-close" title="关闭 (Esc)" @click="emit('close')">✕</button>
       </div>
 

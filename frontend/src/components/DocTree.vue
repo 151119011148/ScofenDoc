@@ -16,6 +16,7 @@ const emit = defineEmits<{
   (e: 'create-child', doc: Doc): void
   (e: 'rename', doc: Doc, title: string): void
   (e: 'remove', doc: Doc): void
+  (e: 'remove-many', docs: Doc[]): void
   (e: 'move', payload: { doc: Doc; parentId: number | null; index: number | null }): void
 }>()
 
@@ -80,6 +81,64 @@ function select(doc: Doc) {
   if ((childMap.value.get(doc.id) ?? []).length > 0 && !expanded.value.has(doc.id)) {
     expanded.value = new Set([...expanded.value, doc.id])
   }
+}
+
+/* ---------------- Shift / Ctrl 多选 ---------------- */
+
+const selectedIds = ref<Set<number>>(new Set())
+let anchorId: number | null = null
+
+/** 当前展示行的扁平 id 序列（与 rows 同序），用于 Shift 范围选择 */
+const rowIds = computed(() => rows.value.map((r) => r.doc.id))
+
+function toggleSelected(id: number) {
+  const next = new Set(selectedIds.value)
+  next.has(id) ? next.delete(id) : next.add(id)
+  selectedIds.value = next
+}
+
+function rangeSelect(fromId: number, toId: number) {
+  const ids = rowIds.value
+  const from = ids.indexOf(fromId)
+  const to = ids.indexOf(toId)
+  if (from === -1 || to === -1) return
+  const [lo, hi] = from < to ? [from, to] : [to, from]
+  const range = new Set(ids.slice(lo, hi + 1))
+  selectedIds.value = new Set([...selectedIds.value, ...range])
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+/** 行点击：区分普通 / Shift / Ctrl(Cmd) 三种 */
+function onRowClick(e: MouseEvent, doc: Doc) {
+  if (e.shiftKey) {
+    // Shift：从锚点到当前行范围多选
+    e.preventDefault()
+    const from = anchorId ?? doc.id
+    rangeSelect(from, doc.id)
+    anchorId = doc.id
+    return
+  }
+  if (e.metaKey || e.ctrlKey) {
+    // Ctrl/Cmd：切换单个选中态，不改变打开文档
+    e.preventDefault()
+    toggleSelected(doc.id)
+    anchorId = doc.id
+    return
+  }
+  // 普通点击：单选 + 打开文档 + 清空多选
+  clearSelection()
+  anchorId = doc.id
+  select(doc)
+}
+
+/** 批量删除入口 */
+function removeSelected() {
+  if (selectedIds.value.size === 0) return
+  const docs = rows.value.filter((r) => selectedIds.value.has(r.doc.id)).map((r) => r.doc)
+  emit('remove-many', docs)
 }
 
 /* ---------------- 行内重命名 ---------------- */
@@ -232,6 +291,13 @@ function resetDrag() {
 
 <template>
   <div class="tree" @dragend="resetDrag">
+    <!-- 多选工具栏：有选中项时显示 -->
+    <div v-if="selectedIds.size > 0 && !readonly" class="tree-batch-bar">
+      <span class="batch-count">已选 {{ selectedIds.size }} 篇</span>
+      <button class="batch-btn" title="批量删除" @click="removeSelected">🗑 删除</button>
+      <button class="batch-btn" title="取消选择" @click="clearSelection">取消</button>
+    </div>
+
     <div
       v-for="row in rows"
       :key="row.doc.id"
@@ -239,6 +305,7 @@ function resetDrag() {
         'tree-row',
         {
           active: row.doc.id === currentId,
+          selected: selectedIds.has(row.doc.id),
           dragging: dragId === row.doc.id,
           'drop-before': dropId === row.doc.id && dropZone === 'before',
           'drop-after': dropId === row.doc.id && dropZone === 'after',
@@ -251,7 +318,7 @@ function resetDrag() {
       @dragover="onDragOver($event, row.doc)"
       @dragleave="onDragLeave(row.doc)"
       @drop="onDrop($event, row.doc)"
-      @click="select(row.doc)"
+      @click="onRowClick($event, row.doc)"
       @dblclick="!readonly && startRename(row.doc)"
     >
       <span
