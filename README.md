@@ -81,6 +81,7 @@
 | 协同层 | Java 主后端 + Node 轻量协同服务（Hocuspocus） |
 | 鉴权 | JWT（HS256），区分 auth / collab 两类 token |
 | 数据访问 | JPA（Spring Data） |
+| 迁移 | Flyway（`db/migration/*.sql`，随后端启动自动执行，不再手动改库） |
 | 部署 | systemd 直跑 + Nginx 路径挂载（服务器无 Docker，见下文） |
 | 访问方式 | IP 直连（生产再补域名 + HTTPS） |
 
@@ -92,7 +93,8 @@
 │  └─ scripts/    # verify-collab.mjs 协同链路自检
 ├─ collab/        # Node Hocuspocus 协同服务（Yjs 实时同步 + 落盘 + JWT 校验）
 ├─ backend/       # Java / Spring Boot（账号、空间、文档树、协同 token）
-│  └─ security/   # JwtService / JwtAuthFilter / AuthUser / 401·403 异常
+│  ├─ security/   # JwtService / JwtAuthFilter / AuthUser / 401·403 异常
+│  └─ src/main/resources/db/migration/  # Flyway 版本化迁移（V1 基线 + 后续修复）
 ├─ deploy/        # docker-compose（备用）+ prod/ 生产部署脚本与 systemd 单元
 ├─ tools/         # publish-md.sh 发布脚本 + md-to-collab 转换器 + verify-browser 线上核对
 └─ README.md
@@ -207,6 +209,21 @@ npm run dev        # http://localhost:5173
 
 回滚：`git checkout <上一个提交> && ./deploy/prod/deploy.sh`。
 Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-lightdoc-*`，回滚只需还原该文件并删掉 include 行。
+
+### 数据库迁移（Flyway）
+
+表结构已从 JPA `ddl-auto: update` 切换为 `validate`，完全交给 Flyway 版本化管理。
+`backend/src/main/resources/db/migration/` 下的 `V<n>__*.sql` 随后端启动自动执行：
+
+- `V1__baseline.sql`：固化四张表结构（app_user / workspace / workspace_member / doc）。
+- `V2__fix_doc_hierarchy.sql`：修复导入拍平导致的父子关系（X.Y.Z 挂回 X.Y）。
+
+线上已有库的接入方式：`spring.flyway.baseline-on-migrate: true` + `baseline-version: 1`，
+后端首次升级启动时会自动把非空 schema baseline 到 V1（跳过 V1 建表），再执行 V1 之后的迁移。
+全新空库则从 V1 开始建表。**无需手动连库跑任何 SQL**。
+
+新增 DDL/DML 一律写成 `V<n>__描述.sql` 放进 `db/migration/`，随下一次发布自动生效；
+不要再用 `tools/sql/` 下的手写脚本（已移除）。
 
 ### 运维命令
 

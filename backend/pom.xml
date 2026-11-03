@@ -39,6 +39,16 @@
       <scope>runtime</scope>
     </dependency>
 
+    <!-- Flyway：schema 与数据修复版本化迁移，随发布自动执行（不再手动改库） -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-mysql</artifactId>
+    </dependency>
+
     <!-- JWT：签发与校验登录态 / 协同 token（HS256，密钥由 JWT_SECRET 注入） -->
     <dependency>
       <groupId>io.jsonwebtoken</groupId>
