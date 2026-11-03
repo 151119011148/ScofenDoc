@@ -76,8 +76,8 @@ App.vue（顶层状态机）
 ### 4.1 `localStorage`（会话）
 | Key | 内容 | 说明 |
 |---|---|---|
-| `lightdoc.token` | JWT 字符串 | 登录态，每次请求放 `Authorization: Bearer` |
-| `lightdoc.user` | `User` 的 JSON | 登录用户信息（含 `admin`、`color`） |
+| `scofendoc.token` | JWT 字符串 | 登录态，每次请求放 `Authorization: Bearer` |
+| `scofendoc.user` | `User` 的 JSON | 登录用户信息（含 `admin`、`color`） |
 
 会话读写封装在 `api.ts` 的 `loadSession / saveSession / clearSession`。
 
@@ -132,7 +132,7 @@ frontend/
 
 ## 6. 接口设计
 
-前端通过 `api.ts` 调用后端 REST（基础前缀 `API_BASE`，默认 `/api`，生产为 `/lightdoc/api`）。WebSocket 协同地址 `COLLAB_URL`（开发 `ws://localhost:1234`，生产 `/lightdoc/collab`）。
+前端通过 `api.ts` 调用后端 REST（基础前缀 `API_BASE`，默认 `/api`，生产为 `/scofendoc/api`）。WebSocket 协同地址 `COLLAB_URL`（开发 `ws://localhost:1234`，生产 `/scofendoc/collab`）。
 
 ### 6.1 REST 调用清单
 | api.ts 方法 | 方法 | 路径 | 说明 |
@@ -161,7 +161,7 @@ frontend/
 | `collabToken(docId)` | GET | `/docs/{id}/collab-token` | 单文档协同 token |
 
 ### 6.2 协同 WebSocket 契约
-- **地址**：`COLLAB_URL` 固定端点（生产 `/lightdoc/collab`），文档名（房间）由 `HocuspocusProvider` 的 `name` 传入（= `collabKey`），走协议消息而非 URL 路径。
+- **地址**：`COLLAB_URL` 固定端点（生产 `/scofendoc/collab`），文档名（房间）由 `HocuspocusProvider` 的 `name` 传入（= `collabKey`），走协议消息而非 URL 路径。
 - **握手 token**：连接时携带 `collabToken(docId)` 返回的 token（声明 `typ=collab`、`doc=<collabKey>`）。鉴权失败 → `onAuthenticationFailed` → 提示刷新重登。
 - **在线人数**：`onAwarenessChange` 的 `states.length - 1`（减去自己）。
 - **发布校验**：`scripts/verify-collab.mjs` 用同一 token 起两个客户端，验证一端写入被另一端收到（退出码 0=通过），可用于发版后自动化校验。
@@ -175,11 +175,11 @@ cd frontend
 npm install
 npm run dev        # http://localhost:5173，/api 代理到 :8080
 
-# 生产构建（挂在 /lightdoc/ 前缀）
-VITE_BASE=/lightdoc/ npm run build   # 产物 frontend/dist/
+# 生产构建（挂在 /scofendoc/ 前缀）
+VITE_BASE=/scofendoc/ npm run build   # 产物 frontend/dist/
 
 # 协同链路自检
-COLLAB_URL=ws://47.117.110.143/lightdoc/collab \
+COLLAB_URL=ws://47.117.110.143/scofendoc/collab \
 COLLAB_TOKEN=$TOKEN DOC_NAME=<collabKey> node scripts/verify-collab.mjs
 ```
 

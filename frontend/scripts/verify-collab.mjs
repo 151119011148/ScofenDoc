@@ -4,7 +4,7 @@
 //
 //   本地/生产通用（先向接口申请 token，再验证）：
 //     TOKEN=$(curl -s -X GET "$API/docs/$DOC_ID/collab-token" -H "Authorization: Bearer $JWT" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-//     COLLAB_URL=ws://47.117.110.143/lightdoc/collab \
+//     COLLAB_URL=ws://47.117.110.143/scofendoc/collab \
 //     COLLAB_TOKEN=$TOKEN DOC_NAME=<该文档的 collabKey> node scripts/verify-collab.mjs
 //
 // 退出码 0 表示同步成功，可用于发布后的自动化校验。

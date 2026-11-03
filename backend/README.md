@@ -7,7 +7,7 @@
 
 ## 1. 需求设计
 
-`backend` 是「轻量协同文档（light-doc）」的业务中枢，承担**除正文实时同步之外的一切**：账号、空间、文档树、权限判定与协同身份签发。正文本身由前端经 Node 协同服务（Hocuspocus）走 Yjs CRDT 同步，后端不存储正文。
+`backend` 是「轻量协同文档（scofenDoc）」的业务中枢，承担**除正文实时同步之外的一切**：账号、空间、文档树、权限判定与协同身份签发。正文本身由前端经 Node 协同服务（Hocuspocus）走 Yjs CRDT 同步，后端不存储正文。
 
 核心需求拆解：
 
@@ -65,7 +65,7 @@ Repository 层（JPA）
 
 ## 3. 数据实体设计
 
-四个 JPA 实体，包路径 `com.lightdoc.entity`：
+四个 JPA 实体，包路径 `com.scofendoc.entity`：
 
 ### 3.1 `User` — 账号
 - 表名 `app_user`（`user` 是 MySQL 8 保留字，刻意避开）。
@@ -156,8 +156,8 @@ Repository 层（JPA）
 ## 5. 包结构组织
 
 ```
-com.lightdoc
-├─ LightDocApplication.java       启动类
+com.scofendoc
+├─ ScofenDocApplication.java       启动类
 ├─ config
 │  ├─ SecurityConfig.java         无状态 JWT 安全链 + JSON 401/403
 │  └─ DataSeeder.java             种子空间/文档 + 幂等回填成员行
@@ -197,13 +197,13 @@ com.lightdoc
 
 ## 6. 接口设计
 
-基础前缀：`/api`。生产经 Nginx 挂在 `/lightdoc/api/`（见根 README 部署章节）。
+基础前缀：`/api`。生产经 Nginx 挂在 `/scofendoc/api/`（见根 README 部署章节）。
 
 **鉴权约定**：除 `/api/health`、`/api/auth/config`、登录注册接口外，所有接口需 `Authorization: Bearer <token>`。缺失 / 过期 → **401**；越权（非成员 / 角色不足 / 非管理员）→ **403**。注意 401 与 403 必须区分——前端 `api.ts` 仅在非登录类 401 时才清空会话跳登录，否则越权操作会被误踢下线。
 
 | 方法 | 路径 | 鉴权 | 说明 / 请求体 |
 |---|---|---|---|
-| GET | `/api/health` | 公开 | 返回 `{status:"ok", service:"light-doc-backend"}` |
+| GET | `/api/health` | 公开 | 返回 `{status:"ok", service:"scofen-doc-backend"}` |
 | GET | `/api/auth/config` | 公开 | 实例注册策略 `{registrationOpen, hasUsers, registrationMode}` |
 | POST | `/api/auth/register` | 公开（受开关约束） | `{username, password, displayName?}` → `{token, user}` |
 | POST | `/api/auth/login` | 公开 | `{username, password}` → `{token, user}` |
@@ -264,7 +264,7 @@ cd backend
 mvn spring-boot:run -Dspring-boot.run.jvmArguments="-DJWT_SECRET=dev-secret"
 
 # 生产打包
-mvn -B -DskipTests clean package   # 产出 target/light-doc-backend-0.1.0.jar
+mvn -B -DskipTests clean package   # 产出 target/scofen-doc-backend-0.1.0.jar
 ```
 
 依赖见 `pom.xml`：Spring Boot Starter Web / Data JPA / Security + MySQL Connector/J + JJWT 0.12.6（HS256）。

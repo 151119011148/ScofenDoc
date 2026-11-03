@@ -124,8 +124,8 @@ collab/
 
 ### 6.1 WebSocket 端点
 - 开发：`ws://localhost:1234`
-- 生产（经 Nginx 反代）：`ws(s)://<host>/lightdoc/collab`
-- 文档房间（房间名）由 Hocuspocus 协议消息携带 `name = collabKey`，**不走 URL 路径**。因此 Nginx 需同时精确匹配 `/lightdoc/collab`（无尾斜杠）与 `/lightdoc/collab/`，否则客户端不跟随 301 导致连接失败（见 `deploy/prod/lightdoc.locations`）。
+- 生产（经 Nginx 反代）：`ws(s)://<host>/scofendoc/collab`
+- 文档房间（房间名）由 Hocuspocus 协议消息携带 `name = collabKey`，**不走 URL 路径**。因此 Nginx 需同时精确匹配 `/scofendoc/collab`（无尾斜杠）与 `/scofendoc/collab/`，否则客户端不跟随 301 导致连接失败（见 `deploy/prod/scofendoc.locations`）。
 
 ### 6.2 连接握手（鉴权）
 客户端（`HocuspocusProvider`）在建立连接时携带 `token`（即后端 `GET /api/docs/{id}/collab-token` 返回）。服务端 `onAuthenticate` 校验流程：
@@ -161,7 +161,7 @@ cd collab
 npm install
 JWT_SECRET=dev-secret npm start        # 监听 ws://localhost:1234（与后端 JWT_SECRET 一致）
 
-# 生产（systemd 单例，见 deploy/prod/lightdoc-collab.service）
+# 生产（systemd 单例，见 deploy/prod/scofendoc-collab.service）
 COLLAB_PORT=1234 COLLAB_HOST=127.0.0.1 NODE_ENV=production \
   JWT_SECRET=<与后端相同> node server.js
 ```
