@@ -17,7 +17,8 @@ const emit = defineEmits<{
   (e: 'rename', doc: Doc, title: string): void
   (e: 'remove', doc: Doc): void
   (e: 'remove-many', docs: Doc[]): void
-  (e: 'move', payload: { doc: Doc; parentId: number | null; index: number | null }): void
+  /** 拖拽落位：docs 为被拖的一组文档（单选时就是一篇），按树内顺序排列 */
+  (e: 'move', payload: { docs: Doc[]; parentId: number | null; index: number | null }): void
 }>()
 
 /* ---------------- 组树 ---------------- */
@@ -172,9 +173,26 @@ function cancelRename() {
 
 type Zone = 'before' | 'inside' | 'after'
 
-const dragId = ref<number | null>(null)
+/** 本次拖拽涉及的文档 id（多选时为整批，保持树内顺序） */
+const dragIds = ref<number[]>([])
 const dropId = ref<number | 'root' | null>(null)
 const dropZone = ref<Zone | null>(null)
+
+const byId = computed(() => new Map(props.docs.map((d) => [d.id, d])))
+
+const dragging = computed(() => dragIds.value.length > 0)
+
+/** 某文档的祖先 id 链（父 → 根） */
+function ancestorIds(id: number): number[] {
+  const out: number[] = []
+  let cur = byId.value.get(id)?.parentId ?? null
+  let guard = 0
+  while (cur !== null && guard++ < 100) {
+    out.push(cur)
+    cur = byId.value.get(cur)?.parentId ?? null
+  }
+  return out
+}
 
 /** 某文档的整棵子树 id 集合（含自己），用于禁止拖进自己的后代 */
 function subtreeIds(rootId: number): Set<number> {
@@ -192,9 +210,27 @@ function subtreeIds(rootId: number): Set<number> {
   return out
 }
 
-/** 目标父节点下的兄弟（排除正在拖的那篇，和后端 moveDoc 的算法保持一致） */
+/**
+ * 从拖拽集合里剔掉「祖先也在集合里」的项。
+ * 拖父节点时子节点跟着走，若再单独移它一次，层级反而被打乱。
+ */
+function pruneNested(ids: number[]): number[] {
+  const set = new Set(ids)
+  return ids.filter((id) => !ancestorIds(id).some((a) => set.has(a)))
+}
+
+/** 所有被拖文档的子树并集：落点落在这里面一律不允许（会成环） */
+const dragSubtree = computed(() => {
+  const out = new Set<number>()
+  for (const id of dragIds.value) {
+    for (const x of subtreeIds(id)) out.add(x)
+  }
+  return out
+})
+
+/** 目标父节点下的兄弟（排除正在拖的那批，和后端 moveDoc 的算法保持一致） */
 function siblingsOf(parentId: number | null): Doc[] {
-  return (childMap.value.get(parentId) ?? []).filter((d) => d.id !== dragId.value)
+  return (childMap.value.get(parentId) ?? []).filter((d) => !dragIds.value.includes(d.id))
 }
 
 function onDragStart(e: DragEvent, doc: Doc) {
@@ -202,9 +238,14 @@ function onDragStart(e: DragEvent, doc: Doc) {
     e.preventDefault()
     return
   }
-  dragId.value = doc.id
+  // 拖的是选中项 → 整批拖；否则只拖这一篇
+  const picked =
+    selectedIds.value.has(doc.id) && selectedIds.value.size > 1
+      ? rows.value.filter((r) => selectedIds.value.has(r.doc.id)).map((r) => r.doc.id)
+      : [doc.id]
+  dragIds.value = pruneNested(picked)
   // Firefox 必须写 dataTransfer 才会真正开始拖拽
-  e.dataTransfer?.setData('text/plain', String(doc.id))
+  e.dataTransfer?.setData('text/plain', dragIds.value.join(','))
   if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
 }
 
@@ -218,9 +259,9 @@ function zoneOf(e: DragEvent, el: HTMLElement): Zone {
 }
 
 function canDropOn(target: Doc): boolean {
-  if (dragId.value === null || dragId.value === target.id) return false
-  // 不能拖进自己的后代（否则成环）
-  return !subtreeIds(dragId.value).has(target.id)
+  if (!dragging.value) return false
+  // 落点是自己或自己的后代 → 会成环
+  return !dragSubtree.value.has(target.id)
 }
 
 function onDragOver(e: DragEvent, doc: Doc) {
@@ -238,32 +279,45 @@ function onDragLeave(doc: Doc) {
   }
 }
 
+/** 被拖的那批文档，按树内顺序取出来 */
+function draggedDocs(): Doc[] {
+  return dragIds.value
+    .map((id) => props.docs.find((d) => d.id === id))
+    .filter((d): d is Doc => !!d)
+}
+
 function onDrop(e: DragEvent, target: Doc) {
   if (props.disabled || props.readonly || !canDropOn(target)) return
   e.preventDefault()
-  const dragged = props.docs.find((d) => d.id === dragId.value)
+  const moving = draggedDocs()
   const zone = zoneOf(e, e.currentTarget as HTMLElement)
-  resetDrag()
-  if (!dragged) return
+  if (moving.length === 0) {
+    resetDrag()
+    return
+  }
 
   if (zone === 'inside') {
+    const index = siblingsOf(target.id).length
+    resetDrag()
     expanded.value = new Set([...expanded.value, target.id])
-    emit('move', { doc: dragged, parentId: target.id, index: siblingsOf(target.id).length })
+    emit('move', { docs: moving, parentId: target.id, index })
     return
   }
 
   const parent = parentKey(target)
   const list = siblingsOf(parent)
   const at = list.findIndex((d) => d.id === target.id)
+  // 批量拖拽保持原有上下顺序：整块插到落点位置，后面由 App 依次 +1 递进
   const index = zone === 'before' ? Math.max(0, at) : at + 1
-  emit('move', { doc: dragged, parentId: parent, index })
+  resetDrag()
+  emit('move', { docs: moving, parentId: parent, index })
 }
 
 /* 拖到树底部空白 → 提到根目录末尾 */
 const rootHover = ref(false)
 
 function onRootDragOver(e: DragEvent) {
-  if (props.disabled || dragId.value === null) return
+  if (props.disabled || props.readonly || !dragging.value) return
   e.preventDefault()
   rootHover.value = true
   dropId.value = 'root'
@@ -271,18 +325,17 @@ function onRootDragOver(e: DragEvent) {
 }
 
 function onRootDrop(e: DragEvent) {
-  if (props.disabled || dragId.value === null) return
+  if (props.disabled || props.readonly || !dragging.value) return
   e.preventDefault()
-  const dragged = props.docs.find((d) => d.id === dragId.value)
+  // 已经是根节点的跳过（后端允许，但没必要多打一次接口）
+  const moving = draggedDocs().filter((d) => parentKey(d) !== null)
   const index = siblingsOf(null).length
   resetDrag()
-  if (dragged && parentKey(dragged) !== null) {
-    emit('move', { doc: dragged, parentId: null, index })
-  }
+  if (moving.length > 0) emit('move', { docs: moving, parentId: null, index })
 }
 
 function resetDrag() {
-  dragId.value = null
+  dragIds.value = []
   dropId.value = null
   dropZone.value = null
   rootHover.value = false
@@ -293,7 +346,7 @@ function resetDrag() {
   <div class="tree" @dragend="resetDrag">
     <!-- 多选工具栏：有选中项时显示 -->
     <div v-if="selectedIds.size > 0 && !readonly" class="tree-batch-bar">
-      <span class="batch-count">已选 {{ selectedIds.size }} 篇</span>
+      <span class="batch-count">已选 {{ selectedIds.size }} 篇 · 可直接拖拽整批移动</span>
       <button class="batch-btn" title="批量删除" @click="removeSelected">🗑 删除</button>
       <button class="batch-btn" title="取消选择" @click="clearSelection">取消</button>
     </div>
@@ -306,7 +359,7 @@ function resetDrag() {
         {
           active: row.doc.id === currentId,
           selected: selectedIds.has(row.doc.id),
-          dragging: dragId === row.doc.id,
+          dragging: dragIds.includes(row.doc.id),
           'drop-before': dropId === row.doc.id && dropZone === 'before',
           'drop-after': dropId === row.doc.id && dropZone === 'after',
           'drop-inside': dropId === row.doc.id && dropZone === 'inside',
@@ -354,7 +407,7 @@ function resetDrag() {
 
     <!-- 拖到根目录：把子文档提为顶层 -->
     <div
-      v-if="dragId !== null && !readonly"
+      v-if="dragging && !readonly"
       :class="['tree-root-drop', { hover: rootHover }]"
       @dragover="onRootDragOver"
       @dragleave="rootHover = false"

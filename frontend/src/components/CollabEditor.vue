@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import type { ChainedCommands } from '@tiptap/core'
+import { Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -41,6 +42,25 @@ const props = withDefaults(
 
 const editor = ref<Editor>()
 let provider: HocuspocusProvider | null = null
+
+/**
+ * 撤销/重做快捷键补全。
+ *
+ * 关掉 StarterKit 的 history 后，撤销由 Collaboration 扩展提供（Yjs UndoManager），
+ * 它只注册了 Mod-z —— 在 macOS 上 Mod 等于 ⌘，所以习惯按 Ctrl+Z 的人会觉得"撤不了"。
+ * 这里把 Ctrl 系列也显式绑上，两个平台的肌肉记忆都能用。
+ * 注意必须走 editor.commands.undo()，那是 Yjs 的撤销栈；用 ProseMirror 的 history 会和 CRDT 打架。
+ */
+const UndoRedoShortcuts = Extension.create({
+  name: 'undoRedoShortcuts',
+  addKeyboardShortcuts() {
+    return {
+      'Ctrl-z': () => this.editor.commands.undo(),
+      'Ctrl-Shift-z': () => this.editor.commands.redo(),
+      'Ctrl-y': () => this.editor.commands.redo(),
+    }
+  },
+})
 
 const emit = defineEmits<{
   /** 编辑器实例就绪后上报，供大纲/折叠等外部面板使用 */
@@ -358,6 +378,7 @@ onMounted(() => {
       MermaidBlock,
       PlantUMLBlock,
       HeadingFold,
+      UndoRedoShortcuts,
       Collaboration.configure({ document: ydoc }),
       CollaborationCursor.configure({
         provider,

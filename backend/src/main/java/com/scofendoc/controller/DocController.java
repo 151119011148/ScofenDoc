@@ -81,6 +81,13 @@ public class DocController {
         return Map.of("deleted", n);
     }
 
+    /** 撤销删除：恢复被软删的文档及其子树（前端 Ctrl+Z 用这个） */
+    @PostMapping("/docs/{id}/restore")
+    public Map<String, Object> restore(@PathVariable Long id) {
+        int n = service.restoreDoc(id, CurrentUser.id());
+        return Map.of("restored", n);
+    }
+
     /** 协同 token：前端拿它连 WebSocket，只对本篇文档有效 */
     @GetMapping("/docs/{id}/collab-token")
     public CollabTokenDto collabToken(@PathVariable Long id) {

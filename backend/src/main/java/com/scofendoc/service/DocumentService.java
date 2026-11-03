@@ -204,6 +204,47 @@ public class DocumentService {
     }
 
     /**
+     * 撤销删除：把这篇文档以及它整棵子树里被标记删除的节点恢复回来。
+     *
+     * 删除本来就是软删（deleted 标记 + 协同 bin 保留），所以恢复不需要重建正文。
+     * 唯一要处理的是「父级也被删了」的情况：那时挂回根节点，避免出现孤儿文档
+     * ——挂着的父 id 找不到，前端会把它当成根节点渲染，位置会莫名其妙。
+     */
+    @Transactional
+    public int restoreDoc(Long id, Long userId) {
+        Doc root = docRepo.findById(id).orElseThrow(() -> new ForbiddenException("文档不存在：" + id));
+        membership.requireWrite(root.getWorkspaceId(), userId);
+
+        List<Doc> all = docRepo.findByWorkspaceId(root.getWorkspaceId());
+        List<Long> subtree = new ArrayList<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.add(id);
+        while (!queue.isEmpty()) {
+            Long cur = queue.poll();
+            subtree.add(cur);
+            all.stream().filter(x -> cur.equals(x.getParentId())).forEach(x -> queue.add(x.getId()));
+        }
+
+        List<Doc> hit = all.stream()
+                .filter(x -> subtree.contains(x.getId()) && x.isDeleted())
+                .toList();
+
+        LocalDateTime now = LocalDateTime.now();
+        for (Doc d : hit) {
+            d.setDeleted(false);
+            d.setUpdatedAt(now);
+        }
+        if (root.isDeleted() && root.getParentId() != null) {
+            Doc parent = docRepo.findById(root.getParentId()).orElse(null);
+            if (parent == null || parent.isDeleted()) {
+                root.setParentId(null);
+            }
+        }
+        docRepo.saveAll(hit);
+        return hit.size();
+    }
+
+    /**
      * 签发协同 token：只能用于这一个文档房间，且默认 2 小时过期。
      * 查看者同样能拿到——只读是在前端约束的，服务端没有强制拦截 Yjs 更新，
      * 这点在 README 里如实写明，不假装它是硬隔离。

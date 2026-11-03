@@ -215,6 +215,10 @@ export const api = {
   deleteDoc: (id: number) =>
     request<{ deleted: number }>(`/docs/${id}`, { method: 'DELETE' }),
 
+  /** 撤销删除：把软删掉的文档（含子树）恢复回来 */
+  restoreDoc: (id: number) =>
+    request<{ restored: number }>(`/docs/${id}/restore`, { method: 'POST' }),
+
   /** 协同 token：只对这篇文档有效，前端连 WebSocket 时带上 */
   collabToken: (docId: number) =>
     request<{ token: string; expiresIn: number }>(`/docs/${docId}/collab-token`),

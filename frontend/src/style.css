@@ -944,6 +944,10 @@ body {
   z-index: 100;
 }
 .toast.error { background: var(--danger); }
+/* 撤销/重做等中性提示：比错误提示低一级，不抢注意力 */
+.toast.notice { background: #3a4048; }
+/* 两条同时出现时错开，避免叠在一起 */
+.toast.error + .toast.notice { bottom: 70px; }
 
 /* ============ 账号 / 成员 / 弹窗 ============ */
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CollabEditor from './components/CollabEditor.vue'
 import DocTree from './components/DocTree.vue'
 import OutlinePanel from './components/OutlinePanel.vue'
@@ -17,6 +17,7 @@ import {
   type Session,
   type Workspace,
 } from './api'
+import { clearUndo, pushUndo, redoOnce, undoOnce, undoState } from './undo'
 
 /* ---------- 会话 ---------- */
 const session = ref<Session | null>(loadSession())
@@ -105,6 +106,8 @@ function resetState() {
   titleDraft.value = ''
   collabToken.value = ''
   collabKeyOfToken.value = ''
+  // 撤销栈里存的是上个空间的文档 id，跨空间没有任何意义
+  clearUndo()
 }
 
 /* ---------- 数据加载 ---------- */
@@ -175,6 +178,7 @@ function selectSpace(id: number) {
   currentDocId.value = null
   collabToken.value = ''
   collabKeyOfToken.value = ''
+  clearUndo()
   loadDocs(id)
 }
 
@@ -218,13 +222,24 @@ async function createDoc(parentId: number | null) {
 }
 
 async function renameDoc(doc: Doc, title: string) {
+  const oldTitle = doc.title
   try {
-    const updated = await api.renameDoc(doc.id, title)
-    docs.value = docs.value.map((d) => (d.id === updated.id ? updated : d))
-    if (currentDocId.value === updated.id) titleDraft.value = updated.title
+    await applyRename(doc.id, title)
+    pushUndo({
+      label: `重命名「${oldTitle}」→「${title}」`,
+      undo: () => applyRename(doc.id, oldTitle),
+      redo: () => applyRename(doc.id, title),
+    })
   } catch (e) {
     showError(e)
   }
+}
+
+/** 落库改标题并同步本地状态（撤销/重做复用） */
+async function applyRename(id: number, title: string) {
+  const updated = await api.renameDoc(id, title)
+  docs.value = docs.value.map((d) => (d.id === updated.id ? updated : d))
+  if (currentDocId.value === updated.id) titleDraft.value = updated.title
 }
 
 async function saveTitle() {
@@ -248,6 +263,12 @@ async function removeDoc(doc: Doc) {
     await api.deleteDoc(doc.id)
     const wasCurrent = currentDocId.value === doc.id
     await loadDocs(currentSpaceId.value!, wasCurrent ? null : currentDocId.value)
+    // 后端是软删除，撤销就是把 deleted 标记翻回去，正文原样保留
+    pushUndo({
+      label: `删除「${doc.title}」`,
+      undo: () => restoreDocs([doc.id]),
+      redo: () => deleteDocs([doc.id]),
+    })
   } catch (e) {
     showError(e)
   }
@@ -258,13 +279,19 @@ async function removeManyDocs(list: Doc[]) {
   if (!canWrite.value || list.length === 0) return
   const names = list.slice(0, 8).map((d) => d.title).join('、')
   const suffix = list.length > 8 ? ` 等 ${list.length} 篇` : ''
-  if (!confirm(`确定删除选中的 ${list.length} 篇文档吗？（${names}${suffix}）\n其中含子文档的会连同子文档一起删除，此操作不可恢复。`)) return
+  if (!confirm(`确定删除选中的 ${list.length} 篇文档吗？（${names}${suffix}）\n其中含子文档的会连同子文档一起删除。删错了可以按 Ctrl+Z 撤销。`)) return
   moving.value = true
+  const ids = list.map((d) => d.id)
   try {
-    for (const doc of list) {
-      await api.deleteDoc(doc.id)
+    for (const id of ids) {
+      await api.deleteDoc(id)
     }
     await loadDocs(currentSpaceId.value!, null)
+    pushUndo({
+      label: `删除 ${ids.length} 篇文档`,
+      undo: () => restoreDocs(ids),
+      redo: () => deleteDocs(ids),
+    })
   } catch (e) {
     showError(e)
     await loadDocs(currentSpaceId.value!, null)
@@ -273,21 +300,129 @@ async function removeManyDocs(list: Doc[]) {
   }
 }
 
-/** 拖拽改层级 / 改顺序 */
-async function moveDoc(payload: { doc: Doc; parentId: number | null; index: number | null }) {
-  if (!currentSpaceId.value || !canWrite.value) return
+/* ---------- 撤销 / 重做 ---------- */
+
+/** 撤销/重做的即时反馈（和错误提示分开，颜色不同） */
+const notice = ref('')
+let noticeTimer: number | undefined
+
+function flash(msg: string) {
+  notice.value = msg
+  window.clearTimeout(noticeTimer)
+  noticeTimer = window.setTimeout(() => (notice.value = ''), 2600)
+}
+
+async function reloadDocs() {
+  if (currentSpaceId.value) await loadDocs(currentSpaceId.value, currentDocId.value)
+}
+
+/** 文档在「当前父级下」排第几 —— 撤销移动时要原样放回去 */
+function siblingIndexOf(doc: Doc): number {
+  const sibs = docs.value.filter((d) => d.parentId === doc.parentId)
+  const at = sibs.findIndex((d) => d.id === doc.id)
+  return at < 0 ? 0 : at
+}
+
+/**
+ * 按计划逐条落库。
+ * 同一个父级下要按 index 升序插入：拖 3 篇到第 2 位，就是 2、3、4，
+ * 顺序反了会把整批的先后倒过来。
+ */
+async function applyMovePlan(plan: { id: number; parentId: number | null; index: number }[]) {
+  const sorted = [...plan].sort((a, b) => a.index - b.index)
+  for (const step of sorted) {
+    await api.moveDoc(step.id, step.parentId, step.index)
+  }
+  await reloadDocs()
+}
+
+async function restoreDocs(ids: number[]) {
+  for (const id of ids) await api.restoreDoc(id)
+  await reloadDocs()
+}
+
+async function deleteDocs(ids: number[]) {
+  for (const id of ids) await api.deleteDoc(id)
+  await reloadDocs()
+}
+
+/** 拖拽改层级 / 改顺序，支持整批（多选后直接拖） */
+async function moveDocs(payload: { docs: Doc[]; parentId: number | null; index: number | null }) {
+  if (!currentSpaceId.value || !canWrite.value || payload.docs.length === 0) return
+  // 撤销用：记下每篇原来的父级与位置（必须在请求前取，请求后 docs 就变了）
+  const before = payload.docs.map((d) => ({
+    id: d.id,
+    parentId: d.parentId,
+    index: siblingIndexOf(d),
+  }))
+  // 目标位置：index 为 null 表示放到末尾
+  const movingIds = new Set(payload.docs.map((d) => d.id))
+  const restCount = docs.value.filter(
+    (d) => d.parentId === payload.parentId && !movingIds.has(d.id),
+  ).length
+  const base = payload.index ?? restCount
+  const after = payload.docs.map((d, i) => ({
+    id: d.id,
+    parentId: payload.parentId,
+    index: base + i,
+  }))
+
   moving.value = true
   try {
-    await api.moveDoc(payload.doc.id, payload.parentId, payload.index)
-    await loadDocs(currentSpaceId.value, currentDocId.value)
+    await applyMovePlan(after)
+    pushUndo({
+      label:
+        payload.docs.length > 1
+          ? `移动 ${payload.docs.length} 篇文档`
+          : `移动「${payload.docs[0].title}」`,
+      undo: () => applyMovePlan(before),
+      redo: () => applyMovePlan(after),
+    })
   } catch (e) {
     showError(e)
     // 失败后重新拉一次，避免界面上留着"看起来已经移动"的假象
-    await loadDocs(currentSpaceId.value, currentDocId.value)
+    await reloadDocs()
   } finally {
     moving.value = false
   }
 }
+
+/** 焦点在正文编辑器或输入框里时，Ctrl+Z 交给它们自己处理 */
+function isTypingTarget(el: EventTarget | null): boolean {
+  const node = el as HTMLElement | null
+  if (!node || !node.tagName) return false
+  if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') return true
+  if (node.isContentEditable) return true
+  return !!node.closest?.('.ProseMirror')
+}
+
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+  const key = e.key.toLowerCase()
+  if (key !== 'z' && key !== 'y') return
+  // 正文有 Yjs 自己的撤销栈（按文档、跨端一致），这里只管文档树这类元数据操作
+  if (isTypingTarget(e.target)) return
+  if (undoState.busy) return
+
+  e.preventDefault()
+  const wantRedo = key === 'y' || e.shiftKey
+  const run = wantRedo ? redoOnce() : undoOnce()
+  run
+    .then((label) => {
+      if (label) flash(`${wantRedo ? '已重做' : '已撤销'}：${label}`)
+      else flash(wantRedo ? '没有可重做的操作' : '没有可撤销的操作')
+    })
+    .catch((err) => {
+      showError(err)
+      reloadDocs()
+    })
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  window.clearTimeout(noticeTimer)
+})
 
 function showError(e: unknown) {
   error.value = e instanceof Error ? e.message : String(e)
@@ -420,12 +555,12 @@ boot()
             @rename="renameDoc"
             @remove="removeDoc"
             @remove-many="removeManyDocs"
-            @move="moveDoc"
+            @move="moveDocs"
           />
         </div>
 
         <div class="sidebar-foot">
-          <template v-if="canWrite">拖动文档可调整层级与顺序</template>
+          <template v-if="canWrite">拖动文档可调整层级与顺序 · Ctrl+Z 撤销</template>
           <template v-else>你在此空间只有查看权限</template>
         </div>
       </aside>
@@ -526,5 +661,6 @@ boot()
     />
 
     <div v-if="error" class="toast error">{{ error }}</div>
+    <div v-if="notice" class="toast notice">{{ notice }}</div>
   </div>
 </template>

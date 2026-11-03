@@ -17,4 +17,7 @@ public interface DocRepository extends JpaRepository<Doc, Long> {
     boolean existsByWorkspaceIdAndDeletedFalse(Long workspaceId);
 
     List<Doc> findByWorkspaceIdAndDeletedFalse(Long workspaceId);
+
+    /** 含已软删除的整空间文档，供「撤销删除」把子树捞回来 */
+    List<Doc> findByWorkspaceId(Long workspaceId);
 }
