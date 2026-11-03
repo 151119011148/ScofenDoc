@@ -247,7 +247,7 @@ com.lightdoc
 | 配置 / 变量 | 默认 | 说明 |
 |---|---|---|
 | `SERVER_PORT` | `8080` | 生产由 systemd 传 `8081`（8080 被同机另一服务占用） |
-| `DB_URL` / `DB_USER` / `DB_PASSWORD` | 本地 MySQL `light_doc` | 生产在 `backend.env` 注入 |
+| `DB_URL` / `DB_USER` / `DB_PASSWORD` | 本地 MySQL `scofen_doc` | 生产在 `backend.env` 注入 |
 | `DB_POOL_SIZE` | `5` | 小内存机器限制连接数 |
 | `REGISTRATION_MODE` | `closed` | `closed`(默认) / `open` |
 | `JWT_SECRET` | dev 占位串 | 与 Node 协同服务共享，SHA-256 派生 HS256 密钥 |
