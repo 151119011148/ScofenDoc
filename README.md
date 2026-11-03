@@ -217,6 +217,7 @@ Nginx 配置备份在 `/etc/nginx/conf.d/emotion-web.conf.bak-lightdoc-*`，回�
 
 - `V1__baseline.sql`：固化四张表结构（app_user / workspace / workspace_member / doc）。
 - `V2__fix_doc_hierarchy.sql`：修复导入拍平导致的父子关系（X.Y.Z 挂回 X.Y）。
+- `V3__doc_chapter_hierarchy.sql`：按「第一~六章」在导入根（技术栈）下新建一级章，把拍平的编号子文档按章重挂；幂等可重复执行（2026-11-03 已对线上执行，执行前备份在服务器 `/opt/lightdoc/backup/doc_20261103_hierarchy.sql.gz`）。
 
 线上已有库的接入方式：`spring.flyway.baseline-on-migrate: true` + `baseline-version: 1`，
 后端首次升级启动时会自动把非空 schema baseline 到 V1（跳过 V1 建表），再执行 V1 之后的迁移。
