@@ -47,6 +47,9 @@ const showMembers = ref(false)
 const showChangePwd = ref(false)
 const showAdminUsers = ref(false)
 
+/* 侧边栏折叠 */
+const sidebarCollapsed = ref(false)
+
 /* 大纲面板：需要拿到正文编辑器实例与滚动容器（.main），标题变化时重扫 */
 const mainScroller = ref<HTMLElement | null>(null)
 const outlineEditor = ref<{ view?: { dom?: HTMLElement } } | null>(null)
@@ -362,7 +365,15 @@ boot()
     </header>
 
     <div class="layout">
-      <aside class="sidebar">
+      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+        <button
+          class="sidebar-collapse"
+          :title="sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+        >
+          {{ sidebarCollapsed ? '»' : '«' }}
+        </button>
+
         <div class="section-label">
           <span>空间</span>
           <button class="mini" title="新建空间" @click="showCreateSpace = true">＋</button>
@@ -425,10 +436,19 @@ boot()
         <template v-else-if="currentDoc">
           <div class="doc-head">
             <div class="crumb">
-              <span>{{ currentSpace?.name }}</span>
+              <button class="crumb-link" :class="{ last: !breadcrumb.length }" @click="breadcrumb.length ? selectDoc(breadcrumb[0]) : null">
+                {{ currentSpace?.name }}
+              </button>
               <template v-for="node in breadcrumb" :key="node.id">
                 <span class="sep">/</span>
-                <span :class="{ last: node.id === currentDoc.id }">{{ node.title }}</span>
+                <button
+                  class="crumb-link"
+                  :class="{ last: node.id === currentDoc.id }"
+                  :disabled="node.id === currentDoc.id"
+                  @click="selectDoc(node)"
+                >
+                  {{ node.title }}
+                </button>
               </template>
               <span v-if="!canWrite" class="crumb-ro">仅查看</span>
             </div>

@@ -57,25 +57,61 @@ interface SlashItem {
   label: string
   hint: string
   icon: string
+  color?: string
   keywords: string
   run: (chain: ChainedCommands) => ChainedCommands
+  /** 二级子菜单：展开后替代主项 */
+  children?: SlashItem[]
 }
 
-const ALL_ITEMS: SlashItem[] = [
-  { key: 'text', label: '正文', hint: '普通段落', icon: '¶', keywords: 'zhengwen text p paragraph', run: (c) => c.setParagraph() },
-  { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => c.toggleHeading({ level: 1 }) },
-  { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => c.toggleHeading({ level: 2 }) },
-  { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => c.toggleHeading({ level: 3 }) },
-  { key: 'bullet', label: '无序列表', hint: '圆点列表', icon: '•', keywords: 'wuxu liebiao list bullet ul', run: (c) => c.toggleBulletList() },
-  { key: 'ordered', label: '有序列表', hint: '带编号列表', icon: '1.', keywords: 'youxu liebiao list ordered ol number', run: (c) => c.toggleOrderedList() },
-  { key: 'task', label: '待办清单', hint: '可勾选的任务项', icon: '☑', keywords: 'daiban qingdan todo task checkbox', run: (c) => c.toggleTaskList() },
-  { key: 'quote', label: '引用', hint: '引述一段话', icon: '❝', keywords: 'yinyong quote blockquote', run: (c) => c.toggleBlockquote() },
-  { key: 'code', label: '代码块', hint: '等宽字体代码', icon: '</>', keywords: 'daima code codeblock', run: (c) => c.toggleCodeBlock() },
-  { key: 'table', label: '表格', hint: '3 行 3 列，可增删行列', icon: '▦', keywords: 'biaoge table grid liebiao', run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
-  { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
-  { key: 'mermaid', label: 'Mermaid 图', hint: 'flowchart / sequence 流程图', icon: '🖼', keywords: 'mermaid liucheng tu flowchart sequence graph 图', run: (c) => c.insertContent({ type: 'mermaid', attrs: { code: 'graph TD\n  A[开始] --> B[结束]' } }) },
-  { key: 'plantuml', label: 'PlantUML 图', hint: '时序图/类图/用例图', icon: '🌱', keywords: 'plantuml puml uml shixu tu sequence class usecase 图', run: (c) => c.insertContent({ type: 'plantuml', attrs: { code: '@startuml\nAlice -> Bob: Hello\n@enduml' } }) },
+interface SlashGroup {
+  name: string
+  items: SlashItem[]
+}
+
+const TABLE_PRESETS = [
+  { rows: 2, cols: 2, label: '2×2', hint: '2 行 2 列' },
+  { rows: 3, cols: 3, label: '3×3', hint: '3 行 3 列（带表头）' },
+  { rows: 4, cols: 4, label: '4×4', hint: '4 行 4 列' },
+  { rows: 5, cols: 5, label: '5×5', hint: '5 行 5 列' },
+  { rows: 6, cols: 8, label: '6×8', hint: '宽表：6 行 8 列' },
 ]
+
+const SLASH_GROUPS: SlashGroup[] = [
+  {
+    name: '基础',
+    items: [
+      { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => c.toggleHeading({ level: 1 }) },
+      { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => c.toggleHeading({ level: 2 }) },
+      { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => c.toggleHeading({ level: 3 }) },
+      { key: 'bullet', label: '无序列表', hint: '圆点列表', icon: '•', keywords: 'wuxu liebiao list bullet ul', run: (c) => c.toggleBulletList() },
+      { key: 'ordered', label: '有序列表', hint: '带编号列表', icon: '1.', keywords: 'youxu liebiao list ordered ol number', run: (c) => c.toggleOrderedList() },
+      { key: 'task', label: '待办清单', hint: '可勾选的任务项', icon: '☑', keywords: 'daiban qingdan todo task checkbox', run: (c) => c.toggleTaskList() },
+      { key: 'code', label: '代码块', hint: '等宽字体代码', icon: '</>', keywords: 'daima code codeblock', run: (c) => c.toggleCodeBlock() },
+      { key: 'quote', label: '引用', hint: '引述一段话', icon: '❝', keywords: 'yinyong quote blockquote', run: (c) => c.toggleBlockquote() },
+      { key: 'text', label: '正文', hint: '普通段落', icon: '¶', keywords: 'zhengwen text p paragraph', run: (c) => c.setParagraph() },
+      { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
+    ],
+  },
+  {
+    name: '常用',
+    items: [
+      {
+        key: 'table', label: '表格', hint: '插入表格', icon: '▦', color: '#16a085', keywords: 'biaoge table grid liebiao',
+        run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+        children: TABLE_PRESETS.map((p) => ({
+          key: `table-${p.rows}x${p.cols}`, label: `表格 ${p.label}`, hint: p.hint, icon: '▦',
+          keywords: `biaoge table ${p.rows} ${p.cols}`,
+          run: (c) => c.insertTable({ rows: p.rows, cols: p.cols, withHeaderRow: true }),
+        })),
+      },
+      { key: 'mermaid', label: 'Mermaid 图', hint: 'flowchart / sequence 流程图', icon: '🖼', color: '#e67e22', keywords: 'mermaid liucheng tu flowchart sequence graph 图', run: (c) => c.insertContent({ type: 'mermaid', attrs: { code: 'graph TD\n  A[开始] --> B[结束]' } }) },
+      { key: 'plantuml', label: 'PlantUML 图', hint: '时序图/类图/用例图', icon: '🌱', color: '#27ae60', keywords: 'plantuml puml uml shixu tu sequence class usecase 图', run: (c) => c.insertContent({ type: 'plantuml', attrs: { code: '@startuml\nAlice -> Bob: Hello\n@enduml' } }) },
+    ],
+  },
+]
+
+const ALL_ITEMS: SlashItem[] = SLASH_GROUPS.flatMap((g) => g.items)
 
 /* ---------------- 斜杠菜单状态 ---------------- */
 
@@ -87,12 +123,11 @@ const slashTo = ref(0)
 const slashQuery = ref('')
 const slashIndex = ref(0)
 
+/** 无查询时按分组返回；有查询时跨分组扁平搜索（含子菜单项），并按匹配强度排序 */
 const filtered = computed(() => {
   const q = slashQuery.value.trim().toLowerCase()
-  if (!q) return ALL_ITEMS
+  if (!q) return SLASH_GROUPS
 
-  // 按匹配强度排序，而不是简单过滤：
-  // 输入 "h" 时应先看到标题类，而不是因为关键词里恰好含 h 的「正文」排在最前。
   // 0 文本以查询开头 → 1 文本包含 → 2 key 以查询开头 → 3 拼音/英文关键词命中
   const scored: { item: SlashItem; score: number; order: number }[] = []
   ALL_ITEMS.forEach((item, order) => {
@@ -104,7 +139,17 @@ const filtered = computed(() => {
     else if (item.keywords.toLowerCase().includes(q)) score = 3
     if (score >= 0) scored.push({ item, score, order })
   })
-  return scored.sort((a, b) => a.score - b.score || a.order - b.order).map((x) => x.item)
+  const sorted = scored.sort((a, b) => a.score - b.score || a.order - b.order).map((x) => x.item)
+  return sorted.length ? [{ name: '匹配结果', items: sorted }] : []
+})
+
+/** 当前处于「展开子菜单」状态时的父项 key（非空表示在展示子菜单） */
+const submenuOf = ref('')
+
+/** 子菜单项列表（当 submenuOf 指向某父项时） */
+const activeChildren = computed(() => {
+  if (!submenuOf.value) return []
+  return ALL_ITEMS.find((i) => i.key === submenuOf.value)?.children ?? []
 })
 
 /** 光标是否处在「段首输入 /xxx」的状态；是则更新菜单位置 */
@@ -148,6 +193,21 @@ function closeSlash() {
   slashOpen.value = false
   slashQuery.value = ''
   slashIndex.value = 0
+  submenuOf.value = ''
+}
+
+/** 键盘导航用的扁平项列表：展开子菜单时用子项，否则用过滤结果扁平化 */
+const flatItems = computed<SlashItem[]>(() => {
+  if (submenuOf.value) return activeChildren.value
+  return filtered.value.flatMap((g) => g.items)
+})
+
+/** 当前高亮项的 key（根态用，用于跨分组定位高亮） */
+const currentFlatKey = computed(() => flatItems.value[slashIndex.value]?.key ?? '')
+
+/** 根态下按 key 反查扁平索引（供 mouseenter 同步高亮） */
+function flatIndexOf(item: SlashItem) {
+  return flatItems.value.findIndex((x) => x.key === item.key)
 }
 
 function applySlash(item: SlashItem) {
@@ -160,8 +220,22 @@ function applySlash(item: SlashItem) {
   item.run(ed.chain().focus().deleteRange({ from, to })).run()
 }
 
+function openSubmenu(item: SlashItem) {
+  if (item.children?.length) {
+    submenuOf.value = item.key
+    slashIndex.value = 0
+  } else {
+    applySlash(item)
+  }
+}
+
+function backToRoot() {
+  submenuOf.value = ''
+  slashIndex.value = 0
+}
+
 function moveSlash(delta: number) {
-  const n = filtered.value.length
+  const n = flatItems.value.length
   if (n === 0) return
   slashIndex.value = (slashIndex.value + delta + n) % n
 }
@@ -226,9 +300,27 @@ onMounted(() => {
           moveSlash(-1)
           return true
         }
+        if (event.key === 'ArrowLeft') {
+          if (submenuOf.value) {
+            backToRoot()
+            return true
+          }
+          return false
+        }
+        if (event.key === 'ArrowRight') {
+          const item = flatItems.value[slashIndex.value]
+          if (item?.children?.length) {
+            openSubmenu(item)
+            return true
+          }
+          return false
+        }
         if (event.key === 'Enter' || event.key === 'Tab') {
-          const item = filtered.value[slashIndex.value]
-          if (item) applySlash(item)
+          const item = flatItems.value[slashIndex.value]
+          if (item) {
+            if (item.children?.length) openSubmenu(item)
+            else applySlash(item)
+          }
           return true
         }
         return false
@@ -337,25 +429,55 @@ function onAnyScroll(e: Event) {
       @mousedown.prevent
     >
       <div class="slash-head">
-        插入区块
-        <em v-if="slashQuery">「{{ slashQuery }}」</em>
+        <template v-if="submenuOf">
+          <button class="slash-back" @click="backToRoot">‹ 返回</button>
+          <span>选择规格</span>
+        </template>
+        <template v-else>
+          插入区块
+          <em v-if="slashQuery">「{{ slashQuery }}」</em>
+        </template>
       </div>
-      <div class="slash-list">
+
+      <!-- 子菜单态：列出父项的所有子项 -->
+      <div v-if="submenuOf" class="slash-list">
         <button
-          v-for="(item, i) in filtered"
+          v-for="(item, i) in activeChildren"
           :key="item.key"
           :class="['slash-item', { on: i === slashIndex }]"
           @click="applySlash(item)"
           @mouseenter="slashIndex = i"
         >
-          <span class="slash-icon">{{ item.icon }}</span>
+          <span class="slash-icon" :style="item.color ? { background: item.color, borderColor: item.color, color: '#fff' } : {}">{{ item.icon }}</span>
           <span class="slash-text">
             <b>{{ item.label }}</b>
             <i>{{ item.hint }}</i>
           </span>
         </button>
+      </div>
+
+      <!-- 根态：分组展示，支持有子菜单的项 -->
+      <div v-else class="slash-list">
+        <template v-for="group in filtered" :key="group.name">
+          <div class="slash-group-name">{{ group.name }}</div>
+          <button
+            v-for="item in group.items"
+            :key="item.key"
+            :class="['slash-item', { on: item.key === currentFlatKey }]"
+            @click="openSubmenu(item)"
+            @mouseenter="slashIndex = flatIndexOf(item)"
+          >
+            <span class="slash-icon" :style="item.color ? { background: item.color, borderColor: item.color, color: '#fff' } : {}">{{ item.icon }}</span>
+            <span class="slash-text">
+              <b>{{ item.label }}</b>
+              <i>{{ item.hint }}</i>
+            </span>
+            <span v-if="item.children?.length" class="slash-sub">›</span>
+          </button>
+        </template>
         <div v-if="filtered.length === 0" class="slash-empty">没有匹配的区块</div>
       </div>
+
       <div class="slash-foot">↑↓ 选择 · Enter 确认 · Esc 关闭</div>
     </div>
   </div>
