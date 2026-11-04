@@ -1,0 +1,170 @@
+{
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/00-总索引.md": {
+    "docId": 19,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.1-Java基础-章节导览.md": {
+    "docId": 20,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.2-Java基础-OO三大特性.md": {
+    "docId": 21,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.3-Java基础-集合框架.md": {
+    "docId": 22,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.4-Java基础-并发线程.md": {
+    "docId": 23,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.5-Java基础-IO.md": {
+    "docId": 24,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.5.1-Java基础-Netty与网络编程.md": {
+    "docId": 25,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.6-Java基础-JVM内存与GC.md": {
+    "docId": 26,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/1.7-Java基础-JDK8-11-17新特性.md": {
+    "docId": 27,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/2.1-Spring框架.md": {
+    "docId": 28,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/2.2-MyBatis框架.md": {
+    "docId": 29,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/2.3-Dubbo远程调用.md": {
+    "docId": 30,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/2.4-ZooKeeper分布式协调.md": {
+    "docId": 31,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.1-数据库-章节导览.md": {
+    "docId": 32,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.2-MySQL-InnoDB.md": {
+    "docId": 33,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.3-Redis缓存与分布式锁.md": {
+    "docId": 34,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.4-HBase.md": {
+    "docId": 35,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.5-Elasticsearch.md": {
+    "docId": 36,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.6-图数据库.md": {
+    "docId": 37,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/3.7-向量数据库.md": {
+    "docId": 38,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/4.1-消息队列-章节导览.md": {
+    "docId": 39,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/4.2-RocketMQ.md": {
+    "docId": 40,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/4.3-Kafka.md": {
+    "docId": 41,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/5.1-MBSE方法论与规范地图.md": {
+    "docId": 42,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/5.1.1-模型互通-Rhapsody与Modelica转换.md": {
+    "docId": 43,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/5.1.2-DDD与模型驱动.md": {
+    "docId": 44,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/技术栈/5.2-架构与高并发.md": {
+    "docId": 45,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1-agent开发.md": {
+    "docId": 56,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.1-agent开发-Python工程底座.md": {
+    "docId": 57,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.10-agent开发-AgentHarness.md": {
+    "docId": 66,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.11-agent开发-数据标注与评估.md": {
+    "docId": 67,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.12-agent开发-模型微调.md": {
+    "docId": 68,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.13-agent开发-ClaudeCode.md": {
+    "docId": 69,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.2-agent开发-LLM原理与API.md": {
+    "docId": 58,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.3-agent开发-RAG检索.md": {
+    "docId": 59,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.4-agent开发-提示词工程.md": {
+    "docId": 60,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.5-agent开发-向量数据库.md": {
+    "docId": 61,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.6-agent开发-Embedding原理.md": {
+    "docId": 62,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.7-agent开发-LangChain与LangGraph.md": {
+    "docId": 63,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.8-agent开发-MCP与Skill.md": {
+    "docId": 64,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.1.9-agent开发-DeepAgent.md": {
+    "docId": 65,
+    "spaceId": 2
+  },
+  "/Users/gaoying/Desktop/study/人生/职业规划/ai学习/6.2-LLM技术栈-面试剖析.md": {
+    "docId": 70,
+    "spaceId": 2
+  }
+}

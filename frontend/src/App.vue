@@ -167,6 +167,119 @@ function onEditorReady(ed: unknown) {
 const currentDoc = computed(() => docs.value.find((d) => d.id === currentDocId.value) ?? null)
 const currentSpace = computed(() => workspaces.value.find((w) => w.id === currentSpaceId.value) ?? null)
 
+/* ---------- 站内跳转：链接 → 切文档 → 滚到锚点 ---------- */
+
+/**
+ * 待定位的锚点文字。
+ *
+ * Markdown 里的 `#g-语言细节与常用工具（散篇）` 这类锚点，在导出 HTML 时是加在
+ * 「整段加粗」上的 id，正文进 Yjs 后并没有 id 属性。所以这里不做 id 查找，
+ * 而是按**文字**匹配落点：去掉生成器的 g- 前缀和标点空白后做包含比较。
+ * 好处是文档被改写、标题前后加字都不影响跳转。
+ */
+const pendingAnchor = ref('')
+
+function normAnchor(s: string) {
+  return s
+    .replace(/^g-/, '')
+    .replace(/[\s\u00a0]/g, '')
+    .replace(/[·：:，,。.、；;！!？?（）()【】\[\]「」“”"'’‘—\-_/\\|*`~#]/g, '')
+}
+
+/** 按文字找落点：标题优先，其次「整段加粗」的分组行 */
+function findAnchorNode(dom: HTMLElement, want: string): HTMLElement | null {
+  const heads = Array.from(dom.querySelectorAll('h1,h2,h3,h4,h5,h6')) as HTMLElement[]
+  const byHead = heads.find((h) => normAnchor(h.textContent || '').includes(want))
+  if (byHead) return byHead
+  // 分组锚点落在「整段加粗」的段落上，用等值匹配避免命中正文里顺带提到的那一句
+  const blocks = Array.from(dom.querySelectorAll('p,li')) as HTMLElement[]
+  return (
+    blocks.find((b) => normAnchor(b.textContent || '') === want) ??
+    blocks.find((b) => {
+      const t = normAnchor(b.textContent || '')
+      return t.includes(want) && t.length <= want.length + 12
+    }) ??
+    null
+  )
+}
+
+/** 高亮落点：协同同步会重渲染节点，class 会掉，所以隔一会儿补一次 */
+function markAnchor(want: string, rounds = 3) {
+  const dom = outlineEditor.value?.view?.dom ?? null
+  if (!dom) return
+  const node = findAnchorNode(dom, want)
+  if (!node) return
+  node.classList.add('anchor-hit')
+  setTimeout(() => node.classList.remove('anchor-hit'), 3400)
+  if (rounds > 1) setTimeout(() => markAnchor(want, rounds - 1), 1200)
+}
+
+/**
+ * 二次对齐。
+ * 正文里有 mermaid 图、表格，渲染完成会明显改变高度：一次性算好的位置在
+ * 图渲染完之后就偏了。这里在图/表格陆续渲染完的时间窗里再校几次，偏差大才动。
+ */
+function alignAnchor(want: string, rounds = 4) {
+  const scroller = mainScroller.value
+  const dom = outlineEditor.value?.view?.dom ?? null
+  if (!scroller || !dom) return
+  const node = findAnchorNode(dom, want)
+  if (node) {
+    const delta = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24
+    if (Math.abs(delta) > 40) scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + delta), behavior: 'auto' })
+  }
+  if (rounds > 1) setTimeout(() => alignAnchor(want, rounds - 1), 700)
+}
+
+/** 滚动到锚点；协同正文是异步到达的，没命中就重试（最多约 5 秒） */
+function scrollToAnchor(anchor: string, tries = 0) {
+  const want = normAnchor(anchor)
+  if (!want) return
+  const scroller = mainScroller.value
+  const dom = outlineEditor.value?.view?.dom ?? null
+  if (scroller && dom) {
+    const hit = findAnchorNode(dom, want)
+    if (hit) {
+      const top = scroller.scrollTop + hit.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24
+      scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      markAnchor(want)
+      alignAnchor(want)
+      return
+    }
+  }
+  if (tries < 25) setTimeout(() => scrollToAnchor(anchor, tries + 1), 200)
+}
+
+/**
+ * 编辑器里点了站内链接。
+ * spaceId 与当前不同就先切空间，再按 docId 选文档；同空间直接选，不整页刷新。
+ */
+async function onNavigate(payload: { spaceId: number; docId: number; anchor: string }) {
+  const anchor = payload.anchor || ''
+  view.value = 'doc'
+  searchQuery.value = ''
+  searchResults.value = []
+  closeNav()
+
+  if (payload.spaceId && payload.spaceId !== currentSpaceId.value) {
+    currentSpaceId.value = payload.spaceId
+    currentDocId.value = payload.docId > 0 ? payload.docId : null
+    collabToken.value = ''
+    collabKeyOfToken.value = ''
+    clearUndo()
+    await loadDocs(payload.spaceId, payload.docId || null)
+  } else if (payload.docId > 0 && payload.docId !== currentDocId.value) {
+    const target = docs.value.find((d) => d.id === payload.docId)
+    if (target) selectDoc(target)
+    else if (currentSpaceId.value) await loadDocs(currentSpaceId.value, payload.docId)
+  }
+
+  // selectDoc 会清掉锚点（用户手动选文档时不该带着旧锚点），所以放在它之后设置
+  pendingAnchor.value = anchor
+  syncUrl()
+  if (anchor) scrollToAnchor(anchor)
+}
+
 /* ---------- 移动端：左栏改为滑出抽屉 ---------- */
 
 /**
@@ -176,12 +289,21 @@ const currentSpace = computed(() => workspaces.value.find((w) => w.id === curren
  */
 const isMobile = ref(false)
 const navOpen = ref(false)
+/**
+ * 手机上的大纲面板是否展开（桌面忽略）。
+ * 桌面是常驻左中栏；手机宽度放不下，改成顶栏「目录」按钮唤起的底部面板，
+ * 点条目 / 点遮罩 / 再点按钮收起。
+ */
+const outlineOpen = ref(false)
 let viewportMq: MediaQueryList | undefined
 
 function syncViewport(e?: MediaQueryListEvent) {
   isMobile.value = e ? e.matches : !!viewportMq?.matches
-  // 回到桌面宽度时收掉抽屉，避免下次变窄时莫名其妙是开着的
-  if (!isMobile.value) navOpen.value = false
+  // 回到桌面宽度时收掉抽屉与大纲面板，避免下次变窄时莫名其妙是开着的
+  if (!isMobile.value) {
+    navOpen.value = false
+    outlineOpen.value = false
+  }
 }
 
 /** 手机上没有「折叠成窄条」这回事，永远是完整抽屉 */
@@ -191,7 +313,11 @@ const railCollapsed = computed(() => sidebarCollapsed.value && !isMobile.value)
 const mobileTitle = computed(() => currentDoc.value?.title || currentSpace.value?.name || 'scofenDoc')
 
 function closeNav() {
-  if (isMobile.value) navOpen.value = false
+  if (isMobile.value) {
+    navOpen.value = false
+    // 切文档/切空间后，旧的纲面板不该还挂着（内容已经换了）
+    outlineOpen.value = false
+  }
 }
 
 function onToggleCollapse() {
@@ -199,9 +325,9 @@ function onToggleCollapse() {
   else sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
-/** 抽屉打开时锁住背景滚动，否则手指滑的是背后的正文 */
-watch(navOpen, (open) => {
-  document.body.style.overflow = open ? 'hidden' : ''
+/** 抽屉/大纲面板打开时锁住背景滚动，否则手指滑的是背后的正文 */
+watch([navOpen, outlineOpen], ([n, o]) => {
+  document.body.style.overflow = n || o ? 'hidden' : ''
 })
 
 /* ---------- 中间栏：文章大纲（宽度可拖） ---------- */
@@ -336,6 +462,8 @@ function syncUrl() {
   if (currentSpaceId.value) params.set('space', String(currentSpaceId.value))
   // 主页不带 doc 参数：否则刷新一下就又跳回某篇文档，回不到主页
   if (currentDocId.value && view.value !== 'home') params.set('doc', String(currentDocId.value))
+  // 锚点只在「从别处跳进来」时带上，方便把定位结果整条链接发出去
+  if (pendingAnchor.value && view.value !== 'home') params.set('h', pendingAnchor.value)
   const qs = params.toString()
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
 }
@@ -378,6 +506,8 @@ function selectDoc(doc: Doc) {
   closeNav()
   currentDocId.value = doc.id
   titleDraft.value = doc.title
+  // 手动点树选文档时不该带着上一跳的锚点
+  pendingAnchor.value = ''
   // 从搜索/主页点进来时，要回到文档视图
   view.value = 'doc'
   searchQuery.value = ''
@@ -766,6 +896,13 @@ async function boot() {
     if (!wantsDoc) {
       syncUrl()
       loadRecent()
+    } else {
+      // 分享链接里带了锚点：等编辑器把协同正文拉回来再定位（scrollToAnchor 内部会重试）
+      const anchor = new URLSearchParams(location.search).get('h') || ''
+      if (anchor) {
+        pendingAnchor.value = anchor
+        scrollToAnchor(anchor)
+      }
     }
   } catch (e) {
     if (session.value) showError(e)
@@ -796,6 +933,15 @@ boot()
     <header class="m-topbar">
       <button class="m-menu" title="打开菜单" @click="navOpen = true">☰</button>
       <span class="m-title">{{ mobileTitle }}</span>
+      <!-- 手机上大纲不常驻，靠这个按钮唤出底部面板 -->
+      <button
+        v-if="hasOutline"
+        :class="['m-outline', { on: outlineOpen }]"
+        :title="outlineOpen ? '收起大纲' : '文章大纲'"
+        @click="outlineOpen = !outlineOpen"
+      >
+        目录
+      </button>
       <button
         v-if="canWrite && view === 'doc' && currentSpace"
         class="m-new"
@@ -872,33 +1018,39 @@ boot()
         @dblclick="resetSidebarWidth"
       />
 
-      <!-- 中间：当前文档的文章大纲 -->
+      <!-- 手机大纲面板的遮罩：点空白处收起 -->
+      <div v-if="outlineOpen" class="outline-mask" @click="outlineOpen = false" />
+
+      <!-- 中间：当前文档的文章大纲（桌面常驻；手机是顶栏「目录」唤出的底部面板） -->
       <aside
         v-if="hasOutline"
-        :class="['outline-col', { mini: outlineCollapsed, resizing: outlineResizing }]"
-        :style="outlineStyle"
+        :class="['outline-col', { mini: outlineCollapsed, resizing: outlineResizing, 'm-open': outlineOpen }]"
+        :style="isMobile ? undefined : outlineStyle"
       >
         <div class="outline-col-head">
-          <span v-if="!outlineCollapsed" class="outline-col-title">文章大纲</span>
+          <span v-if="!outlineCollapsed || isMobile" class="outline-col-title">文章大纲</span>
           <button
+            v-if="!isMobile"
             class="outline-toggle"
             :title="outlineCollapsed ? '展开大纲' : '收起大纲'"
             @click="outlineCollapsed = !outlineCollapsed"
           >
             {{ outlineCollapsed ? '»' : '«' }}
           </button>
+          <button v-else class="outline-toggle" title="收起大纲" @click="outlineOpen = false">✕</button>
         </div>
-        <div v-if="outlineCollapsed" class="outline-mini-label">大纲</div>
+        <div v-if="outlineCollapsed && !isMobile" class="outline-mini-label">大纲</div>
         <OutlinePanel
           v-else
           :scroller="mainScroller"
           :editor="outlineEditor"
           :refresh="outlineRefresh"
+          @select="outlineOpen = false"
         />
       </aside>
 
       <div
-        v-if="hasOutline && !outlineCollapsed"
+        v-if="hasOutline && !outlineCollapsed && !isMobile"
         :class="['resize-handle', { active: outlineResizing }]"
         title="拖动调整大纲宽度，双击复位"
         @mousedown="startOutlineResize"
@@ -983,7 +1135,9 @@ boot()
               :user-name="session.user.displayName"
               :user-color="session.user.color"
               :editable="canWrite"
+              :space-id="currentSpaceId ?? 0"
               @editor-ready="onEditorReady"
+              @navigate="onNavigate"
             />
           </template>
 

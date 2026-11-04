@@ -24,7 +24,10 @@
 | 文档操作 | 新建（根/子）、行内重命名、双击重命名、删除（级联子树软删） |
 | 块编辑器 | 输入 `/` 弹出块菜单（标题/列表/待办/引用/代码块/**表格**/分割线），支持方向键、拼音搜索 |
 | 表格 | 单元格可编辑、表头行、光标在表格内时出现「+行/+列/-行/-列/删表」 |
+| 选区工具条 | 选中文字弹出浮动格式条：标题下拉、列表下拉、加粗、删除线、斜体、下划线、链接、行内代码、字体颜色、更多、评论 |
+| 批注 | 选中文字写评论；锚点在正文、内容在 `ydoc.getMap('comments')`，支持回复、标记已解决、删除，刷新与多人同步都不丢 |
 | Markdown 导入 | `tools/publish-md.sh` 单篇、`publish-dir.sh` 整目录批量，支持挂父节点（见「导入已有 Markdown 文档」） |
+| 文档互引 | 正文里的 `<a>` 可点：站内链接写成 `?space=&doc=`，点击在站内切文档（不整页刷新），带 `&h=` 的还会滚到对应标题/分组；外链新标签打开 |
 | 多文档协同 | 每篇文档独立 `collabKey`（Yjs 房间），切文档自动换房间，内容互不串档 |
 | 实时协同 | 多人同编、彩色光标（显示真实昵称+专属颜色）、在线人数、断线重连 |
 | 协同鉴权 | 每次切文档向后端申请 2 小时有效的单文档协同 token；无效/越权 token 直接断开 |
@@ -96,7 +99,9 @@
 │  ├─ security/   # JwtService / JwtAuthFilter / AuthUser / 401·403 异常
 │  └─ src/main/resources/db/migration/  # Flyway 版本化迁移（V1 基线 + 后续修复）
 ├─ deploy/        # docker-compose（备用）+ prod/ 生产部署脚本与 systemd 单元
-├─ tools/         # publish-md.sh 发布脚本 + md-to-collab 转换器 + verify-browser 线上核对
+├─ tools/         # publish-md.sh / publish-dir.sh / relink-all.sh 发布脚本
+│  ├─ md-to-collab/    # md→Yjs 转换器、对照表生成、批量结构校验
+│  └─ verify-browser/  # 无头浏览器核对（渲染、跳转、读写链路）
 └─ README.md
 ```
 
@@ -257,34 +262,89 @@ docker compose -f deploy/docker-compose.yml up --build
 # 整个目录批量发布到某个父文档下（同级顺序＝文件名排序）
 ./tools/publish-dir.sh "../技术栈" --parent 17
 
-# 覆盖某一篇的正文（会丢弃该文档上的在线编辑记录，慎用）
-./tools/publish-md.sh "../个人履历详解.md" "个人履历详解（2014.07 — 2026.10）" --doc-id 13
+# 覆盖某一篇的正文（标题可省略，默认沿用线上标题）
+./tools/publish-md.sh "../个人履历详解.md" "" --doc-id 13
+
+# 整批重发：给所有已发布的 md 补站内跳转链接（标题沿用线上，正文覆盖）
+./tools/relink-all.sh
 ```
 
-脚本做四件事：`marked` 转 HTML → `generateJSON`（与前端同一套扩展）→ `prosemirrorJSONToYDoc`
-→ 建/改 doc 记录 + 上传 `{collabKey}.bin` → 回读校验。单独用转换器也可以：
+脚本做四件事：`marked` 转 HTML → `generateJSON`（与前端同一套扩展）→ 写入 Yjs 状态
+（已有文档走 `--merge-into` 就地替换）→ 建/改 doc 记录 + 上传 `{collabKey}.bin` → 回读校验。
+单独用转换器也可以：
 
 ```bash
 cd tools/md-to-collab && npm i
 node md-to-ydoc.mjs a.md /tmp/a.bin --drop-first-h1   # 转换 + 结构统计
 node read-ydoc.mjs /tmp/a.bin                          # 回读校验
-node batch-verify.mjs <md目录> map.tsv <bin目录>        # 批量逐篇比对表格/标题/代码块数
+node build-link-manifest.mjs map.tsv link-manifest.json ../技术栈 ../ai学习   # 生成「md → 文档」对照表
+node gen-chapter-index.mjs 00-总索引.md ../技术栈                       # 从总索引切出每章索引页（发布到章节点）
+node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/标题/图/代码/链接数
 ```
 
-六条踩过的坑：
+## 文档互引与站内跳转
 
-1. **扩展集必须与 `CollabEditor.vue` 逐项一致**。少一个节点类型（比如 table），
-   客户端会静默丢掉那类内容——它不会报错，只是表格变没了。
+站内链接统一写成 `?space=2&doc=20`（带锚点时追加 `&h=分组标题`），不写死域名——
+换域名、换机器都不用重发；外链 http(s) 原样保留，点击时新标签打开。
+
+- **改写**：导入时按 md 文件的**相对路径**解析目标，命中 `link-manifest.json` 就换成深链；
+  未发布的本地文件（`CSDN存档/xxx.html` 等）仍去壳留字，点开必 404 的链接不给。
+- **点击**：编辑器拦截正文里的 `<a>` 点击，解析 `doc` 参数后交给 App 在站内切文档
+  （`selectDoc`，不整页刷新）；跨空间会先切空间。macOS/Windows 下按住 ⌘/Ctrl 点链接不拦截，
+  方便把光标放进链接里改字。
+- **锚点**：Yjs 正文里没有 heading id（导出 HTML 时的 `id="g-…"` 没有一起搬过来），
+  所以按**文字**匹配落点：去掉 `g-` 前缀与标点空白后比较标题或「整段加粗」的分组行。
+  文档改写、标题前后加字都不影响。落点会二次对齐（mermaid 图与表格渲染完会改高度）。
+- **对照表不是手写的**：`build-link-manifest.mjs` 用「md 文件名 == 线上标题」匹配，
+  改过名的文档在脚本里的 `TITLE_ALIAS` 补一行（例：`00-总索引.md` → 站内「总索引」）。
+
+七条踩过的坑：
+
+1. **扩展集必须与 `CollabEditor.vue` 逐项一致**。少一个节点类型（比如 table、link），
+   客户端会静默丢掉那类内容——它不会报错，只是表格/链接变没了。
 2. **先发前端，再投数据**。旧版编辑器不认识新节点，一打开一保存就把内容洗掉。
 3. **中文加粗贴着标点不满足 CommonMark 规则**：`**"记账服务＝分录模板"**，` 里开头的 `**`
    后面紧跟引号、前面是汉字，既不算 left-flanking 也不算 right-flanking，解析器只能输出裸星号。
    转换器先把这类 `**…**` 改写成 `<strong>…</strong>` 再解析（代码块/行内代码里的星号不动）。
-4. **相对链接会被降级成纯文字**：md 里指向 `1.1-xxx.md`、`CSDN存档/xxx.html` 的链接搬到线上必然 404，
-   而文档站没有可按 doc id 拼的 URL，所以默认去壳留字；要保留原样加 `--keep-local-links`。
-5. **表格是编辑器新增能力**：StarterKit 本身不含 table，`/` 菜单可插入表格，
+   校验时也别把代码块里的 `1024**3`、`**kwargs` 当成残留。
+4. **覆盖正文必须「先停服务，再写文件」**。房间一旦被加载（有人正开着、或上次发布后服务读过），
+   进程退出时会用内存里的旧状态覆盖磁盘 —— 直接 `restart` 会把刚上传的新正文冲掉。
+   批量脚本因此是「停一次 → 逐篇写 → 启动一次」。
+5. **覆盖正文还要「就地替换」而不是换一份新历史**。`prosemirrorJSONToYDoc` 造的是全新 CRDT 历史，
+   还开着的客户端重连时会把旧历史推回来，合并后旧内容赢（实测：链接整段消失）。
+   所以默认 `--merge-into <旧 bin>`：读入旧状态，在同一份历史上删掉全部子节点再插入新内容，
+   删除成为 tombstone，任何在线端都会跟着删。真要另起一份历史用 `--fresh`。
+6. **表格是编辑器新增能力**：StarterKit 本身不含 table，`/` 菜单可插入表格，
    光标落在表格内时工具栏会多出「+行 / +列 / -行 / -列 / 删表」。
-6. **shell 里 `$VAR` 后面紧跟中文标点会被当成变量名的一部分**（macOS bash 3.2 直接报
-   `unbound variable`）。脚本里一律写 `${VAR}`；另外 `set -e` 下别用 `[ cond ] && cmd` 的短路写法。
+7. **shell 里 `$VAR` 后面紧跟中文标点会被当成变量名的一部分**（macOS bash 3.2 直接报
+   `unbound variable`）。脚本里一律写 `${VAR}`；另外 `set -e` 下别用 `[ cond ] && cmd` 的短路写法，
+   `while read` 里调子脚本要加 `< /dev/null`，否则子脚本吃掉 stdin，循环只跑第一轮。
+
+## 选中文字浮动工具条与批注
+
+选中任意文字，正文旁会弹出格式条（对标飞书）：标题下拉、列表下拉、加粗、删除线、斜体、
+下划线、链接、行内代码、字体颜色、更多（引用 / 代码块 / 分割线 / 插入表格 / 清除格式）、评论。
+
+- **定位没走 tippy**：`@tiptap/extension-bubble-menu` 在跨行选区、贴近视口边缘、正文里嵌
+  图块时位置会飘。这里直接读 `getSelection().getRangeAt(0).getBoundingClientRect()` 做
+  `position: fixed`，上方放不下就翻到选区下方；下拉面板默认向上展开，避免盖住刚选中的字。
+- **点按钮不丢选区**：工具条按钮全部 `mousedown` + `preventDefault`；链接/评论面板里的
+  输入框例外（要真正拿到焦点，靠「面板打开时不因 blur 收起」兜住）。
+- **评论的数据分层**：正文只写一个 `mark[data-comment-id]` 锚点，评论正文、作者、时间、
+  回复、已解决状态都存在 `ydoc.getMap('comments')` 里。它跟正文同一个 ydoc，一起增量同步、
+  一起落进 `{collabKey}.bin`，**后端与表结构都不用改**。
+- 已解决的批注显示为灰色虚线下划线，点开可「重新打开」；删除评论会连同正文锚点一起移除。
+- 只读成员看不到格式条，但点批注仍能看内容（不能回复/解决/删除）。
+- 验收脚本：`node tools/verify-browser/bubble-check.mjs <JWT_SECRET>`，在临时文档里跑完
+  加粗/颜色/下划线/链接/标题/评论/刷新持久化/回复/解决/删除全链路，跑完自动删文档。
+
+两条坑：
+
+1. **同类型 mark 改属性必须 `removeMark` + `addMark`**。mark 的 `excludes` 为空时新旧两个
+   不会互相替换，直接 `addMark({resolved:true})` 会和旧 mark 并存，DOM 里取到的是先出现的
+   那个——表现就是「标记已解决」点了没反应（实测踩到）。
+2. **批注锚点是正文节点的一部分**，仍然遵守「先发前端，再投数据」：旧版编辑器不认识
+   `comment` mark，会把锚点洗掉（评论 Map 还在，正文里却再也点不到）。
 
 ## 已知边界 / 下一步
 
@@ -296,7 +356,7 @@ node batch-verify.mjs <md目录> map.tsv <bin目录>        # 批量逐篇比对
    但已经建立着的 WebSocket 不会被踢；协同 token 最长 2 小时，这是有意的取舍（换取不引入回调解耦）。
 3. **账号不能删**：目前只能停用式处理（移出所有空间 + 重置密码）。
    真要删除要考虑其作为 OWNER 的空间如何转移，属独立议题。
-4. 前端：评论侧栏、历史版本 UI、`@` 提及、图片块（表格已支持，见上一节）。
+4. 前端：评论侧栏（现在只能点正文里的批注看）、评论通知、历史版本 UI、`@` 提及、图片块。
 5. 协同：增量持久化 + 定时快照（当前为全量覆盖）、断线重连后的冲突提示。
 6. 部署：域名 + HTTPS（Let's Encrypt）、定期备份 MySQL 与 `collab/data`。
 

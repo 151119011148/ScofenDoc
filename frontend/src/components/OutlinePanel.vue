@@ -24,6 +24,9 @@ const props = defineProps<{
   refresh?: number
 }>()
 
+/** 点了某条大纲：手机上据此收起底部面板（桌面端忽略） */
+const emit = defineEmits<{ (e: 'select'): void }>()
+
 const items = ref<Item[]>([])
 const activeId = ref<number | null>(null)
 
@@ -53,6 +56,20 @@ function offsetOf(el: HTMLElement): number {
   return el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
 }
 
+/**
+ * 跳转落点上方要留出的高度。
+ *
+ * 桌面就是一条呼吸留白（12px）；手机正文顶部有吸顶的编辑器工具栏，
+ * 若只留 12px，标题第一行会被工具栏压住，所以由 CSS 变量 --jump-gap 给出更大值。
+ * 数值只维护在 style.css 一处，这里只负责读。
+ */
+function jumpGap(): number {
+  const scroller = props.scroller
+  if (!scroller) return 12
+  const v = parseFloat(getComputedStyle(scroller).getPropertyValue('--jump-gap'))
+  return Number.isFinite(v) ? v : 12
+}
+
 const empty = computed(() => items.value.length === 0)
 
 function refresh() {
@@ -69,9 +86,10 @@ function refresh() {
 function jump(item: Item, i: number) {
   const scroller = props.scroller
   if (!scroller) return
-  const target = offsetOf(item.el) - 12
+  const target = offsetOf(item.el) - jumpGap()
   scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
   activeId.value = i
+  emit('select')
 }
 
 let spyTimer: number | undefined

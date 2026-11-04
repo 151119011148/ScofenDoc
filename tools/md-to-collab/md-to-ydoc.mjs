@@ -28,11 +28,12 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
+import Link from '@tiptap/extension-link'
 import { MermaidBlock } from './mermaid-block.mjs'
 import { PlantUMLBlock } from './plantuml-block.mjs'
 import { generateJSON } from '@tiptap/html'
 import * as Y from 'yjs'
-import { prosemirrorJSONToYDoc, yDocToProsemirrorJSON } from 'y-prosemirror'
+import { prosemirrorJSONToYDoc, prosemirrorJSONToYXmlFragment, yDocToProsemirrorJSON } from 'y-prosemirror'
 
 /* ---------------- 与前端完全一致的扩展集 ---------------- */
 
@@ -45,6 +46,7 @@ function buildExtensions() {
     TableRow,
     TableHeader,
     TableCell,
+    Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
     MermaidBlock,
     PlantUMLBlock,
   ]
@@ -53,11 +55,36 @@ function buildExtensions() {
 /* ---------------- 参数 ---------------- */
 
 const argv = process.argv.slice(2)
-const flags = new Set(argv.filter((a) => a.startsWith('--')))
-const positional = argv.filter((a) => !a.startsWith('--'))
+const positional = []
+const opts = {
+  dropFirstH1: false,
+  keepLocalLinks: false,
+  quiet: false,
+  manifest: '',
+  selfDocId: 0,
+  spaceId: 0,
+  mergeInto: '',
+}
+for (let i = 0; i < argv.length; i += 1) {
+  const a = argv[i]
+  if (a === '--drop-first-h1') opts.dropFirstH1 = true
+  else if (a === '--keep-local-links') opts.keepLocalLinks = true
+  else if (a === '--quiet') opts.quiet = true
+  else if (a === '--manifest') opts.manifest = argv[++i] || ''
+  else if (a === '--merge-into') opts.mergeInto = argv[++i] || ''
+  else if (a === '--self') opts.selfDocId = Number(argv[++i] || 0)
+  else if (a === '--space') opts.spaceId = Number(argv[++i] || 0)
+  else if (a.startsWith('--')) {
+    console.error(`未知参数：${a}`)
+    process.exit(1)
+  } else positional.push(a)
+}
 
 if (positional.length < 2) {
-  console.error('用法: node md-to-ydoc.mjs <input.md> <output.bin> [--drop-first-h1] [--keep-local-links] [--quiet]')
+  console.error(
+    '用法: node md-to-ydoc.mjs <input.md> <output.bin> [--drop-first-h1] [--keep-local-links] [--quiet]\n' +
+      '       [--manifest link-manifest.json --self <docId> --space <spaceId>]',
+  )
   process.exit(1)
 }
 
@@ -71,31 +98,77 @@ const raw = fs.readFileSync(mdFile, 'utf8')
 marked.setOptions({ gfm: true, breaks: false, headerIds: false, mangle: false })
 
 let markdown = raw
-if (flags.has('--drop-first-h1')) {
+if (opts.dropFirstH1) {
   // 文档标题已经在列表和页头展示，正文再出现一次一级标题就是重复
   markdown = markdown.replace(/^#\s+.*\r?\n/, '')
 }
 
-const html = cleanLinks(fixLiteralStrong(marked.parse(preNormalizeStrong(markdown))))
+const manifest = opts.manifest ? JSON.parse(fs.readFileSync(opts.manifest, 'utf8')) : null
+const linkStats = { internal: 0, inDoc: 0, external: 0, stripped: 0, missing: new Set() }
+
+function internalUrl(docId, spaceId, anchor) {
+  let url = `?space=${spaceId}&doc=${docId}`
+  if (anchor) url += `&h=${encodeURIComponent(anchor)}`
+  return url
+}
+
+function safeDecode(s) {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
+const html = rewriteLinks(fixLiteralStrong(marked.parse(preNormalizeStrong(markdown))))
 
 /**
- * 相对链接降级为纯文字。
+ * 链接改写：把「指向另一篇 md」的相对链接换成站内深链。
  *
- * md 里的 [1.1-Java基础-章节导览](1.1-Java基础-章节导览.md)、[存档](CSDN存档/xxx.html)
- * 指向的是本地文件，搬到线上就是一串 404。文档站又没有 URL 深链可改写，
- * 所以默认把这类本地链接去壳留字（文字本身通常是可读的标题），外链 http(s) 原样保留。
- * 需要保留原样时加 --keep-local-links。
+ * md 里的 [1.1-Java基础-章节导览](1.1-Java基础-章节导览.md)、[RAG](.../6.1.3-xxx.md)
+ * 指向的是本地文件，搬到线上就是 404。文档站本身是按 id 找文档的，所以只要知道
+ * 「这个 md 路径对应哪一篇线上文档」，就能把链接改写成 `?space=2&doc=20`——
+ * 不写死域名，换机器、换域名都不用重发。
+ *
+ * 锚点（`#g-xxx`、`#存档导航`）一并带过去，前端按文字匹配滚动（Yjs 正文里没有 heading id）。
+ *
+ * 没收录进清单的本地链接（CSDN存档/xxx.html 这类没发布的内容）仍然去壳留字，
+ * 因为点开必然 404；需要保留原样时加 --keep-local-links。
  */
-function cleanLinks(input) {
-  if (flags.has('--keep-local-links')) return input
-  let stripped = 0
-  const out = input.replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g, (m, href, inner) => {
-    if (/^(https?:|mailto:|tel:|#|\/\/)/i.test(href)) return m
-    stripped += 1
-    return inner
+function rewriteLinks(input) {
+  const baseDir = path.dirname(path.resolve(mdFile))
+  return input.replace(/<a\s([^>]*?)href="([^"]*)"([^>]*)>([\s\S]*?)<\/a>/g, (m, pre, href, post, inner) => {
+    if (/^(https?:|mailto:|tel:|\/\/)/i.test(href)) {
+      linkStats.external += 1
+      return m
+    }
+    // 纯页内锚点：指向本文档
+    if (href.startsWith('#')) {
+      if (!opts.selfDocId) {
+        linkStats.stripped += 1
+        return inner
+      }
+      linkStats.inDoc += 1
+      return `<a href="${internalUrl(opts.selfDocId, opts.spaceId, safeDecode(href.slice(1)))}">${inner}</a>`
+    }
+
+    const [rawPath, rawHash = ''] = href.split('#')
+    let target = ''
+    try {
+      target = path.resolve(baseDir, safeDecode(rawPath))
+    } catch {
+      target = ''
+    }
+    const hit = target && manifest ? manifest[target] : null
+    if (!hit) {
+      if (opts.keepLocalLinks) return m
+      linkStats.stripped += 1
+      if (/\.md$/i.test(rawPath)) linkStats.missing.add(path.basename(rawPath))
+      return inner
+    }
+    linkStats.internal += 1
+    return `<a href="${internalUrl(hit.docId, hit.spaceId ?? opts.spaceId, rawHash ? safeDecode(rawHash) : '')}">${inner}</a>`
   })
-  if (!flags.has('--quiet') && stripped > 0) console.log(`本地链接降级为文字：${stripped} 处`)
-  return out
 }
 
 /**
@@ -168,7 +241,31 @@ const json = generateJSON(html, extensions)
 
 /* ---------------- ProseMirror JSON → Y.Doc ---------------- */
 
-const ydoc = prosemirrorJSONToYDoc(schema, json, 'default')
+/**
+ * 生成 Yjs 状态。
+ *
+ * 直接 `prosemirrorJSONToYDoc` 得到的是一个「全新文档」——它和线上已有房间是两条
+ * 互不相干的 CRDT 历史。只要还有客户端连着（或离线端还留着旧状态），重新连上时
+ * 它会把旧历史推回来，服务端合并后旧内容就盖掉了新内容（实测：链接会被整段抹掉）。
+ *
+ * 所以覆盖已有文档时走 `--merge-into <旧 bin>`：先把旧状态读进来，在**同一条历史**上
+ * 删掉全部子节点、再插入新内容。删除动作会变成 CRDT 的 tombstone，任何还活着的客户端
+ * 收到后都会跟着删，而不是各说各话。
+ */
+let ydoc
+if (opts.mergeInto && fs.existsSync(opts.mergeInto)) {
+  ydoc = new Y.Doc()
+  Y.applyUpdate(ydoc, new Uint8Array(fs.readFileSync(opts.mergeInto)))
+  const fragment = ydoc.getXmlFragment('default')
+  const oldLength = fragment.length
+  ydoc.transact(() => {
+    if (fragment.length > 0) fragment.delete(0, fragment.length)
+    prosemirrorJSONToYXmlFragment(schema, json, fragment)
+  })
+  if (!opts.quiet) console.log(`合并  基于现有房间（原 ${oldLength} 个顶层节点，已就地替换）`)
+} else {
+  ydoc = prosemirrorJSONToYDoc(schema, json, 'default')
+}
 const update = Y.encodeStateAsUpdate(ydoc)
 
 fs.mkdirSync(path.dirname(path.resolve(binFile)), { recursive: true })
@@ -178,16 +275,18 @@ fs.writeFileSync(binFile, Buffer.from(update))
 
 const back = yDocToProsemirrorJSON(ydoc, 'default')
 
-function walk(node, stats) {
+function walk(node, stats, inCode = false) {
   stats.nodes += 1
   stats.byType[node.type] = (stats.byType[node.type] || 0) + 1
+  const nextInCode = inCode || node.type === 'codeBlock'
   if (node.type === 'text') {
     stats.text += (node.text || '').length
-    if ((node.text || '').includes('**')) stats.leftoverStars += 1
+    // 代码块里的 ** 是语法（1024**3、**kwargs），不是没转成的加粗
+    if (!nextInCode && (node.text || '').includes('**')) stats.leftoverStars += 1
   }
   if (node.type === 'table') stats.tables += 1
   if (node.type === 'taskList') stats.taskLists += 1
-  for (const child of node.content || []) walk(child, stats)
+  for (const child of node.content || []) walk(child, stats, nextInCode)
 }
 
 const stats = { nodes: 0, tables: 0, taskLists: 0, text: 0, leftoverStars: 0, byType: {} }
@@ -197,11 +296,19 @@ const headings = (back.content || [])
   .filter((n) => n.type === 'heading')
   .map((n) => `${'  '.repeat((n.attrs?.level || 1) - 1)}H${n.attrs?.level} ${(n.content || []).map((c) => c.text || '').join('')}`)
 
-if (!flags.has('--quiet')) {
+if (!opts.quiet) {
   const kb = (update.length / 1024).toFixed(1)
   console.log(`输入  ${mdFile}  (${(raw.length / 1024).toFixed(1)} KB)`)
   console.log(`输出  ${binFile}  (${kb} KB Yjs 更新)`)
   console.log(`节点  ${stats.nodes}　表格 ${stats.tables}　待办 ${stats.taskLists}　正文字数 ${stats.text}`)
+  console.log(
+    `链接  站内 ${linkStats.internal}　页内锚点 ${linkStats.inDoc}　外链 ${linkStats.external}　` +
+      `未发布降级 ${linkStats.stripped}`,
+  )
+  if (linkStats.missing.size > 0) {
+    const list = [...linkStats.missing].slice(0, 8).join('、')
+    console.log(`\u26a0 有 ${linkStats.missing.size} 个 md 链接找不到对应文档：${list}${linkStats.missing.size > 8 ? ' …' : ''}`)
+  }
   if (stats.leftoverStars > 0) {
     console.log(`\u26a0 仍有 ${stats.leftoverStars} 处文本残留 ** 标记（可能是跨段的加粗写法，需人工看）`)
   } else {

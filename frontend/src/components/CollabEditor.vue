@@ -10,11 +10,17 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
+import Link from '@tiptap/extension-link'
+import Underline from '@tiptap/extension-underline'
+import TextStyle from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import MermaidBlock from '../extensions/MermaidBlock'
 import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import HeadingFold from '../extensions/HeadingFold'
+import { CommentMark } from '../extensions/CommentMark'
+import SelectionToolbar from './SelectionToolbar.vue'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { COLLAB_URL } from '../config'
@@ -29,6 +35,8 @@ const props = withDefaults(
     collabToken?: string
     /** 只读：空间角色为 VIEWER 时为 false，只能看不能改 */
     editable?: boolean
+    /** 当前空间 id：站内链接没带 space 参数时用它兜底 */
+    spaceId?: number
   }>(),
   {
     docName: 'demo-doc',
@@ -37,11 +45,16 @@ const props = withDefaults(
     wsUrl: COLLAB_URL,
     collabToken: '',
     editable: true,
+    spaceId: 0,
   },
 )
 
 const editor = ref<Editor>()
+const toolbarRef = ref<InstanceType<typeof SelectionToolbar> | null>(null)
 let provider: HocuspocusProvider | null = null
+
+// 在 setup 里创建，选中文工具栏要拿它挂评论 Map（换文档时组件整体重建，实例天然隔离）
+const ydoc = new Y.Doc()
 
 /**
  * 撤销/重做快捷键补全。
@@ -65,6 +78,8 @@ const UndoRedoShortcuts = Extension.create({
 const emit = defineEmits<{
   /** 编辑器实例就绪后上报，供大纲/折叠等外部面板使用 */
   (e: 'editor-ready', editor: Editor): void
+  /** 点了站内链接：交给外层切换文档并滚到锚点，不整页刷新 */
+  (e: 'navigate', payload: { spaceId: number; docId: number; anchor: string }): void
 }>()
 const connected = ref(false)
 const peers = ref(0)
@@ -344,8 +359,6 @@ function moveSlash(delta: number) {
 /* ---------------- 编辑器 ---------------- */
 
 onMounted(() => {
-  const ydoc = new Y.Doc()
-
   provider = new HocuspocusProvider({
     url: props.wsUrl,
     name: props.docName,
@@ -375,6 +388,20 @@ onMounted(() => {
       TableRow,
       TableHeader,
       TableCell,
+      // 链接：文档之间互相引用（总索引→各篇、各篇→相关篇）全靠这层 mark；
+      // openOnClick 关掉，点击行为由下面的 onContentClick 接管（站内跳转不整页刷新）
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: { rel: 'noopener noreferrer' },
+      }),
+      // 选中文字后的浮动工具条要用到下划线 / 文字颜色（Color 依赖 TextStyle）
+      Underline,
+      TextStyle,
+      Color,
+      // 批注锚点：正文只留 id，评论正文在 ydoc 的 comments Map 里
+      CommentMark,
       MermaidBlock,
       PlantUMLBlock,
       HeadingFold,
@@ -465,6 +492,74 @@ function onAnyScroll(e: Event) {
   }
   syncPlusDot()
 }
+
+/**
+ * 正文里的链接点击。
+ *
+ * 站内链接的 href 是 `?space=2&doc=20`（可能带 `&h=锚点文字`）这种形式——
+ * 由 Markdown 导入时按文档清单改写而来，不写死域名，换域名/换机器都不用重发。
+ * 点它不应该整页刷新：解析出 docId 交给外层 selectDoc（SPA 内切文档）。
+ *
+ * 外链（http/https）保持默认行为：新标签打开，编辑器本身不跳走。
+ */
+function onContentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+
+  // 点批注高亮 → 打开这条评论（正在拖选文字时不弹，避免选到一半被打断）
+  const cmt = target?.closest?.('mark[data-comment-id]') as HTMLElement | null
+  if (cmt && window.getSelection()?.isCollapsed) {
+    const id = cmt.getAttribute('data-comment-id') || ''
+    if (id) {
+      e.preventDefault()
+      toolbarRef.value?.openThread(id, cmt)
+      return
+    }
+  }
+
+  const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
+  if (!anchor) return
+  // 编辑态下按住修饰键点链接是「放光标进链接」，不拦截
+  if (props.editable && (e.metaKey || e.ctrlKey)) return
+
+  const href = anchor.getAttribute('href') || ''
+  if (!href) return
+
+  // 纯站内锚点（老数据里可能残留 #xxx）：在当前文档内滚动
+  if (href.startsWith('#')) {
+    e.preventDefault()
+    emit('navigate', {
+      spaceId: props.spaceId,
+      docId: 0,
+      anchor: decodeURIComponent(href.slice(1)),
+    })
+    return
+  }
+
+  let url: URL
+  try {
+    url = new URL(href, location.href)
+  } catch {
+    return
+  }
+
+  const docId = Number(url.searchParams.get('doc'))
+  const isInternal = docId > 0 && url.origin === location.origin
+  if (isInternal) {
+    e.preventDefault()
+    emit('navigate', {
+      spaceId: Number(url.searchParams.get('space')) || props.spaceId,
+      docId,
+      anchor: url.searchParams.get('h') || '',
+    })
+    return
+  }
+
+  if (/^https?:/i.test(href)) {
+    // 外链不接管默认行为，但补上 target：避免在编辑器里把当前页顶掉
+    anchor.target = '_blank'
+    anchor.rel = 'noopener noreferrer'
+  }
+}
 </script>
 
 <template>
@@ -490,6 +585,9 @@ function onAnyScroll(e: Event) {
         </button>
         <button :class="{ active: editor?.isActive('strike') }" title="删除线" @click="editor?.chain().focus().toggleStrike().run()">
           <s>S</s>
+        </button>
+        <button :class="{ active: editor?.isActive('underline') }" title="下划线" @click="editor?.chain().focus().toggleUnderline().run()">
+          <u>U</u>
         </button>
         <button :class="{ active: editor?.isActive('code') }" title="行内代码" @click="editor?.chain().focus().toggleCode().run()">
           &lt;/&gt;
@@ -526,7 +624,18 @@ function onAnyScroll(e: Event) {
       <span v-else class="readonly-badge">👁 仅查看 · 你没有编辑权限</span>
     </div>
 
-    <EditorContent :editor="editor" class="content" />
+    <EditorContent :editor="editor" class="content" @click="onContentClick" />
+
+    <!-- 选中文字后的浮动格式条（标题/列表/加粗/删除线/斜体/下划线/链接/代码/颜色/评论） -->
+    <SelectionToolbar
+      v-if="editor"
+      ref="toolbarRef"
+      :editor="editor"
+      :ydoc="ydoc"
+      :editable="editable"
+      :user-name="userName"
+      :user-color="userColor"
+    />
 
     <!-- 斜杠菜单：position: fixed，坐标直接来自 coordsAtPos -->
     <div
