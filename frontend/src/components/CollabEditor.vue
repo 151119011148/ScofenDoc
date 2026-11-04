@@ -258,15 +258,167 @@ function closeSlash() {
   submenuOf.value = ''
 }
 
-/** 定位行内 + 按钮：取当前光标所在块的左侧位置 */
+/* ---------- 行内 ＋ 按钮：飞书式「鼠标到哪儿跟哪儿」 ----------
+ * 规则（与飞书一致）：
+ *   鼠标压在某一行正文上 → ＋ 出现在该行左侧（长段落里跟着行往下走）
+ *   鼠标停在 ＋ 或它的块菜单上 → 保持不动
+ *   鼠标离开正文/＋/菜单 → 160ms 后连同块菜单一起收掉
+ * 位置由鼠标决定，显隐由鼠标决定；光标/滚动只负责在可见时把位置对齐。
+ */
+
+/** 行内 + 的块菜单是否正开着（用于让 + 保持可见、保持高亮） */
+const plusMenuOpen = computed(() => slashOpen.value && menuSource.value === 'plus')
+
+/** 鼠标是否正压在「正文 / ＋ / 块菜单」上 */
+const plusHovering = ref(false)
+/** 当前 + 锚定的块起始 pos */
+const plusHoverBlock = ref(-1)
+
+const PLUS_SIZE = 20
+/** 收起延迟：正文和 ＋ 之间还有 6px 缝，留一点缓冲，否则手还没点上去按钮先没了 */
+const PLUS_HIDE_DELAY = 160
+
+let plusHideTimer = 0
+let plusRaf = 0
+const plusPointer = { x: 0, y: 0 }
+
+function cancelPlusHide() {
+  if (plusHideTimer) {
+    window.clearTimeout(plusHideTimer)
+    plusHideTimer = 0
+  }
+}
+
+function schedulePlusHide() {
+  if (plusHideTimer) return
+  plusHideTimer = window.setTimeout(() => {
+    plusHideTimer = 0
+    // 块菜单是从 ＋ 长出来的，按钮收掉时菜单也得跟着走，不然会留一个没有锚点的浮窗；
+    // 斜杠菜单（键入 / 触发）不归这里管，保持原有关闭逻辑。
+    if (plusMenuOpen.value) closeSlash()
+    plusHovering.value = false
+    plusHoverBlock.value = -1
+    plusDotVisible.value = false
+  }, PLUS_HIDE_DELAY)
+}
+
+/** 指针是否还压在 ＋ 上（连同它和正文之间那道缝）。坐标就是 fixed 定位值，直接比，省一次布局读取 */
+function nearPlusDot(x: number, y: number) {
+  if (!plusDotVisible.value && !plusMenuOpen.value) return false
+  return (
+    x >= plusDotX.value - 8 &&
+    x <= plusDotX.value + PLUS_SIZE + 10 &&
+    y >= plusDotY.value - 8 &&
+    y <= plusDotY.value + PLUS_SIZE + 8
+  )
+}
+
+/**
+ * 把 ＋ 摆到某个块的左侧。
+ * lineTop 传了就跟这一行垂直居中（鼠标停在第几行就贴第几行），不传则贴块首行。
+ * 只摆位置，不决定显隐 —— 显隐归鼠标。
+ */
+function placePlusDot(blockStart: number, lineTop?: number) {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed || !props.editable) return false
+  const node = ed.state.doc.nodeAt(blockStart)
+  if (!node) return false
+  const block = ed.view.coordsAtPos(blockStart)
+  plusHoverBlock.value = blockStart
+  plusBlockFrom.value = blockStart
+  plusBlockTo.value = blockStart + node.nodeSize
+  // 贴着正文内容左边缘往左挪一格（26px = 按钮 20 + 缝 6）
+  plusDotX.value = Math.round(block.left - 26)
+  plusDotY.value = Math.round(lineTop == null ? block.top : lineTop)
+  return true
+}
+
+/** 鼠标在哪儿就怎么处理：正文跟随 / ＋ 与菜单保持 / 其它延时收起 */
+function applyPlusHover(x: number, y: number) {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed || !props.editable) {
+    schedulePlusHide()
+    return
+  }
+  const el = document.elementFromPoint(x, y) as HTMLElement | null
+  const onPlusOrMenu = !!el?.closest('.plus-dot') || !!el?.closest('.slash-menu')
+
+  // 键入「/」唤起的斜杠菜单开着时，不弹 ＋（两套菜单同时出现会让人不知道在选什么）
+  if (slashOpen.value && menuSource.value === 'slash') {
+    plusDotVisible.value = false
+    return
+  }
+
+  // 块菜单开着时只做「留 / 收」，不再改锚点：否则鼠标扫过别的行会把 ＋ 挪走，
+  // 插入位置（plusBlockFrom）也跟着变，点下去就插错地方了。
+  if (plusMenuOpen.value) {
+    if (onPlusOrMenu || nearPlusDot(x, y)) cancelPlusHide()
+    else schedulePlusHide()
+    return
+  }
+
+  if (onPlusOrMenu || nearPlusDot(x, y)) {
+    cancelPlusHide()
+    return
+  }
+
+  if (!el || !ed.view.dom.contains(el)) {
+    schedulePlusHide()
+    return
+  }
+
+  const hit = ed.view.posAtCoords({ left: x, top: y })
+  if (!hit) {
+    schedulePlusHide()
+    return
+  }
+  const $pos = ed.state.doc.resolve(hit.pos)
+  if ($pos.depth < 1) {
+    schedulePlusHide()
+    return
+  }
+  const line = ed.view.coordsAtPos(hit.pos)
+  // 与鼠标所在那行垂直居中：行高一般 24~30，按钮 20
+  const lineTop = line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2)
+  if (placePlusDot($pos.before(1), lineTop)) {
+    plusHovering.value = true
+    plusDotVisible.value = true
+    cancelPlusHide()
+  } else {
+    schedulePlusHide()
+  }
+}
+
+/** 文档级 mousemove：rAF 节流，一帧最多算一次 posAtCoords */
+function onDocMouseMove(ev: MouseEvent) {
+  plusPointer.x = ev.clientX
+  plusPointer.y = ev.clientY
+  if (plusRaf) return
+  plusRaf = requestAnimationFrame(() => {
+    plusRaf = 0
+    applyPlusHover(plusPointer.x, plusPointer.y)
+  })
+}
+
+/**
+ * 光标/滚动变化后重新对齐 +（只对位置负责，不负责显隐）。
+ * 鼠标还压在正文上时跟随鼠标所在块，否则跟随光标所在块。
+ */
 function syncPlusDot() {
   const ed = editor.value
   if (!ed || ed.isDestroyed) {
     plusDotVisible.value = false
+    plusHovering.value = false
     return
   }
   if (!props.editable) {
     plusDotVisible.value = false
+    plusHovering.value = false
+    return
+  }
+  if (plusHovering.value && plusHoverBlock.value >= 0) {
+    const line = ed.view.coordsAtPos(plusHoverBlock.value)
+    placePlusDot(plusHoverBlock.value, line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2))
     return
   }
   const { state } = ed
@@ -276,19 +428,8 @@ function syncPlusDot() {
     plusDotVisible.value = false
     return
   }
-  // 取块起点坐标，+ 按钮放在块左侧
-  const blockStart = $from.before($from.depth)
-  const coords = ed.view.coordsAtPos(blockStart)
-  plusBlockFrom.value = blockStart
-  plusBlockTo.value = $from.after($from.depth)
-  // + 按钮固定在正文内容左侧，与块首行垂直对齐
-  plusDotX.value = coords.left - 26
-  plusDotY.value = coords.top
-  plusDotVisible.value = true
+  placePlusDot($from.before($from.depth))
 }
-
-/** 行内 + 的块菜单是否正开着（用于让 + 保持可见、保持高亮） */
-const plusMenuOpen = computed(() => slashOpen.value && menuSource.value === 'plus')
 
 /** 点击/悬停行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
 function openPlusMenu() {
@@ -312,7 +453,9 @@ function openPlusMenu() {
   slashOpen.value = true
   // 注意：这里不要隐藏 + 按钮。菜单是从它身上长出来的，按钮一消失，
   // 用户会以为操作已结束，也失去「再点一次收起」的锚点。
+  plusHovering.value = true
   plusDotVisible.value = true
+  cancelPlusHide()
 }
 
 /** 键盘导航用的扁平项列表：展开子菜单时用子项，否则用过滤结果扁平化 */
@@ -475,13 +618,20 @@ onMounted(() => {
   emit('editor-ready', editor.value)
 
   document.addEventListener('scroll', onAnyScroll, true)
+  // ＋ 按钮的显隐跟着鼠标走（飞书式），用文档级监听，因为按钮本体在编辑器 DOM 之外
+  document.addEventListener('mousemove', onDocMouseMove, { passive: true })
+  document.addEventListener('mousedown', onDocMouseMove, { passive: true })
 
-  // 编辑器就绪后定位一次行内 + 按钮（协同内容异步加载，延迟一点再定位）
+  // 编辑器就绪后先量一次位置（此时按钮还是隐藏的，等鼠标过来才露面）
   setTimeout(() => syncPlusDot(), 300)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('scroll', onAnyScroll, true)
+  document.removeEventListener('mousemove', onDocMouseMove)
+  document.removeEventListener('mousedown', onDocMouseMove)
+  cancelPlusHide()
+  if (plusRaf) cancelAnimationFrame(plusRaf)
   provider?.destroy()
   editor.value?.destroy()
 })
