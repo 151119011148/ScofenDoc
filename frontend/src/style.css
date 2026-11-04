@@ -693,7 +693,8 @@ body {
 /* ============ 行内 + 按钮 ============ */
 .plus-dot {
   position: fixed;
-  z-index: 190;
+  /* 高于 .slash-menu(200)：+ 是菜单的锚点，任何时候都不该被自己弹出的窗口压住 */
+  z-index: 210;
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -713,6 +714,13 @@ body {
 .plus-dot:hover {
   transform: scale(1.15);
   background: #2a60e0;
+}
+/* 菜单已展开：+ 留在原位并保持展开态，给用户一个「菜单从这儿来、还能点这儿」的锚点 */
+.plus-dot.on,
+.plus-dot.on:hover {
+  transform: scale(1.1);
+  background: #2a60e0;
+  box-shadow: 0 0 0 4px rgba(51, 112, 255, 0.16), 0 2px 8px rgba(51, 112, 255, 0.35);
 }
 
 /* ============ 选中文字浮动工具条 ============ */

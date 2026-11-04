@@ -287,10 +287,16 @@ function syncPlusDot() {
   plusDotVisible.value = true
 }
 
-/** 点击行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
+/** 行内 + 的块菜单是否正开着（用于让 + 保持可见、保持高亮） */
+const plusMenuOpen = computed(() => slashOpen.value && menuSource.value === 'plus')
+
+/** 点击/悬停行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
 function openPlusMenu() {
   const ed = editor.value
   if (!ed) return
+  // 已经开着就不要再重算位置——鼠标从菜单挪回 + 上时 mouseenter 会再触发一次，
+  // 重复计算会让菜单轻微跳动
+  if (plusMenuOpen.value) return
   menuSource.value = 'plus'
   slashQuery.value = ''
   submenuOf.value = ''
@@ -304,7 +310,9 @@ function openPlusMenu() {
       ? Math.max(8, coords.top - menuH - 6)
       : coords.bottom + 6
   slashOpen.value = true
-  plusDotVisible.value = false
+  // 注意：这里不要隐藏 + 按钮。菜单是从它身上长出来的，按钮一消失，
+  // 用户会以为操作已结束，也失去「再点一次收起」的锚点。
+  plusDotVisible.value = true
 }
 
 /** 键盘导航用的扁平项列表：展开子菜单时用子项，否则用过滤结果扁平化 */
@@ -701,12 +709,13 @@ function onContentClick(e: MouseEvent) {
       <div class="slash-foot">↑↓ 选择 · Enter 确认 · Esc 关闭</div>
     </div>
 
-    <!-- 行内 + 按钮：光标所在块左侧，hover 出 + 弹出块菜单 -->
+    <!-- 行内 + 按钮：光标所在块左侧，悬停弹出块菜单；菜单开着时按钮保留（高亮成「已展开」态） -->
     <button
-      v-if="plusDotVisible && editable"
-      class="plus-dot"
+      v-if="editable && (plusDotVisible || plusMenuOpen)"
+      :class="['plus-dot', { on: plusMenuOpen }]"
       :style="{ left: plusDotX + 'px', top: plusDotY + 'px' }"
-      title="插入区块"
+      :title="plusMenuOpen ? '收起区块菜单' : '插入区块'"
+      :aria-expanded="plusMenuOpen ? 'true' : 'false'"
       @mousedown.prevent
       @mouseenter="openPlusMenu"
       @click="openPlusMenu"
