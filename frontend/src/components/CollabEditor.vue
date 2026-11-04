@@ -822,9 +822,11 @@ function onContentClick(e: MouseEvent) {
   }
 
   if (/^https?:/i.test(href)) {
-    // 外链不接管默认行为，但补上 target：避免在编辑器里把当前页顶掉
-    anchor.target = '_blank'
-    anchor.rel = 'noopener noreferrer'
+    // 浏览器不会在 contenteditable 里激活 <a> 的默认跳转（点了什么都不发生），
+    // 而 Link 扩展又配了 openOnClick:false 不帮忙，所以这里必须自己开。
+    // 只改 target 是没用的 —— 没有默认动作可改。
+    e.preventDefault()
+    window.open(href, '_blank', 'noopener,noreferrer')
   }
 }
 </script>
