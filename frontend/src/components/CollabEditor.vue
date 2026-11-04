@@ -201,7 +201,7 @@ const activeChildren = computed(() => {
 })
 
 /** 光标是否处在「段首输入 /xxx」的状态；是则更新菜单位置 */
-function syncSlash() {
+function syncSlash(revealPlus = false) {
   const ed = editor.value
   if (!ed || ed.isDestroyed) return
   if (!props.editable) {
@@ -224,8 +224,8 @@ function syncSlash() {
   const before = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc')
   const matched = /^\/([^\s/]*)$/.exec(before)
   if (!matched) {
-    // 非斜杠输入：刷新行内 + 按钮位置
-    if (!slashOpen.value) syncPlusDot()
+    // 非斜杠输入：光标动了就把 ＋ 送到新位置并露出来（键盘换段时鼠标往往还留在老地方）
+    if (!slashOpen.value) syncPlusDot(revealPlus)
     return closeSlash()
   }
 
@@ -272,14 +272,27 @@ const plusMenuOpen = computed(() => slashOpen.value && menuSource.value === 'plu
 /** 鼠标是否正压在「光标所在块 / ＋ / 块菜单」上 */
 const plusHovering = ref(false)
 
-/** 光标所在块的几何范围（＋ 的可见区间）；ok=false 表示当前位置不该有 ＋ */
-const plusAnchor = { ok: false, top: 0, bottom: 0, left: 0 }
+/** 光标所在块 + 光标那一行的几何范围（＋ 的可见区间）；ok=false 表示当前位置不该有 ＋ */
+const plusAnchor = {
+  ok: false,
+  top: 0,
+  bottom: 0,
+  left: 0,
+  lineTop: 0,
+  lineBottom: 0,
+  /** 上次记录的光标块 / 光标 pos，用来判断「光标是不是真的搬家了」 */
+  blockStart: -1,
+  caretPos: -1,
+}
 
 const PLUS_SIZE = 20
 /** 收起延迟：正文和 ＋ 之间还有 6px 缝，留一点缓冲，否则手还没点上去按钮先没了 */
 const PLUS_HIDE_DELAY = 160
+/** 光标搬家用键盘操作时，鼠标常常还在原处；停手这么久后复核一次显隐 */
+const PLUS_RECHECK_DELAY = 900
 
 let plusHideTimer = 0
+let plusRecheckTimer = 0
 let plusRaf = 0
 /** 最后一次鼠标位置；seen=false 表示还没动过鼠标，此时 ＋ 一律不显示 */
 const plusPointer = { x: 0, y: 0, seen: false }
@@ -288,6 +301,10 @@ function hidePlusDotNow() {
   // 块菜单是从 ＋ 长出来的，按钮收掉时菜单也得跟着走，不然会留一个没有锚点的浮窗；
   // 斜杠菜单（键入 / 触发）不归这里管，保持原有关闭逻辑
   if (plusMenuOpen.value) closeSlash()
+  if (plusRecheckTimer) {
+    window.clearTimeout(plusRecheckTimer)
+    plusRecheckTimer = 0
+  }
   plusHovering.value = false
   plusDotVisible.value = false
 }
@@ -297,6 +314,20 @@ function cancelPlusHide() {
     window.clearTimeout(plusHideTimer)
     plusHideTimer = 0
   }
+}
+
+/**
+ * 光标搬家会把 ＋ 直接亮出来，但鼠标可能压根不在这一行（比如用键盘挪光标、鼠标停在侧栏）。
+ * 停手一会儿后复核一次：鼠标还是不在光标那一行，就收掉，别让它一直赖在屏幕上。
+ */
+function schedulePlusRecheck() {
+  if (plusRecheckTimer) window.clearTimeout(plusRecheckTimer)
+  plusRecheckTimer = window.setTimeout(() => {
+    plusRecheckTimer = 0
+    if (!plusPointer.seen || plusMenuOpen.value) return
+    const el = document.elementFromPoint(plusPointer.x, plusPointer.y) as HTMLElement | null
+    if (!pointerOnAnchorLine(plusPointer.x, plusPointer.y, el)) hidePlusDotNow()
+  }, PLUS_RECHECK_DELAY)
 }
 
 function schedulePlusHide() {
@@ -318,18 +349,23 @@ function nearPlusDot(x: number, y: number) {
   )
 }
 
-/** 指针是否落在「光标所在块」上（含块左侧那条专门给 ＋ 留的缝，不然够不着按钮） */
-function pointerOnAnchorBlock(x: number, y: number, el: HTMLElement | null) {
+/**
+ * 指针是否还压在「光标那一行」上。
+ * 取行而不是取整块：长段落、嵌套列表的一整个 LI 可能横跨十几行，
+ * 按块判定会出现「鼠标已经挪到别的行，＋ 还赖着不走」。
+ */
+function pointerOnAnchorLine(x: number, y: number, el: HTMLElement | null) {
   if (!plusAnchor.ok) return false
-  if (y < plusAnchor.top - 4 || y > plusAnchor.bottom + 4) return false
+  if (y < plusAnchor.lineTop - 6 || y > plusAnchor.lineBottom + 6) return false
   const pm = editor.value?.view.dom
   if (pm && el && pm.contains(el)) return true
+  // 正文左边缘到 ＋ 之间有 6px 缝，鼠标横移过去时不能判成「离开」
   return x >= plusAnchor.left - 40 && x <= plusAnchor.left + 2
 }
 
 /**
- * 鼠标判定：只认「光标所在块 / ＋ / 块菜单」三处，别处一律收起。
- * 不再跟随鼠标所在的块 —— ＋ 的插入位置取自光标，位置和判定都必须是同一个块，
+ * 鼠标判定：只认「光标那一行 / ＋ / 块菜单」三处，别处一律收起。
+ * 位置和判定都以光标为准 —— 插进去的是光标所在块，判定的也得是同一个地方，
  * 否则会出现「看着挂在 A 行、实际插到 B 行」。
  */
 function applyPlusHover(x: number, y: number) {
@@ -347,7 +383,7 @@ function applyPlusHover(x: number, y: number) {
     return
   }
 
-  if (onPlusOrMenu || nearPlusDot(x, y) || pointerOnAnchorBlock(x, y, el)) {
+  if (onPlusOrMenu || nearPlusDot(x, y) || pointerOnAnchorLine(x, y, el)) {
     plusHovering.value = true
     plusDotVisible.value = true
     cancelPlusHide()
@@ -368,11 +404,19 @@ function onDocMouseMove(ev: MouseEvent) {
   })
 }
 
+/** 鼠标整个离开窗口（切到别的应用、移出浏览器）时 mousemove 就断了，这里兜底收起 */
+function onWindowMouseOut(ev: MouseEvent) {
+  if (ev.relatedTarget) return
+  if (plusMenuOpen.value) return
+  hidePlusDotNow()
+}
+
 /**
- * 把 ＋ 对齐到「光标所在块的那一行」。
- * 只负责位置和锚点范围，显不显示仍由鼠标决定（鼠标不在这一块就收起来）。
+ * 把 ＋ 对齐到「光标所在块的那一行」，并按需要决定是否露面。
+ * @param reveal 光标搬家后调用：把 ＋ 直接送到新位置并显示出来（否则要等鼠标自己挪过去，
+ *               键盘移动光标时鼠标还在老地方，按钮永远不会跟过去）。滚动/缩放只摆位置，不改显隐。
  */
-function syncPlusDot() {
+function syncPlusDot(reveal = false) {
   const ed = editor.value
   if (!ed || ed.isDestroyed || !props.editable) {
     plusAnchor.ok = false
@@ -396,23 +440,40 @@ function syncPlusDot() {
     hidePlusDotNow()
     return
   }
+  // 光标那一块已经滚出视口，没必要还挂在屏幕边缘
+  if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    plusAnchor.ok = false
+    hidePlusDotNow()
+    return
+  }
   const block = ed.view.coordsAtPos(start)
   // 贴着正文内容左边缘往左挪一格（26px = 按钮 20 + 缝 6）；图块这类 coordsAtPos
   // 给不出横坐标的，退到 DOM 盒子上取，否则按钮会被算到屏幕外、看起来像「没出现」
   const left = block && block.left > 0 ? block.left : rect.left
 
   let dotTop: number
+  let lineTop: number
+  let lineBottom: number
   if (!node.isTextblock) {
     // 图块 / 图片 / 表格 / 分割线没有「行」的概念：贴它可见内容的顶边，
     // 否则会停在 node view 外框的 padding 里，看着像挂在上一块旁边
     const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
     const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
     dotTop = innerRect && innerRect.height > 0 ? innerRect.top : rect.top
+    lineTop = rect.top
+    lineBottom = rect.bottom
   } else {
     // 光标所在那一行：行高一般 24~30，按钮 20
     const line = ed.view.coordsAtPos($from.pos)
-    dotTop =
-      line && line.bottom > line.top ? line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2) : rect.top
+    if (line && line.bottom > line.top) {
+      lineTop = line.top
+      lineBottom = line.bottom
+      dotTop = line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2)
+    } else {
+      lineTop = rect.top
+      lineBottom = rect.bottom
+      dotTop = rect.top
+    }
   }
   dotTop = Math.min(Math.max(dotTop, rect.top), rect.bottom - PLUS_SIZE)
 
@@ -420,13 +481,29 @@ function syncPlusDot() {
   plusAnchor.top = rect.top
   plusAnchor.bottom = rect.bottom
   plusAnchor.left = left
+  plusAnchor.lineTop = lineTop
+  plusAnchor.lineBottom = lineBottom
   plusBlockFrom.value = start
   plusBlockTo.value = start + node.nodeSize
   plusDotX.value = Math.round(left - 26)
   plusDotY.value = Math.round(dotTop)
 
-  // 光标挪走以后，鼠标可能已经不在这一块上了：按最新的锚点重判一次显隐
-  if (plusPointer.seen) applyPlusHover(plusPointer.x, plusPointer.y)
+  // 光标真的换位置了吗？（协作者在别处打字也会触发 selectionUpdate，
+  // 那种情况不该把 ＋ 从用户眼前重新弹出来）
+  const moved = start !== plusAnchor.blockStart || $from.pos !== plusAnchor.caretPos
+  plusAnchor.blockStart = start
+  plusAnchor.caretPos = $from.pos
+
+  if (reveal && moved) {
+    // 光标搬到哪儿，＋ 就跟到哪儿（键盘上下左右、点击、Tab 都算）。
+    // 鼠标还停在老段落也没关系：下一次 mousemove 会把它收掉，停手 900ms 也会复核一次。
+    plusHovering.value = true
+    plusDotVisible.value = true
+    cancelPlusHide()
+    schedulePlusRecheck()
+  }
+  // 其它情况（滚动、缩放、位置没变）只重排位置，不动显隐：
+  // 光标换行时浏览器常会自动滚动一下，这里若按鼠标位置重判，刚露面的 ＋ 会立刻被收掉。
 }
 
 /** 点击/悬停行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
@@ -608,8 +685,9 @@ onMounted(() => {
         return false
       },
     },
-    onUpdate: syncSlash,
-    onSelectionUpdate: syncSlash,
+    onUpdate: () => syncSlash(false),
+    // 光标搬家（点击 / 方向键 / Tab）→ 把 ＋ 送到新段落
+    onSelectionUpdate: () => syncSlash(true),
     onBlur: closeSlash,
   })
 
@@ -619,6 +697,7 @@ onMounted(() => {
   // ＋ 按钮的显隐跟着鼠标走（飞书式），用文档级监听，因为按钮本体在编辑器 DOM 之外
   document.addEventListener('mousemove', onDocMouseMove, { passive: true })
   document.addEventListener('mousedown', onDocMouseMove, { passive: true })
+  window.addEventListener('mouseout', onWindowMouseOut)
 
   // 编辑器就绪后先量一次位置（此时按钮还是隐藏的，等鼠标过来才露面）
   setTimeout(() => syncPlusDot(), 300)
@@ -628,7 +707,9 @@ onBeforeUnmount(() => {
   document.removeEventListener('scroll', onAnyScroll, true)
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mousedown', onDocMouseMove)
+  window.removeEventListener('mouseout', onWindowMouseOut)
   cancelPlusHide()
+  if (plusRecheckTimer) window.clearTimeout(plusRecheckTimer)
   if (plusRaf) cancelAnimationFrame(plusRaf)
   provider?.destroy()
   editor.value?.destroy()
