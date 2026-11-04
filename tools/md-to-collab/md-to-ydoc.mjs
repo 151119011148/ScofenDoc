@@ -29,6 +29,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import { MermaidBlock } from './mermaid-block.mjs'
 import { PlantUMLBlock } from './plantuml-block.mjs'
 import { generateJSON } from '@tiptap/html'
@@ -47,6 +48,8 @@ function buildExtensions() {
     TableHeader,
     TableCell,
     Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+    // 必须与前端一致：少这个节点，导入的图会被 schema 静默丢掉
+    Image.configure({ inline: false, allowBase64: false }),
     MermaidBlock,
     PlantUMLBlock,
   ]

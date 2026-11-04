@@ -19,6 +19,14 @@ location /scofendoc/ {
     try_files $uri $uri/ /scofendoc/index.html;
 }
 
+
+# 存档文章配图（离线存档导入时落地，不进前端 dist —— 否则每次发版 --delete 会清掉）
+location /scofendoc/files/ {
+    alias /var/www/scofendoc-files/;
+    expires 7d;
+    add_header Cache-Control "public, max-age=604800";
+}
+
 # 带 hash 的产物可长缓存
 location /scofendoc/assets/ {
     root /var/www;

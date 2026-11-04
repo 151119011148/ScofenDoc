@@ -27,3 +27,6 @@ collab/data/
 
 # 验收脚本产出的截图
 tools/verify-browser/*.png
+
+# 存档导入的中间产物（422 个 .bin，上传后即可删）
+tools/md-to-collab/archive-out/

@@ -427,6 +427,19 @@ body {
 .ProseMirror ul, .ProseMirror ol { padding-left: 24px; }
 .ProseMirror hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
 
+/* 正文配图：存档文章一张图常占满宽度，别让它撑破版心 */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 18px auto;
+  display: block;
+}
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid #3370ff;
+  outline-offset: 2px;
+}
+
 /* 正文链接：站内互引与外链都走这一套。密度高的索引表里要能一眼看出可点 */
 .ProseMirror a {
   color: #245bdb;

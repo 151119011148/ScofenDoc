@@ -12,6 +12,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
 import Underline from '@tiptap/extension-underline'
 import TextStyle from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
@@ -128,6 +129,8 @@ const SLASH_GROUPS: SlashGroup[] = [
       { key: 'quote', label: '引用', hint: '引述一段话', icon: '❝', keywords: 'yinyong quote blockquote', run: (c) => c.toggleBlockquote() },
       { key: 'text', label: '正文', hint: '普通段落', icon: '¶', keywords: 'zhengwen text p paragraph', run: (c) => c.setParagraph() },
       { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
+      // run 是空转：图片需要先问地址，由 applySlash 里的 insertImageByUrl 接管
+      { key: 'image', label: '图片', hint: '按图片地址插入', icon: '🖼', keywords: 'tupian image img picture photo', run: (c) => c },
     ],
   },
   {
@@ -561,6 +564,11 @@ function applySlash(item: SlashItem) {
   const from = source === 'plus' ? plusBlockTo.value : slashFrom.value
   const to = source === 'plus' ? plusBlockTo.value : slashTo.value
   closeSlash()
+  // 图片要现填地址，不能像别的块那样直接 run
+  if (item.key === 'image') {
+    insertImageByUrl(source, from, to)
+    return
+  }
   if (source === 'plus') {
     // 行内 + 触发：在当前块之后插入新块（列表里插到列表之后，正文里插在当前段之后）
     const chain = ed
@@ -586,6 +594,27 @@ function applySlash(item: SlashItem) {
   } else {
     // 斜杠触发：先删掉输入的 "/xxx"，再执行块转换
     item.run(ed.chain().focus().deleteRange({ from, to })).run()
+  }
+}
+
+/**
+ * 插入图片。
+ * 目前没有上传接口，所以走「填地址」：既支持外链，也支持站内路径
+ * （存档文章那 1892 张图就由 nginx 静态托管在 /scofendoc/files/archive/ 下）。
+ */
+function insertImageByUrl(source: 'plus' | 'slash', from: number, to: number) {
+  const ed = editor.value
+  if (!ed) return
+  const input = window.prompt('图片地址（https://… 或 /scofendoc/files/…）', '')
+  if (!input) return
+  const src = input.trim()
+  if (!src) return
+  try {
+    const chain = ed.chain().focus()
+    if (source === 'slash') chain.deleteRange({ from, to })
+    chain.insertContentAt(from, { type: 'image', attrs: { src } }).run()
+  } catch (err) {
+    console.error('[image] insert failed', (err as Error)?.stack || err, { from })
   }
 }
 
@@ -658,6 +687,9 @@ onMounted(() => {
       Color,
       // 批注锚点：正文只留 id，评论正文在 ydoc 的 comments Map 里
       CommentMark,
+      // 图片：存档文章导入、以及正文里贴图都需要。inline:false 让它独占一段，
+      // 否则图片会混进行内文本，markdown 导入时层级很容易乱。
+      Image.configure({ inline: false, allowBase64: false }),
       MermaidBlock,
       PlantUMLBlock,
       HeadingFold,

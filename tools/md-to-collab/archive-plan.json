@@ -1,0 +1,3176 @@
+{
+ "spaceId": 2,
+ "parentId": 17,
+ "roots": [
+  {
+   "key": "csdn",
+   "title": "CSDN 存档",
+   "indexFile": "CSDN存档/CSDN存档索引.html",
+   "imgBase": "/scofendoc/files/archive/csdn/",
+   "groups": [
+    {
+     "title": "00-总索引",
+     "items": [
+      {
+       "file": "CSDN存档/106092509.html",
+       "title": "阿里代码规范检查工具的安装使用",
+       "collabKey": "fc2c01da-f13b-4dcb-90f5-2622a544cfda",
+       "sortOrder": 1,
+       "docId": 128
+      },
+      {
+       "file": "CSDN存档/93649834.html",
+       "title": "常用Linux命令",
+       "collabKey": "9ff34350-bc91-4e99-bd4f-e5126d261405",
+       "sortOrder": 2,
+       "docId": 129
+      },
+      {
+       "file": "CSDN存档/86518180.html",
+       "title": "GitHub怎样fork别人代码到自己仓库并进行贡献",
+       "collabKey": "0ab97b21-b511-4759-953b-2cadbf25486b",
+       "sortOrder": 3,
+       "docId": 130
+      },
+      {
+       "file": "CSDN存档/78843168.html",
+       "title": "Eclipse下svn的创建分支/合并/切换使用",
+       "collabKey": "b32b2ef3-11a5-43ce-a72b-23807e7d1316",
+       "sortOrder": 4,
+       "docId": 131
+      },
+      {
+       "file": "CSDN存档/78784005.html",
+       "title": "谷歌浏览器插件-jsonView插件安装与使用",
+       "collabKey": "fa0db1da-2e14-41a1-902b-db0fcf47f122",
+       "sortOrder": 5,
+       "docId": 132
+      },
+      {
+       "file": "CSDN存档/78751517.html",
+       "title": "eclipse idea 快捷键对比",
+       "collabKey": "e034603d-186a-419c-a0cf-75314a7d29dc",
+       "sortOrder": 6,
+       "docId": 133
+      }
+     ],
+     "collabKey": "2a29aa55-fc2f-4092-a106-26a6d0e9cd63",
+     "sortOrder": 1,
+     "docId": 127
+    },
+    {
+     "title": "1.1-Java基础-章节导览",
+     "items": [
+      {
+       "file": "CSDN存档/103454516.html",
+       "title": "通过Calendar类正确计算两日期之间的间隔",
+       "collabKey": "95c7d591-2efc-4ba8-b1f0-1b3cd521b8b3",
+       "sortOrder": 1,
+       "docId": 135
+      },
+      {
+       "file": "CSDN存档/102628323.html",
+       "title": "POI（三）：SAX方式 之 实战心得和演示案例",
+       "collabKey": "7307b221-539d-4d92-ab3c-bd147ccfdd48",
+       "sortOrder": 2,
+       "docId": 136
+      },
+      {
+       "file": "CSDN存档/102628241.html",
+       "title": "POI（二）：SAX方式之读取大数据2007版Excel（xlsx）",
+       "collabKey": "bc5320ad-105c-422d-8737-f8fc3f0e3ed9",
+       "sortOrder": 3,
+       "docId": 137
+      },
+      {
+       "file": "CSDN存档/102628187.html",
+       "title": "POI（一）：SAX方式之读取大数据2007版Excel（xlsx）",
+       "collabKey": "c4ea70d3-590d-4d98-aa59-577e20a11110",
+       "sortOrder": 4,
+       "docId": 138
+      },
+      {
+       "file": "CSDN存档/95169798.html",
+       "title": "性能分析（四）：几个常用的Json库，性能强势对比",
+       "collabKey": "ede4e007-43f7-4626-a757-b78d26bd1da6",
+       "sortOrder": 5,
+       "docId": 139
+      },
+      {
+       "file": "CSDN存档/80402799.html",
+       "title": "GsonUtil",
+       "collabKey": "dd91ddcf-0c60-4f05-abd7-039024ab7b9a",
+       "sortOrder": 6,
+       "docId": 140
+      },
+      {
+       "file": "CSDN存档/80283342.html",
+       "title": "姓名，身份证，手机号正则匹配",
+       "collabKey": "dff1674c-20d8-4bef-92fc-a0733e4e363f",
+       "sortOrder": 7,
+       "docId": 141
+      },
+      {
+       "file": "CSDN存档/80075844.html",
+       "title": "Guava工具类",
+       "collabKey": "b9e642eb-33bc-40ad-9520-e55f2a2326d3",
+       "sortOrder": 8,
+       "docId": 142
+      },
+      {
+       "file": "CSDN存档/79454514.html",
+       "title": "CsvUtils",
+       "collabKey": "b775bc1e-14fe-4e96-ab69-e10293377cd1",
+       "sortOrder": 9,
+       "docId": 143
+      },
+      {
+       "file": "CSDN存档/79426402.html",
+       "title": "上传及下载",
+       "collabKey": "03d6609c-f56f-4b91-b586-83c70ecdfc0d",
+       "sortOrder": 10,
+       "docId": 144
+      },
+      {
+       "file": "CSDN存档/79289214.html",
+       "title": "给定目录，抽取目录下所有文件中所有中文，花了半天时间编写调试。好东西哦",
+       "collabKey": "3e1701d9-9af1-49d2-8268-26c70ce2c640",
+       "sortOrder": 11,
+       "docId": 145
+      },
+      {
+       "file": "CSDN存档/78891900.html",
+       "title": "Quartz定时任务配置",
+       "collabKey": "6cdfd486-12fe-469c-a5fa-97fe8dacc792",
+       "sortOrder": 12,
+       "docId": 146
+      },
+      {
+       "file": "CSDN存档/78792141.html",
+       "title": "@Valid使用",
+       "collabKey": "fa1b3814-7807-46db-ada1-22adad5fa112",
+       "sortOrder": 13,
+       "docId": 147
+      },
+      {
+       "file": "CSDN存档/78771877.html",
+       "title": "BeanUtils.copyProperties()用法",
+       "collabKey": "44b804f0-73f1-4d7c-ba25-103ea1496d90",
+       "sortOrder": 14,
+       "docId": 148
+      },
+      {
+       "file": "CSDN存档/78717514.html",
+       "title": "fastjson 使用方法",
+       "collabKey": "7c252150-6423-4b65-be4b-a5852c11c7d3",
+       "sortOrder": 15,
+       "docId": 149
+      },
+      {
+       "file": "CSDN存档/78717457.html",
+       "title": "MessageFormat用法",
+       "collabKey": "9d1318dd-a2e8-4c4d-9490-b2fec100f898",
+       "sortOrder": 16,
+       "docId": 150
+      }
+     ],
+     "collabKey": "5d53a080-97c3-48a4-b7b5-258394553468",
+     "sortOrder": 2,
+     "docId": 134
+    },
+    {
+     "title": "1.2-Java基础-OO三大特性",
+     "items": [
+      {
+       "file": "CSDN存档/105198576.html",
+       "title": "java多态底层实现原理",
+       "collabKey": "7b0ca899-09f8-4838-b7f5-83d0ab637162",
+       "sortOrder": 1,
+       "docId": 152
+      },
+      {
+       "file": "CSDN存档/104778582.html",
+       "title": "设计模式（八）：利用工厂模式+策略模式去掉if-else",
+       "collabKey": "dd54cbb8-45d9-49da-8b1f-82f5d1fdaf4a",
+       "sortOrder": 2,
+       "docId": 153
+      },
+      {
+       "file": "CSDN存档/102938644.html",
+       "title": "性能分析（四）：动态代理方案性能对比",
+       "collabKey": "86622124-4591-4ba4-a7da-29cd68c76e37",
+       "sortOrder": 3,
+       "docId": 154
+      },
+      {
+       "file": "CSDN存档/102934493.html",
+       "title": "设计模式（七）：动态代理上是否能再进行一层代理",
+       "collabKey": "2cc0670d-8b81-4774-bb99-6514a6679b6a",
+       "sortOrder": 4,
+       "docId": 155
+      },
+      {
+       "file": "CSDN存档/102501301.html",
+       "title": "设计模式（六）：Spring 框架中的设计模式 （part five）",
+       "collabKey": "c5772a19-7d1d-438c-8287-e41745276ffd",
+       "sortOrder": 5,
+       "docId": 156
+      },
+      {
+       "file": "CSDN存档/102501292.html",
+       "title": "设计模式（五）：Spring 框架中的设计模式 （part four）",
+       "collabKey": "9f5ba3c5-0380-4948-83db-e63a7ae3c3ae",
+       "sortOrder": 6,
+       "docId": 157
+      },
+      {
+       "file": "CSDN存档/102501272.html",
+       "title": "设计模式（四）：Spring 框架中的设计模式 （part three）",
+       "collabKey": "4dd7c2b2-f26d-425a-9071-8ab777acbed4",
+       "sortOrder": 7,
+       "docId": 158
+      },
+      {
+       "file": "CSDN存档/102501218.html",
+       "title": "设计模式（三）：Spring 框架中的设计模式 （part two）",
+       "collabKey": "c5f9070c-1825-4d3b-8bcb-dc7f0c1cfa78",
+       "sortOrder": 8,
+       "docId": 159
+      },
+      {
+       "file": "CSDN存档/102501163.html",
+       "title": "设计模式（二）：Spring 框架中的设计模式 （part one）",
+       "collabKey": "46e0bcde-2c71-45ba-97ec-067ff516b5a0",
+       "sortOrder": 9,
+       "docId": 160
+      },
+      {
+       "file": "CSDN存档/83787653.html",
+       "title": "设计模式（一）： 单例模式",
+       "collabKey": "1ac7fa65-4f33-4f19-908c-a680bfab804d",
+       "sortOrder": 10,
+       "docId": 161
+      },
+      {
+       "file": "CSDN存档/88606126.html",
+       "title": "性能分析（三）：Cglib和jdk动态代理（基于JDK1.8）",
+       "collabKey": "b9b20199-f3aa-4e72-9bb8-6fd98e486989",
+       "sortOrder": 11,
+       "docId": 162
+      }
+     ],
+     "collabKey": "53598dd2-7e98-407d-9f0d-6453d18f49b2",
+     "sortOrder": 3,
+     "docId": 151
+    },
+    {
+     "title": "1.3-Java基础-集合框架",
+     "items": [
+      {
+       "file": "CSDN存档/105238992.html",
+       "title": "jdk集合源码阅读（八）：并发下1.7HashMap死循环，1.8解决过程",
+       "collabKey": "769efa62-b760-476c-a51f-3110eb9c48ec",
+       "sortOrder": 1,
+       "docId": 164
+      },
+      {
+       "file": "CSDN存档/105224809.html",
+       "title": "函数式接口代码应用",
+       "collabKey": "13bce063-43e8-4a38-9731-e5a03700c2d4",
+       "sortOrder": 2,
+       "docId": 165
+      },
+      {
+       "file": "CSDN存档/104778644.html",
+       "title": "Java8中Collectors详解",
+       "collabKey": "8916f7b9-4488-470e-8239-6bb3c7267b06",
+       "sortOrder": 3,
+       "docId": 166
+      },
+      {
+       "file": "CSDN存档/104768845.html",
+       "title": "jdk集合源码阅读（七）：HashMap默认加载因子为什么选择0.75？",
+       "collabKey": "595c4006-5412-4327-9aba-95dddb839b01",
+       "sortOrder": 4,
+       "docId": 167
+      },
+      {
+       "file": "CSDN存档/104690152.html",
+       "title": "函数式接口学习实践",
+       "collabKey": "54a55c2b-fda5-4517-a938-6b4607f701ab",
+       "sortOrder": 5,
+       "docId": 168
+      },
+      {
+       "file": "CSDN存档/85164030.html",
+       "title": "java8新特性 lambda Stream FunctionInterface",
+       "collabKey": "b155c218-3ea4-4308-ba1b-d0ec3552d730",
+       "sortOrder": 6,
+       "docId": 169
+      },
+      {
+       "file": "CSDN存档/85162816.html",
+       "title": "jdk集合源码阅读（六）：Stack源码分析（基于JDK1.8）",
+       "collabKey": "c17de407-4f53-4646-8e63-664223a4f47c",
+       "sortOrder": 7,
+       "docId": 170
+      },
+      {
+       "file": "CSDN存档/85162786.html",
+       "title": "jdk集合源码阅读（五）：Vector源码分析（基于JDK1.8）",
+       "collabKey": "0519287b-4e08-4132-8101-7ca25c030030",
+       "sortOrder": 8,
+       "docId": 171
+      },
+      {
+       "file": "CSDN存档/85162751.html",
+       "title": "jdk集合源码阅读（四）：LinkedList源码分析（基于JDK1.8）",
+       "collabKey": "deb9a3c6-5e66-4ec7-9fdf-02ca56a53afb",
+       "sortOrder": 9,
+       "docId": 172
+      },
+      {
+       "file": "CSDN存档/85162713.html",
+       "title": "jdk集合源码阅读（三）：ArrayList源码探讨（基于JDK1.8）",
+       "collabKey": "711023a3-c27d-4786-9fe6-b55bda702758",
+       "sortOrder": 10,
+       "docId": 173
+      },
+      {
+       "file": "CSDN存档/85161427.html",
+       "title": "性能分析（一）：List实现类的性能分析和应用场景（基于JDK1.8）",
+       "collabKey": "74882026-87cd-4239-84e8-6e3ab1890e9a",
+       "sortOrder": 11,
+       "docId": 174
+      },
+      {
+       "file": "CSDN存档/85161084.html",
+       "title": "jdk集合源码阅读（一）：HashMap分析（基于JDK1.8）",
+       "collabKey": "22ca3bf5-bb5a-4287-9e7b-87344fa2830b",
+       "sortOrder": 12,
+       "docId": 175
+      },
+      {
+       "file": "CSDN存档/85161028.html",
+       "title": "jdk集合源码阅读（二）：ConcurrentHashMap分析（基于JDK1.8）",
+       "collabKey": "f5ae9ceb-7ce0-4ee1-be40-63ce769f58f5",
+       "sortOrder": 13,
+       "docId": 176
+      },
+      {
+       "file": "CSDN存档/79915724.html",
+       "title": "lambda的peek，filter，map，collect函数使用",
+       "collabKey": "b3e98cba-e275-4a4f-b1a3-0660363cc582",
+       "sortOrder": 14,
+       "docId": 177
+      },
+      {
+       "file": "CSDN存档/79098919.html",
+       "title": "ConcurrentHashMap能完全替代HashTable吗",
+       "collabKey": "c3b175a7-b91e-4700-9b06-919fcc6a86f4",
+       "sortOrder": 15,
+       "docId": 178
+      }
+     ],
+     "collabKey": "aea93332-94c8-4a0f-9a96-b2e1545fdc0c",
+     "sortOrder": 4,
+     "docId": 163
+    },
+    {
+     "title": "1.4-Java基础-并发线程",
+     "items": [
+      {
+       "file": "CSDN存档/112982821.html",
+       "title": "Java多线程（二十）： J.U.C 之LongAdder：LongAdder原理",
+       "collabKey": "12275e2d-a982-491c-a873-ed83ac4da2cb",
+       "sortOrder": 1,
+       "docId": 180
+      },
+      {
+       "file": "CSDN存档/105269093.html",
+       "title": "Java多线程（十九）： J.U.C 之线程池：ThreadPoolExecutor",
+       "collabKey": "c0c1c49e-672b-4b0d-a950-9e5e4f438914",
+       "sortOrder": 2,
+       "docId": 181
+      },
+      {
+       "file": "CSDN存档/105269037.html",
+       "title": "Java多线程（十八）： J.U.C 之阻塞队列LinkedBlockingDeque",
+       "collabKey": "54f1d335-2479-4d4f-a623-9f944e3c585d",
+       "sortOrder": 3,
+       "docId": 182
+      },
+      {
+       "file": "CSDN存档/105269007.html",
+       "title": "Java多线程（十七）： J.U.C 之阻塞队列SynchronousQueue",
+       "collabKey": "c00ee734-28a2-4220-99d8-1f78c33c6c07",
+       "sortOrder": 4,
+       "docId": 183
+      },
+      {
+       "file": "CSDN存档/105268974.html",
+       "title": "Java多线程（十六）： J.U.C 之阻塞队列DelayQueue",
+       "collabKey": "89c2c162-f081-4812-99a3-944a3833011b",
+       "sortOrder": 5,
+       "docId": 184
+      },
+      {
+       "file": "CSDN存档/105268959.html",
+       "title": "Java多线程（十五）： J.U.C 之阻塞队列PriorityBlockingQueue",
+       "collabKey": "a3c1ae4c-55b9-4519-84fc-8043990862fe",
+       "sortOrder": 6,
+       "docId": 185
+      },
+      {
+       "file": "CSDN存档/105268931.html",
+       "title": "Java多线程（十四）： J.U.C 之阻塞队列ArrayBlockingQueue",
+       "collabKey": "38c33833-32e2-4377-9d7f-3f0af805d4db",
+       "sortOrder": 7,
+       "docId": 186
+      },
+      {
+       "file": "CSDN存档/105250442.html",
+       "title": "Java多线程（十三）： 深入分析 ThreadLocal",
+       "collabKey": "8a8a2b12-8bfc-4e84-b62b-71924db16879",
+       "sortOrder": 8,
+       "docId": 187
+      },
+      {
+       "file": "CSDN存档/105250400.html",
+       "title": "Java多线程（十二）：J.U.C 之 Condition",
+       "collabKey": "cf89c838-9c86-4561-a8ce-f399b8174462",
+       "sortOrder": 9,
+       "docId": 188
+      },
+      {
+       "file": "CSDN存档/105249078.html",
+       "title": "Java多线程（十一）：J.U.C 之并发容器ConcurrentSkipListMap/ConcurrentLinkedQueue",
+       "collabKey": "48d697c2-2191-4fc0-b93e-400162136012",
+       "sortOrder": 10,
+       "docId": 189
+      },
+      {
+       "file": "CSDN存档/105248991.html",
+       "title": "Java多线程（十）：J.U.C 之并发容器ConcurrentHashMap",
+       "collabKey": "9109fda3-afee-4ed9-ab2b-3c6c3bcf5895",
+       "sortOrder": 11,
+       "docId": 190
+      },
+      {
+       "file": "CSDN存档/105248719.html",
+       "title": "Java多线程（九）：J.U.C 之CyclicBarrier/CountDownLatch/Semaphore",
+       "collabKey": "1dfa334b-0950-4af8-8e55-6fadf9ec9778",
+       "sortOrder": 12,
+       "docId": 191
+      },
+      {
+       "file": "CSDN存档/105248607.html",
+       "title": "Java多线程（八）：深入分析 CAS",
+       "collabKey": "ee8e696e-ad84-425a-a4fe-04d9bdf9eecb",
+       "sortOrder": 13,
+       "docId": 192
+      },
+      {
+       "file": "CSDN存档/105248554.html",
+       "title": "Java多线程（七）：J.U.C 之 ReentrantLock和ReentrantReadWriteLock",
+       "collabKey": "6f029505-ec4b-4d4c-877e-5323510e7b3c",
+       "sortOrder": 14,
+       "docId": 193
+      },
+      {
+       "file": "CSDN存档/105239247.html",
+       "title": "三个线程交替顺序打印ABC",
+       "collabKey": "7828f785-222c-40af-a2e6-f7add990d0bc",
+       "sortOrder": 15,
+       "docId": 194
+      },
+      {
+       "file": "CSDN存档/103237050.html",
+       "title": "死磕 Java 并发",
+       "collabKey": "8199045d-62a1-41ea-a776-2b0e034d2fd2",
+       "sortOrder": 16,
+       "docId": 195
+      },
+      {
+       "file": "CSDN存档/88606056.html",
+       "title": "Java多线程（十七）：多线程下的其他组件之CyclicBarrier、Callable、Future和FutureTask",
+       "collabKey": "c443baef-7fc4-4dd0-b4aa-e5db0ec5666a",
+       "sortOrder": 17,
+       "docId": 196
+      },
+      {
+       "file": "CSDN存档/88606042.html",
+       "title": "Java多线程（十六）：多线程下的其他组件之CountDownLatch、Semaphore、Exchanger",
+       "collabKey": "a97ad1e8-237e-4c26-ad2c-f5b4c4015488",
+       "sortOrder": 18,
+       "docId": 197
+      },
+      {
+       "file": "CSDN存档/88606026.html",
+       "title": "Java多线程（十五）：定时器Timer",
+       "collabKey": "613837c3-7553-4cbe-9071-d23e1a85de23",
+       "sortOrder": 19,
+       "docId": 198
+      },
+      {
+       "file": "CSDN存档/88606003.html",
+       "title": "Java多线程（十四）：线程池",
+       "collabKey": "3d06ee6f-c043-47f6-bad9-ba547f238dac",
+       "sortOrder": 20,
+       "docId": 199
+      },
+      {
+       "file": "CSDN存档/88605983.html",
+       "title": "Java多线程（十三）：中断机制",
+       "collabKey": "41e81892-94cb-4344-aa4c-6def0a9db4c8",
+       "sortOrder": 21,
+       "docId": 200
+      },
+      {
+       "file": "CSDN存档/88605944.html",
+       "title": "Java多线程（十二）：Queue、BlockingQueue以及利用BlockingQueue实现生产者/消费者模型",
+       "collabKey": "83cee84b-0515-4ac0-9d53-96b477990e97",
+       "sortOrder": 22,
+       "docId": 201
+      },
+      {
+       "file": "CSDN存档/88605910.html",
+       "title": "Java多线程（十一）：生产者/消费者模型",
+       "collabKey": "cad5f222-88be-4e30-91fa-3c4e20b66c50",
+       "sortOrder": 23,
+       "docId": 202
+      },
+      {
+       "file": "CSDN存档/88605880.html",
+       "title": "Java多线程（十）：读写锁和两种同步方式的对比",
+       "collabKey": "56a959b4-d36f-4422-8d5b-f074c4d492af",
+       "sortOrder": 24,
+       "docId": 203
+      },
+      {
+       "file": "CSDN存档/88577503.html",
+       "title": "Java多线程（四）：synchronized锁机制",
+       "collabKey": "c2616855-e885-4839-842f-7a81f9b44292",
+       "sortOrder": 25,
+       "docId": 204
+      },
+      {
+       "file": "CSDN存档/88577712.html",
+       "title": "Java多线程（九）：ThreadLocal源码剖析",
+       "collabKey": "eabf1c91-66c2-4af2-9238-a56dcd13dc9a",
+       "sortOrder": 26,
+       "docId": 205
+      },
+      {
+       "file": "CSDN存档/88577668.html",
+       "title": "Java多线程（八）：wait()和notify()/notifyAll()",
+       "collabKey": "1f35c1af-4bdd-4fa9-8a24-cdc2c9b5e4f6",
+       "sortOrder": 27,
+       "docId": 206
+      },
+      {
+       "file": "CSDN存档/88577617.html",
+       "title": "Java多线程（七）：死锁",
+       "collabKey": "2e5f9bc7-4154-4fe9-acad-d0eab61e0b9e",
+       "sortOrder": 28,
+       "docId": 207
+      },
+      {
+       "file": "CSDN存档/88577386.html",
+       "title": "Java多线程（三）：Thread中的静态方法",
+       "collabKey": "91c4bc99-64fe-456d-9e44-0376450e5dd1",
+       "sortOrder": 29,
+       "docId": 208
+      },
+      {
+       "file": "CSDN存档/88577145.html",
+       "title": "Java多线程（二）：Thread中的实例方法",
+       "collabKey": "27bd5381-2716-4ec2-8430-c69e4b919e55",
+       "sortOrder": 30,
+       "docId": 209
+      },
+      {
+       "file": "CSDN存档/88577069.html",
+       "title": "Java多线程（一）：进程与线程概述",
+       "collabKey": "fa8abc92-a137-4bc8-bc93-2ff722c7562e",
+       "sortOrder": 31,
+       "docId": 210
+      },
+      {
+       "file": "CSDN存档/86302124.html",
+       "title": "性能分析（二）：公平锁与非公平锁（基于JDK1.8）",
+       "collabKey": "b33e6a30-453e-40a0-9a3e-bec838be33df",
+       "sortOrder": 32,
+       "docId": 211
+      },
+      {
+       "file": "CSDN存档/86289326.html",
+       "title": "Java多线程（六）：J.U.C 之 AQS",
+       "collabKey": "4f020c2e-94d8-4501-bd35-dfa2d519f15e",
+       "sortOrder": 33,
+       "docId": 212
+      },
+      {
+       "file": "CSDN存档/86288757.html",
+       "title": "Java多线程（四）：Synchronized实现原理",
+       "collabKey": "3621005e-9e98-4390-82e7-24925262acdd",
+       "sortOrder": 34,
+       "docId": 213
+      },
+      {
+       "file": "CSDN存档/86288620.html",
+       "title": "Java多线程（五）：Volatile解析",
+       "collabKey": "853b8f25-e3e4-43df-800d-e5640c9d7d60",
+       "sortOrder": 35,
+       "docId": 214
+      },
+      {
+       "file": "CSDN存档/83343523.html",
+       "title": "ThreadLocal 深度解析",
+       "collabKey": "9615b835-2f91-43ef-a438-2ebbece85064",
+       "sortOrder": 36,
+       "docId": 215
+      },
+      {
+       "file": "CSDN存档/80164209.html",
+       "title": "Java非线程安全类变线程安全类",
+       "collabKey": "13ce3243-f3ac-46c4-9c1f-0c21246a99de",
+       "sortOrder": 37,
+       "docId": 216
+      }
+     ],
+     "collabKey": "870d09e0-602d-4453-bb93-c841fe3496a2",
+     "sortOrder": 5,
+     "docId": 179
+    },
+    {
+     "title": "1.5-Java基础-IO",
+     "items": [
+      {
+       "file": "CSDN存档/105491870.html",
+       "title": "IO（六）：深入探秘 Netty、Kafka 中的零拷贝技术",
+       "collabKey": "40da7380-23ba-4bcc-b970-9202f9efc4b6",
+       "sortOrder": 1,
+       "docId": 218
+      },
+      {
+       "file": "CSDN存档/105136718.html",
+       "title": "IO（五）：comet技术",
+       "collabKey": "895907f5-bbaf-46fe-ad70-7720c6f9535b",
+       "sortOrder": 2,
+       "docId": 219
+      },
+      {
+       "file": "CSDN存档/105120845.html",
+       "title": "IO（四）：堆外内存详解",
+       "collabKey": "f270978f-d18f-43b6-920f-4f1e04240b22",
+       "sortOrder": 3,
+       "docId": 220
+      },
+      {
+       "file": "CSDN存档/105119821.html",
+       "title": "IO（二）：select、poll、epoll",
+       "collabKey": "f1e86599-d3fa-4145-8695-a3bb5ce65b34",
+       "sortOrder": 4,
+       "docId": 221
+      },
+      {
+       "file": "CSDN存档/105118714.html",
+       "title": "IO（一）：BIO，NIO，AIO",
+       "collabKey": "b1777d8b-8a2c-4d52-8973-9176f3b84727",
+       "sortOrder": 5,
+       "docId": 222
+      },
+      {
+       "file": "CSDN存档/103993665.html",
+       "title": "IO（三）：零拷贝",
+       "collabKey": "7f6021ce-6631-4c60-8c73-cbaefdc4d31e",
+       "sortOrder": 6,
+       "docId": 223
+      },
+      {
+       "file": "CSDN存档/83614972.html",
+       "title": "BIO/NIO/AIO的具体实现",
+       "collabKey": "f57d4c11-966d-424b-9d9b-cce7e1830603",
+       "sortOrder": 7,
+       "docId": 224
+      },
+      {
+       "file": "CSDN存档/80894453.html",
+       "title": "Java 网络IO编程总结（BIO、NIO、AIO均含完整实例代码）",
+       "collabKey": "29bc0137-cc7a-4e2e-9304-38d2bd2b5235",
+       "sortOrder": 8,
+       "docId": 225
+      }
+     ],
+     "collabKey": "93021605-5a48-455b-b6f2-5da12d42011a",
+     "sortOrder": 6,
+     "docId": 217
+    },
+    {
+     "title": "1.5.1-Java基础-Netty与网络编程",
+     "items": [
+      {
+       "file": "CSDN存档/105137027.html",
+       "title": "Websocket（三）：Socket.io",
+       "collabKey": "af512427-f0cc-42b6-b62b-aed0e8503561",
+       "sortOrder": 1,
+       "docId": 227
+      },
+      {
+       "file": "CSDN存档/105136977.html",
+       "title": "Websocket（二）：原理",
+       "collabKey": "a431ad34-32a6-4905-8669-0fd45553bbf4",
+       "sortOrder": 2,
+       "docId": 228
+      },
+      {
+       "file": "CSDN存档/105136916.html",
+       "title": "Websocket（一）：背景",
+       "collabKey": "6acb5fdf-0242-4fec-a87e-4c6af352e3ad",
+       "sortOrder": 3,
+       "docId": 229
+      },
+      {
+       "file": "CSDN存档/103260950.html",
+       "title": "Tomcat 源码解析",
+       "collabKey": "2b2d1275-792d-4548-899b-bda55315a47c",
+       "sortOrder": 4,
+       "docId": 230
+      },
+      {
+       "file": "CSDN存档/103260904.html",
+       "title": "Jetty 源码解析",
+       "collabKey": "8845487b-ffcc-456f-94b3-45230ca17b17",
+       "sortOrder": 5,
+       "docId": 231
+      },
+      {
+       "file": "CSDN存档/100938302.html",
+       "title": "Tomcat（三）：Tomcat中的容器是如何处理请求的",
+       "collabKey": "c687d456-51a3-46a6-aef1-c51d55d75446",
+       "sortOrder": 6,
+       "docId": 232
+      },
+      {
+       "file": "CSDN存档/88672349.html",
+       "title": "Netty源码阅读（八）： NioServerSocketChannel源码解析",
+       "collabKey": "e1aeb2b7-a1d7-47a4-9f44-96113c7567a5",
+       "sortOrder": 7,
+       "docId": 233
+      },
+      {
+       "file": "CSDN存档/88642756.html",
+       "title": "Netty源码阅读（七）： ServerBootstrap启动",
+       "collabKey": "b9c49f1e-dff5-4f5d-86d7-0353e99ca694",
+       "sortOrder": 8,
+       "docId": 234
+      },
+      {
+       "file": "CSDN存档/88642551.html",
+       "title": "Netty源码阅读（六）：初识Netty",
+       "collabKey": "88dbce3b-e1c6-4baf-bb8e-b4dae4af7a2e",
+       "sortOrder": 9,
+       "docId": 235
+      },
+      {
+       "file": "CSDN存档/88642425.html",
+       "title": "Netty源码阅读（五）：选择器",
+       "collabKey": "095ed5f7-e793-4168-adee-660ccf066198",
+       "sortOrder": 10,
+       "docId": 236
+      },
+      {
+       "file": "CSDN存档/88642316.html",
+       "title": "Netty源码阅读（四）：Socket通道",
+       "collabKey": "112d768b-a1b0-4ba8-a87d-23d1c4b3c635",
+       "sortOrder": 11,
+       "docId": 237
+      },
+      {
+       "file": "CSDN存档/88640498.html",
+       "title": "Netty源码阅读（三）：通道Channel和文件通道FileChannel",
+       "collabKey": "e4481ecd-425b-4721-b831-f6f1f6cf9442",
+       "sortOrder": 12,
+       "docId": 238
+      },
+      {
+       "file": "CSDN存档/88640448.html",
+       "title": "Netty源码阅读（二）：缓冲区Buffer",
+       "collabKey": "6733714c-4660-484b-8ba7-311c3145aa8a",
+       "sortOrder": 13,
+       "docId": 239
+      },
+      {
+       "file": "CSDN存档/88170597.html",
+       "title": "TCP三次握手四次挥手详解",
+       "collabKey": "ccdb753a-d530-40e1-8fe0-0bb4096b1c89",
+       "sortOrder": 14,
+       "docId": 240
+      }
+     ],
+     "collabKey": "89560fa8-6e1b-40bc-92a9-8dcc1f4fc16f",
+     "sortOrder": 7,
+     "docId": 226
+    },
+    {
+     "title": "1.6-Java基础-JVM内存与GC",
+     "items": [
+      {
+       "file": "CSDN存档/104004210.html",
+       "title": "JVM（五）：GC调优",
+       "collabKey": "5806c7a7-b0ce-48f4-9c56-617763375cad",
+       "sortOrder": 1,
+       "docId": 242
+      },
+      {
+       "file": "CSDN存档/104004062.html",
+       "title": "JVM（四）：GC",
+       "collabKey": "5af4d5d8-3bd3-40ad-9cda-9255a3a77dab",
+       "sortOrder": 2,
+       "docId": 243
+      },
+      {
+       "file": "CSDN存档/102973487.html",
+       "title": "OOM（四）：201911080845再一次溢出",
+       "collabKey": "5abd25c4-ad26-4280-b6aa-2198aeb794a4",
+       "sortOrder": 3,
+       "docId": 244
+      },
+      {
+       "file": "CSDN存档/102953491.html",
+       "title": "JVM（三）：JVM各种内存溢出是否，以及是否产生dump文件",
+       "collabKey": "6ec6244c-9a2a-443f-b82d-b5aa903ddf62",
+       "sortOrder": 4,
+       "docId": 245
+      },
+      {
+       "file": "CSDN存档/102930219.html",
+       "title": "OOM（三）：VisualVM使用",
+       "collabKey": "62502d34-966d-4e5e-9583-78eb0ed4df22",
+       "sortOrder": 5,
+       "docId": 246
+      },
+      {
+       "file": "CSDN存档/102930185.html",
+       "title": "OOM（二）：eclipse的MAT使用",
+       "collabKey": "1a43df63-9bee-427f-9c81-ba52691cf43b",
+       "sortOrder": 6,
+       "docId": 247
+      },
+      {
+       "file": "CSDN存档/102930098.html",
+       "title": "OOM（一）：线上排查及解决流程",
+       "collabKey": "37333c42-b86c-4f1a-b3d4-f8d44a5c733d",
+       "sortOrder": 7,
+       "docId": 248
+      },
+      {
+       "file": "CSDN存档/96607476.html",
+       "title": "JVM（二）：ClassLoader双亲委派机制源码分析",
+       "collabKey": "7bbb4ec8-6725-4619-b2c9-b07a2d1ac853",
+       "sortOrder": 8,
+       "docId": 249
+      },
+      {
+       "file": "CSDN存档/93649756.html",
+       "title": "Java虚拟机（一）：运行时数据区域",
+       "collabKey": "f64194fa-0323-4833-a2b2-b86c5b36122d",
+       "sortOrder": 9,
+       "docId": 250
+      },
+      {
+       "file": "CSDN存档/93649539.html",
+       "title": "Java虚拟机（二）：对象探秘",
+       "collabKey": "5cd8b6b0-4caa-428c-9d29-67a568a9d0b4",
+       "sortOrder": 10,
+       "docId": 251
+      },
+      {
+       "file": "CSDN存档/88060013.html",
+       "title": "JVM（一）：Java自定义类加载器与双亲委派模型",
+       "collabKey": "b81eed81-f82c-4d79-91ee-bfd9cc76b0f2",
+       "sortOrder": 11,
+       "docId": 252
+      },
+      {
+       "file": "CSDN存档/88059944.html",
+       "title": "java中的安全模型(沙箱机制)",
+       "collabKey": "06230d84-9fbc-48bf-92b8-db4a77574ebb",
+       "sortOrder": 12,
+       "docId": 253
+      },
+      {
+       "file": "CSDN存档/85124095.html",
+       "title": "JVM",
+       "collabKey": "ea78b37f-4c84-4663-ba73-ca9de989ded8",
+       "sortOrder": 13,
+       "docId": 254
+      },
+      {
+       "file": "CSDN存档/83344144.html",
+       "title": "Java四种引用包括强引用，软引用，弱引用，虚引用。",
+       "collabKey": "8652d9d6-621d-4976-80e0-8f5c8db60188",
+       "sortOrder": 14,
+       "docId": 255
+      },
+      {
+       "file": "CSDN存档/78793192.html",
+       "title": "使用Eclipse远程调试及原理",
+       "collabKey": "8c3241fd-ab81-4eb9-ba09-d85fc0979bce",
+       "sortOrder": 15,
+       "docId": 256
+      }
+     ],
+     "collabKey": "2d95de03-698e-4a27-9d86-92dc50de825e",
+     "sortOrder": 8,
+     "docId": 241
+    },
+    {
+     "title": "2.1-Spring框架",
+     "items": [
+      {
+       "file": "CSDN存档/102553521.html",
+       "title": "4 张图读懂 Spring IoC",
+       "collabKey": "87bb4144-49a8-42b9-ab98-83a18bbaf005",
+       "sortOrder": 1,
+       "docId": 258
+      },
+      {
+       "file": "CSDN存档/103243156.html",
+       "title": "Shiro 实现原理与源码解析系统",
+       "collabKey": "afcb7c9b-ce40-4d52-9611-361e95e68a3f",
+       "sortOrder": 2,
+       "docId": 259
+      },
+      {
+       "file": "CSDN存档/103243147.html",
+       "title": "Spring Webflux 实现原理与源码解析系统",
+       "collabKey": "b9bf8b97-2c07-41ad-a12a-e7283135298f",
+       "sortOrder": 3,
+       "docId": 260
+      },
+      {
+       "file": "CSDN存档/103243139.html",
+       "title": "Spring Security 源码解析",
+       "collabKey": "66c6e14a-b73f-449d-a2e1-331b8bcd8347",
+       "sortOrder": 4,
+       "docId": 261
+      },
+      {
+       "file": "CSDN存档/103237017.html",
+       "title": "Spring Data JPA 实现原理与源码解析系统",
+       "collabKey": "e7d19b10-64fd-409a-84d1-28b70aaade54",
+       "sortOrder": 5,
+       "docId": 262
+      },
+      {
+       "file": "CSDN存档/102549261.html",
+       "title": "Spring（十四）：IoC 之解析 &lt;bean&gt; 标签：constructor-arg、property、qualifier",
+       "collabKey": "ece91682-fdec-4352-a939-1ba52d410b28",
+       "sortOrder": 6,
+       "docId": 263
+      },
+      {
+       "file": "CSDN存档/100938292.html",
+       "title": "Tomcat（二）：Tomcat在SpringBoot中是如何启动的",
+       "collabKey": "b0c604a5-8c6e-4897-ab74-2bf50d0c1cf8",
+       "sortOrder": 7,
+       "docId": 264
+      },
+      {
+       "file": "CSDN存档/100938280.html",
+       "title": "Tomcat（一）：Tomcat在SpringBoot中是如何启动的",
+       "collabKey": "61e0cf3a-46f1-4b0c-896d-e02139babfff",
+       "sortOrder": 8,
+       "docId": 265
+      },
+      {
+       "file": "CSDN存档/95591808.html",
+       "title": "排坑（一）：@Transaction失效",
+       "collabKey": "b212c7fa-8f54-4207-b705-e19228cec46a",
+       "sortOrder": 9,
+       "docId": 266
+      },
+      {
+       "file": "CSDN存档/80346332.html",
+       "title": "Java自定义注解和运行时靠反射获取注解",
+       "collabKey": "20c64146-1283-4b7f-a955-cc40f2368bdd",
+       "sortOrder": 10,
+       "docId": 267
+      },
+      {
+       "file": "CSDN存档/79408545.html",
+       "title": "利用postman发送带cookie请求的方法,上传文件等等",
+       "collabKey": "a88b88d6-1b93-4348-8001-f4b25bd0efe9",
+       "sortOrder": 11,
+       "docId": 268
+      },
+      {
+       "file": "CSDN存档/79236584.html",
+       "title": "一个极端的前端国际化方法",
+       "collabKey": "f6a67a65-2a4d-4881-9c16-894c01bd962d",
+       "sortOrder": 12,
+       "docId": 269
+      },
+      {
+       "file": "CSDN存档/79157954.html",
+       "title": "spring国际化（cookie方式）",
+       "collabKey": "7af2a953-5179-498b-8f9d-fe7569e531e0",
+       "sortOrder": 13,
+       "docId": 270
+      },
+      {
+       "file": "CSDN存档/79128339.html",
+       "title": "spring国际化",
+       "collabKey": "9a9f5bb4-0463-43cc-a8f3-7501d2cce0ae",
+       "sortOrder": 14,
+       "docId": 271
+      },
+      {
+       "file": "CSDN存档/79000679.html",
+       "title": "spring过滤器和拦截器的区别和联系",
+       "collabKey": "2e59e495-ae83-4df0-bcbb-82abb4cb25cd",
+       "sortOrder": 15,
+       "docId": 272
+      },
+      {
+       "file": "CSDN存档/78802809.html",
+       "title": "不受spring管理的类注入问题",
+       "collabKey": "b9ca342e-b56f-4491-ac8d-3cc8c9f4b341",
+       "sortOrder": 16,
+       "docId": 273
+      }
+     ],
+     "collabKey": "f27170b9-bdc6-42d5-99ad-94df779690c2",
+     "sortOrder": 9,
+     "docId": 257
+    },
+    {
+     "title": "2.2-MyBatis框架",
+     "items": [
+      {
+       "file": "CSDN存档/88576761.html",
+       "title": "mybatis源码学习（四）：动态SQL的解析",
+       "collabKey": "54dd475c-45ec-4831-a893-ecab6daeb5d4",
+       "sortOrder": 1,
+       "docId": 275
+      },
+      {
+       "file": "CSDN存档/88576725.html",
+       "title": "mybatis源码学习（三）：MappedStatement的解析过程",
+       "collabKey": "8904f293-5b91-4e51-ae2a-c8f573fb9c6b",
+       "sortOrder": 2,
+       "docId": 276
+      },
+      {
+       "file": "CSDN存档/88576706.html",
+       "title": "mybatis源码学习（二）：SQL的执行过程",
+       "collabKey": "0274325c-73cc-42de-a18b-3886d5eeecd7",
+       "sortOrder": 3,
+       "docId": 277
+      },
+      {
+       "file": "CSDN存档/88576242.html",
+       "title": "mybatis源码学习（一）：Mapper的绑定",
+       "collabKey": "5ce146e1-d16d-4e73-9689-91c4407a0773",
+       "sortOrder": 4,
+       "docId": 278
+      },
+      {
+       "file": "CSDN存档/84936436.html",
+       "title": "MyBatis一二级缓存",
+       "collabKey": "e2ab54e8-d33d-417f-a115-abf242dc417d",
+       "sortOrder": 5,
+       "docId": 279
+      },
+      {
+       "file": "CSDN存档/80894522.html",
+       "title": "spring boot --- mybatis plus",
+       "collabKey": "16268314-67c2-4543-9907-39d1b06bba93",
+       "sortOrder": 6,
+       "docId": 280
+      }
+     ],
+     "collabKey": "ae130366-8d61-4e7a-ac95-246d8d605e92",
+     "sortOrder": 10,
+     "docId": 274
+    },
+    {
+     "title": "2.3-Dubbo远程调用",
+     "items": [
+      {
+       "file": "CSDN存档/107641400.html",
+       "title": "Dubbo（二）：协议详解",
+       "collabKey": "6dae22c3-66db-4124-8195-bb18b6fc248c",
+       "sortOrder": 1,
+       "docId": 282
+      },
+      {
+       "file": "CSDN存档/107258914.html",
+       "title": "kryo序列化的优缺点",
+       "collabKey": "3e062a8a-91d0-4a59-89ec-64a89fceab7c",
+       "sortOrder": 2,
+       "docId": 283
+      },
+      {
+       "file": "CSDN存档/105226684.html",
+       "title": "远程接口设计",
+       "collabKey": "58d74167-bd25-4c4b-956c-c347fa23caa2",
+       "sortOrder": 3,
+       "docId": 284
+      },
+      {
+       "file": "CSDN存档/105217054.html",
+       "title": "使用kryo做序列化遇到的几个坑",
+       "collabKey": "55a8f2cb-37f1-4643-9fdc-ce29dfbeaca4",
+       "sortOrder": 4,
+       "docId": 285
+      },
+      {
+       "file": "CSDN存档/104042081.html",
+       "title": "Dubbo（一）：服务启动过程",
+       "collabKey": "aea137e3-6064-4b48-b628-bcea2f58ee35",
+       "sortOrder": 5,
+       "docId": 286
+      },
+      {
+       "file": "CSDN存档/103287858.html",
+       "title": "如何使用 SkyWalking 给 Dubbo 服务做链路追踪？",
+       "collabKey": "ef9f289f-c88a-4d35-b868-35f95312a357",
+       "sortOrder": 6,
+       "docId": 287
+      },
+      {
+       "file": "CSDN存档/102544721.html",
+       "title": "Nacos（一）： Raft 协议",
+       "collabKey": "059f2ca0-315b-4836-b0ae-aa9db0ce5d23",
+       "sortOrder": 7,
+       "docId": 288
+      },
+      {
+       "file": "CSDN存档/102500437.html",
+       "title": "浅析不同注册中心的底层原理",
+       "collabKey": "f5491d70-77cd-4d31-aab4-47d7a5266ac9",
+       "sortOrder": 8,
+       "docId": 289
+      },
+      {
+       "file": "CSDN存档/102500266.html",
+       "title": "Eureka（二）： Eureka Server",
+       "collabKey": "d18be038-6be5-4adc-a421-42deef353d77",
+       "sortOrder": 9,
+       "docId": 290
+      },
+      {
+       "file": "CSDN存档/102497782.html",
+       "title": "Eureka（一）： Eureka Client",
+       "collabKey": "399429a3-6cff-44b8-acb1-9cd83f8a3a95",
+       "sortOrder": 10,
+       "docId": 291
+      },
+      {
+       "file": "CSDN存档/100917213.html",
+       "title": "监控（一）：监控系统搭建(Prometheus+Grafana)",
+       "collabKey": "d4f5394f-df11-451a-915b-e7b00ba1bdd2",
+       "sortOrder": 11,
+       "docId": 292
+      },
+      {
+       "file": "CSDN存档/100264651.html",
+       "title": "Dubbo（四九）：过滤器（十一）之 ValidationFilter",
+       "collabKey": "5085261b-00e4-4e1e-992f-f2044d2a09d8",
+       "sortOrder": 12,
+       "docId": 293
+      },
+      {
+       "file": "CSDN存档/100123076.html",
+       "title": "Dubbo（二）： 调试环境搭建",
+       "collabKey": "a5424446-2d2c-47cd-8678-f9e3a2f9bf84",
+       "sortOrder": 13,
+       "docId": 294
+      },
+      {
+       "file": "CSDN存档/100081337.html",
+       "title": "基于Nacos的注册中心",
+       "collabKey": "b81348a4-c029-4ea7-b07b-7f37662897c5",
+       "sortOrder": 14,
+       "docId": 295
+      },
+      {
+       "file": "CSDN存档/100081292.html",
+       "title": "阿里巴巴为什么不用 ZooKeeper 做服务发现？",
+       "collabKey": "de6ea5e9-5bb4-4309-ada1-5d21d97b678b",
+       "sortOrder": 15,
+       "docId": 296
+      }
+     ],
+     "collabKey": "4f3ece7d-52f0-4e9b-8329-2b56475cd875",
+     "sortOrder": 11,
+     "docId": 281
+    },
+    {
+     "title": "2.4-ZooKeeper分布式协调",
+     "items": [
+      {
+       "file": "CSDN存档/102495921.html",
+       "title": "Zookeeper（八）：WATCH",
+       "collabKey": "370e446c-14cf-4e2b-8d26-694ccd54f613",
+       "sortOrder": 1,
+       "docId": 298
+      },
+      {
+       "file": "CSDN存档/102495849.html",
+       "title": "Zookeeper（七）：ACL",
+       "collabKey": "5fe0e5e0-79b0-4423-8577-e007612e84cc",
+       "sortOrder": 2,
+       "docId": 299
+      },
+      {
+       "file": "CSDN存档/102482977.html",
+       "title": "Zookeeper（六）：zk原理浅析",
+       "collabKey": "f7887951-4139-42c9-b937-8e9023d3928e",
+       "sortOrder": 3,
+       "docId": 300
+      },
+      {
+       "file": "CSDN存档/102482075.html",
+       "title": "Zookeeper（一）：zk概述",
+       "collabKey": "d84610e6-18c5-4bda-aabc-e56507027a65",
+       "sortOrder": 4,
+       "docId": 301
+      },
+      {
+       "file": "CSDN存档/102173704.html",
+       "title": "Zookeeper（五）：源码分析",
+       "collabKey": "fed601d3-8e3c-4ae7-a05c-89b1aebd09d9",
+       "sortOrder": 5,
+       "docId": 302
+      },
+      {
+       "file": "CSDN存档/100937844.html",
+       "title": "Zookeeper（三）：Leader选举",
+       "collabKey": "61be440f-2194-4350-bc45-438224d0af6d",
+       "sortOrder": 6,
+       "docId": 303
+      },
+      {
+       "file": "CSDN存档/100937726.html",
+       "title": "Zookeeper（二）：Zab协议详解",
+       "collabKey": "68d35ba5-18d6-4f5d-b3dd-3e196d02640c",
+       "sortOrder": 7,
+       "docId": 304
+      },
+      {
+       "file": "CSDN存档/100937586.html",
+       "title": "Zookeeper（四）：Paxos算法详解",
+       "collabKey": "b53ff2ce-5136-4627-9199-de2257878dbc",
+       "sortOrder": 8,
+       "docId": 305
+      }
+     ],
+     "collabKey": "440e65f0-ff8e-461b-afdf-36297c60db3d",
+     "sortOrder": 12,
+     "docId": 297
+    },
+    {
+     "title": "3.1-数据库-章节导览",
+     "items": [
+      {
+       "file": "CSDN存档/105847344.html",
+       "title": "深度介绍分布式系统原理",
+       "collabKey": "f636302d-87ae-4ee7-bd47-59b9da8e2c66",
+       "sortOrder": 1,
+       "docId": 307
+      },
+      {
+       "file": "CSDN存档/103462211.html",
+       "title": "算法（二）：一致性哈希算法的原理与实现",
+       "collabKey": "5298cd06-522e-4a87-bcb8-0ea3440a6f71",
+       "sortOrder": 2,
+       "docId": 308
+      },
+      {
+       "file": "CSDN存档/99548397.html",
+       "title": "算法（一）：排序算法",
+       "collabKey": "10cd24b3-c6fc-4ad1-9c4f-68319aa5ad74",
+       "sortOrder": 3,
+       "docId": 309
+      },
+      {
+       "file": "CSDN存档/88360530.html",
+       "title": "一致性哈希算法 应用场景",
+       "collabKey": "e2d3378d-b0f8-46d3-a282-2679bee8a2e4",
+       "sortOrder": 4,
+       "docId": 310
+      }
+     ],
+     "collabKey": "cbe4606a-5fd1-48d8-890b-351d9849428e",
+     "sortOrder": 13,
+     "docId": 306
+    },
+    {
+     "title": "3.2-MySQL-InnoDB",
+     "items": [
+      {
+       "file": "CSDN存档/105094070.html",
+       "title": "MYSQL（十）：ORDER BY 详解",
+       "collabKey": "62eed292-f0b9-491d-9392-33bd4d118440",
+       "sortOrder": 1,
+       "docId": 312
+      },
+      {
+       "file": "CSDN存档/105093873.html",
+       "title": "MYSQL（九）：sql执行过程",
+       "collabKey": "95a3c8ee-e1b6-4dd1-965d-4d17753d7a92",
+       "sortOrder": 2,
+       "docId": 313
+      },
+      {
+       "file": "CSDN存档/104539595.html",
+       "title": "MYSQL（八）：查看被锁住的表",
+       "collabKey": "e05fc0a1-8628-4ff5-9135-6ecbf54ab2b9",
+       "sortOrder": 3,
+       "docId": 314
+      },
+      {
+       "file": "CSDN存档/103117764.html",
+       "title": "数据库连接池（一）：HikariCP 源码解析",
+       "collabKey": "3dc5008f-a7f6-4dca-a9be-b030fc8c793a",
+       "sortOrder": 4,
+       "docId": 315
+      },
+      {
+       "file": "CSDN存档/103084317.html",
+       "title": "MyCAT 源码分析 —— 为什么阅读 MyCAT 源码？",
+       "collabKey": "b802a816-bbdb-4dd6-afe8-c9a95b7ef4a5",
+       "sortOrder": 5,
+       "docId": 316
+      },
+      {
+       "file": "CSDN存档/103031377.html",
+       "title": "MYSQL（七）：索引背后的数据结构及算法原理",
+       "collabKey": "3f5ec49f-99eb-41c1-915f-e0f924f9e35a",
+       "sortOrder": 6,
+       "docId": 317
+      },
+      {
+       "file": "CSDN存档/101205562.html",
+       "title": "mysql（六）：MySQL分页Limit优化",
+       "collabKey": "58fe5f7d-e312-48f8-963c-0d7d77fd1523",
+       "sortOrder": 7,
+       "docId": 318
+      },
+      {
+       "file": "CSDN存档/100973972.html",
+       "title": "mysql（五）：一次难得的分库分表实践",
+       "collabKey": "16d702fe-7072-4892-abad-abf5a52a2237",
+       "sortOrder": 8,
+       "docId": 319
+      },
+      {
+       "file": "CSDN存档/100973105.html",
+       "title": "数据安全（一）：Apache ShardingSphere数据脱敏全解决方案详解",
+       "collabKey": "a0a23731-37b5-4f07-bfc0-9b247a25d42a",
+       "sortOrder": 9,
+       "docId": 320
+      },
+      {
+       "file": "CSDN存档/94552786.html",
+       "title": "MYSQL（四）：隔离级别，锁与MVCC",
+       "collabKey": "67845060-d5ac-47e4-b231-f4b7f194f6bd",
+       "sortOrder": 10,
+       "docId": 321
+      },
+      {
+       "file": "CSDN存档/93905260.html",
+       "title": "MYSQL（三）：执行计划",
+       "collabKey": "323beb4f-1b71-4662-a231-faf4b4f2afe7",
+       "sortOrder": 11,
+       "docId": 322
+      },
+      {
+       "file": "CSDN存档/93901646.html",
+       "title": "MYSQL（二）：索引",
+       "collabKey": "de0e75d7-bebb-4fc0-84cd-c8c3f57f60bb",
+       "sortOrder": 12,
+       "docId": 323
+      },
+      {
+       "file": "CSDN存档/93747834.html",
+       "title": "MYSQL（一）：数据库概述",
+       "collabKey": "396b991b-d27f-46ab-b8f9-ee9c7c98357e",
+       "sortOrder": 13,
+       "docId": 324
+      },
+      {
+       "file": "CSDN存档/84974333.html",
+       "title": "MySQL索引背后的数据结构及算法原理",
+       "collabKey": "23f1f728-0d5e-4327-b1d6-abc810efe563",
+       "sortOrder": 14,
+       "docId": 325
+      },
+      {
+       "file": "CSDN存档/82796496.html",
+       "title": "『浅入浅出』MySQL 和 InnoDB",
+       "collabKey": "8a716097-7301-4cc9-bdcb-58173f020c47",
+       "sortOrder": 15,
+       "docId": 326
+      },
+      {
+       "file": "CSDN存档/80907319.html",
+       "title": "MySQL大表优化方案",
+       "collabKey": "7893291b-667e-45b3-b987-8a54473761a3",
+       "sortOrder": 16,
+       "docId": 327
+      },
+      {
+       "file": "CSDN存档/80402821.html",
+       "title": "存储过程详解",
+       "collabKey": "cbb2f750-f96b-4a29-8536-612013918e31",
+       "sortOrder": 17,
+       "docId": 328
+      },
+      {
+       "file": "CSDN存档/80048139.html",
+       "title": "关联查询和多次查询的点 以及 MySQL慢查询优化 EXPLAIN详解",
+       "collabKey": "f379a912-ed2c-4e25-a41d-6993da727c49",
+       "sortOrder": 18,
+       "docId": 329
+      },
+      {
+       "file": "CSDN存档/78792893.html",
+       "title": "分布式mysql中间件（mycat）",
+       "collabKey": "15d2ed1e-5d35-451b-8861-4055b929ed45",
+       "sortOrder": 19,
+       "docId": 330
+      },
+      {
+       "file": "CSDN存档/78791757.html",
+       "title": "MySQL 读写分离",
+       "collabKey": "562fce1f-a4ea-40da-8006-9d1a38ab7aec",
+       "sortOrder": 20,
+       "docId": 331
+      },
+      {
+       "file": "CSDN存档/78742762.html",
+       "title": "sql 行转列、分组、排序，",
+       "collabKey": "473eec26-60e0-481b-8f1a-018b262d9614",
+       "sortOrder": 21,
+       "docId": 332
+      },
+      {
+       "file": "CSDN存档/78720738.html",
+       "title": "Mysql中Cast()函数，strftime()函数用法",
+       "collabKey": "dd4fae4f-df09-4507-97da-c41c8249100d",
+       "sortOrder": 22,
+       "docId": 333
+      }
+     ],
+     "collabKey": "9e8c6ee8-57ff-4192-aa99-1098b323392d",
+     "sortOrder": 14,
+     "docId": 311
+    },
+    {
+     "title": "3.3-Redis缓存与分布式锁",
+     "items": [
+      {
+       "file": "CSDN存档/106525851.html",
+       "title": "Redis（十）：redis的I/O多路复用",
+       "collabKey": "d27b7f03-15e3-45ad-a60d-f405e19fa1cb",
+       "sortOrder": 1,
+       "docId": 335
+      },
+      {
+       "file": "CSDN存档/104803692.html",
+       "title": "数据结构（三）：Redis 跳跃表",
+       "collabKey": "4b8fa046-19e1-4778-ade7-5d91f20c0634",
+       "sortOrder": 2,
+       "docId": 336
+      },
+      {
+       "file": "CSDN存档/104770007.html",
+       "title": "数据结构（二）：跳表java实现",
+       "collabKey": "c6dc69ca-f4bf-4317-b81f-4b9609670b36",
+       "sortOrder": 3,
+       "docId": 337
+      },
+      {
+       "file": "CSDN存档/104769233.html",
+       "title": "数据结构（一）：跳表",
+       "collabKey": "1ee3d22c-77f6-44cb-8184-91eb9a947c29",
+       "sortOrder": 4,
+       "docId": 338
+      },
+      {
+       "file": "CSDN存档/104769048.html",
+       "title": "Redis（九）：redis为何单线程，为何使用跳表",
+       "collabKey": "f2b70859-354b-49c6-9912-be02ff472725",
+       "sortOrder": 5,
+       "docId": 339
+      },
+      {
+       "file": "CSDN存档/103063460.html",
+       "title": "Guava 学习笔记",
+       "collabKey": "72e0f622-7fe7-4f7a-a4a2-87d6e96bf025",
+       "sortOrder": 6,
+       "docId": 340
+      },
+      {
+       "file": "CSDN存档/100917457.html",
+       "title": "本地缓存（三）：使用Guava cache构建本地缓存",
+       "collabKey": "fab8a072-e949-48d0-a01f-38a0514c01c1",
+       "sortOrder": 7,
+       "docId": 341
+      },
+      {
+       "file": "CSDN存档/100917355.html",
+       "title": "本地缓存（二）：Java 本地缓存的实现",
+       "collabKey": "32291dd0-3a37-47a0-b006-5ffc4d60265a",
+       "sortOrder": 8,
+       "docId": 342
+      },
+      {
+       "file": "CSDN存档/100917331.html",
+       "title": "本地缓存（一）：本地缓存的原理及技术选型参考",
+       "collabKey": "1a2776b6-731e-4f3d-b8ec-87779c071881",
+       "sortOrder": 9,
+       "docId": 343
+      },
+      {
+       "file": "CSDN存档/100660451.html",
+       "title": "Redis（八）：redis的分布式解决方案--codis",
+       "collabKey": "8e22405d-3481-430c-9a30-a18f523801d5",
+       "sortOrder": 10,
+       "docId": 344
+      },
+      {
+       "file": "CSDN存档/100656212.html",
+       "title": "Redis（七）：数据异构的武器-BINLOG+MQ 以及阿里cannal的使用",
+       "collabKey": "f0860fb3-69ca-48e7-83a8-9f73a9899ec1",
+       "sortOrder": 11,
+       "docId": 345
+      },
+      {
+       "file": "CSDN存档/100120510.html",
+       "title": "Redis（六）：数据库和缓存双写一致性方案解析",
+       "collabKey": "aaa9d5fb-226e-4bf2-b9e2-a83e994decc8",
+       "sortOrder": 12,
+       "docId": 346
+      },
+      {
+       "file": "CSDN存档/100100717.html",
+       "title": "Redis（五）：由Redis客户端连接数大小说开去",
+       "collabKey": "ef6408b5-d8c9-4109-825d-8394fa5e02a6",
+       "sortOrder": 13,
+       "docId": 347
+      },
+      {
+       "file": "CSDN存档/99742581.html",
+       "title": "Redis（四）：自定义注解实现 redis缓存操作",
+       "collabKey": "52f27ce0-4f17-4e8d-be28-4f24a73fe8e1",
+       "sortOrder": 14,
+       "docId": 348
+      },
+      {
+       "file": "CSDN存档/96479053.html",
+       "title": "Redis（三）：缓存删除策略",
+       "collabKey": "ff752186-71f1-4919-bb0a-4fac4f5b33f7",
+       "sortOrder": 15,
+       "docId": 349
+      },
+      {
+       "file": "CSDN存档/90948780.html",
+       "title": "Spring Boot缓存注解@Cacheable、@CacheEvict、@CachePut使用",
+       "collabKey": "5ab5f0e3-9854-4b9e-9706-c74f7f998ff1",
+       "sortOrder": 16,
+       "docId": 350
+      },
+      {
+       "file": "CSDN存档/90947838.html",
+       "title": "Redis（二）：数据库和缓存双写一致性方案解析",
+       "collabKey": "556d1662-3763-4b7a-895e-709482bcd485",
+       "sortOrder": 17,
+       "docId": 351
+      },
+      {
+       "file": "CSDN存档/90944160.html",
+       "title": "Redis（一）：redis的应用场景",
+       "collabKey": "affd202f-c599-40e4-a770-2306c4da2cd4",
+       "sortOrder": 18,
+       "docId": 352
+      },
+      {
+       "file": "CSDN存档/85124162.html",
+       "title": "缓存穿透、缓存击穿、缓存雪崩概念及解决方案",
+       "collabKey": "77f5830b-eb3c-4e05-8dc8-fe41e32ab65f",
+       "sortOrder": 19,
+       "docId": 353
+      }
+     ],
+     "collabKey": "c64e490a-a4e0-4128-93de-91b51072a041",
+     "sortOrder": 15,
+     "docId": 334
+    },
+    {
+     "title": "4.2-RocketMQ",
+     "items": [
+      {
+       "file": "CSDN存档/107657292.html",
+       "title": "RocketMQ（二）：底层存储",
+       "collabKey": "a873dd74-7ab3-458c-a410-788df8be2b96",
+       "sortOrder": 1,
+       "docId": 355
+      },
+      {
+       "file": "CSDN存档/105847265.html",
+       "title": "分布式事务（三）：分布式事务问题的几种方案",
+       "collabKey": "a8e53eea-dc54-4993-b17c-856a9f72f9d9",
+       "sortOrder": 2,
+       "docId": 356
+      },
+      {
+       "file": "CSDN存档/100118292.html",
+       "title": "RocketMQ（一）：中文文档",
+       "collabKey": "fffd792a-38e1-4792-9b6a-57653b28ec51",
+       "sortOrder": 3,
+       "docId": 357
+      },
+      {
+       "file": "CSDN存档/99567976.html",
+       "title": "分布式事务（二）：基于rocketMQ实现的分布式事务",
+       "collabKey": "b17691bc-07d1-4f4d-9c9e-5d793a12e0ad",
+       "sortOrder": 4,
+       "docId": 358
+      },
+      {
+       "file": "CSDN存档/99549512.html",
+       "title": "分布式事务（一）：基于DTC的分布式事务管理模型",
+       "collabKey": "841bddab-ad3c-493a-b0a0-69f3431d3bb9",
+       "sortOrder": 5,
+       "docId": 359
+      },
+      {
+       "file": "CSDN存档/88170541.html",
+       "title": "分布式系统---幂等性设计",
+       "collabKey": "2e4eb695-48ee-4add-9425-81bfd071a689",
+       "sortOrder": 6,
+       "docId": 360
+      },
+      {
+       "file": "CSDN存档/79567522.html",
+       "title": "幂等控制",
+       "collabKey": "7309c0db-b049-4050-8d97-11c00dddb319",
+       "sortOrder": 7,
+       "docId": 361
+      }
+     ],
+     "collabKey": "ebc8eb63-d5d3-48d6-833d-568ad11e6727",
+     "sortOrder": 16,
+     "docId": 354
+    },
+    {
+     "title": "4.3-Kafka",
+     "items": [
+      {
+       "file": "CSDN存档/103989181.html",
+       "title": "Kafka（一）：简介",
+       "collabKey": "a40d2372-454f-45b1-95f5-b7876fcc2ddb",
+       "sortOrder": 1,
+       "docId": 363
+      }
+     ],
+     "collabKey": "79c7a8b9-90f4-4ffd-9021-cdefb92a89cf",
+     "sortOrder": 17,
+     "docId": 362
+    },
+    {
+     "title": "5.1-MBSE方法论与规范地图",
+     "items": [
+      {
+       "file": "CSDN存档/142144424.html",
+       "title": "什么是SysML",
+       "collabKey": "53422f2d-23cb-4128-9d80-33e42928d67f",
+       "sortOrder": 1,
+       "docId": 365
+      },
+      {
+       "file": "CSDN存档/142142314.html",
+       "title": "什么是UML",
+       "collabKey": "9154475e-1659-49d2-9ce2-bca754bc53b4",
+       "sortOrder": 2,
+       "docId": 366
+      },
+      {
+       "file": "CSDN存档/142141830.html",
+       "title": "MBSE是什么、有什么用、怎么学习？",
+       "collabKey": "b97d0585-ed4c-440a-a984-1438a89d2327",
+       "sortOrder": 3,
+       "docId": 367
+      },
+      {
+       "file": "CSDN存档/142141758.html",
+       "title": "什么是MBSE",
+       "collabKey": "fb2f04c6-2aa5-4455-bc9d-f04c21d1d52e",
+       "sortOrder": 4,
+       "docId": 368
+      }
+     ],
+     "collabKey": "155d1b46-4279-4f14-be1b-fbad6d812e12",
+     "sortOrder": 18,
+     "docId": 364
+    },
+    {
+     "title": "5.1.2-DDD与模型驱动",
+     "items": [
+      {
+       "file": "CSDN存档/125816215.html",
+       "title": "架构之架构",
+       "collabKey": "0af0ec18-c546-4bb4-bb47-10d8a9738c79",
+       "sortOrder": 1,
+       "docId": 370
+      },
+      {
+       "file": "CSDN存档/125816143.html",
+       "title": "架构之领域模型",
+       "collabKey": "9536fd13-ffd9-47b4-a0c5-caf5c2d30387",
+       "sortOrder": 2,
+       "docId": 371
+      },
+      {
+       "file": "CSDN存档/106635949.html",
+       "title": "DDD（四）：会员系统-支撑子域",
+       "collabKey": "993190c3-6311-461a-8b1f-2dc61625f011",
+       "sortOrder": 3,
+       "docId": 372
+      },
+      {
+       "file": "CSDN存档/106635770.html",
+       "title": "DDD（三）：会员系统-核心子域",
+       "collabKey": "83c5fb83-5748-427f-b06d-862151d37fe8",
+       "sortOrder": 4,
+       "docId": 373
+      },
+      {
+       "file": "CSDN存档/106635721.html",
+       "title": "DDD（二）：会员系统-限界上下文与集成",
+       "collabKey": "15ecd542-2849-4e55-9497-0fb9115bf14a",
+       "sortOrder": 5,
+       "docId": 374
+      },
+      {
+       "file": "CSDN存档/106635593.html",
+       "title": "DDD（一）：会员系统-事件风暴",
+       "collabKey": "9d1bd5c9-bbe3-4e2c-8cff-40bf9471a992",
+       "sortOrder": 6,
+       "docId": 375
+      }
+     ],
+     "collabKey": "50a0231b-ee12-43cb-aebc-c089f0893c86",
+     "sortOrder": 19,
+     "docId": 369
+    },
+    {
+     "title": "5.2-架构与高并发",
+     "items": [
+      {
+       "file": "CSDN存档/120849949.html",
+       "title": "信息安全（一）：RSA加密算法",
+       "collabKey": "3fbc0d90-aa1b-4cd9-a8ba-14da1862f163",
+       "sortOrder": 1,
+       "docId": 377
+      },
+      {
+       "file": "CSDN存档/120346394.html",
+       "title": "帐号登录：单点登录",
+       "collabKey": "ace22cf4-2a98-4520-aca4-7477357ded50",
+       "sortOrder": 2,
+       "docId": 378
+      },
+      {
+       "file": "CSDN存档/120346324.html",
+       "title": "帐号登录：session",
+       "collabKey": "48d2f795-77f1-4250-bf10-f5b2ddf5de82",
+       "sortOrder": 3,
+       "docId": 379
+      },
+      {
+       "file": "CSDN存档/120346233.html",
+       "title": "帐号登录：oAuth2.0流程",
+       "collabKey": "966c71f8-9ab0-45b5-b861-8e5604d19215",
+       "sortOrder": 4,
+       "docId": 380
+      },
+      {
+       "file": "CSDN存档/112917543.html",
+       "title": "架构（三）：中台是如何炼成的？",
+       "collabKey": "42d6ca16-3d4d-4522-b165-e4583f90819d",
+       "sortOrder": 5,
+       "docId": 381
+      },
+      {
+       "file": "CSDN存档/112895540.html",
+       "title": "架构（二）：如何对现有系统做微服务改造？",
+       "collabKey": "fcc4c61f-501b-426c-85da-f5f06ab169dc",
+       "sortOrder": 6,
+       "docId": 382
+      },
+      {
+       "file": "CSDN存档/112790146.html",
+       "title": "架构（一）：你需要一个中台吗？",
+       "collabKey": "9673786e-358f-4236-9aea-bfa0a412102f",
+       "sortOrder": 7,
+       "docId": 383
+      },
+      {
+       "file": "CSDN存档/104768891.html",
+       "title": "数学（一）：泊松分布和指数分布",
+       "collabKey": "834068f3-dff6-474a-9200-e99941ac7c51",
+       "sortOrder": 8,
+       "docId": 384
+      },
+      {
+       "file": "CSDN存档/103063293.html",
+       "title": "Kubernetes 系列教程",
+       "collabKey": "856cc047-66d8-4793-9d1d-d1ab6697c900",
+       "sortOrder": 9,
+       "docId": 385
+      },
+      {
+       "file": "CSDN存档/103063264.html",
+       "title": "Docker 系列教程",
+       "collabKey": "3a06aa68-57db-4298-b5c1-afce5a3fd395",
+       "sortOrder": 10,
+       "docId": 386
+      },
+      {
+       "file": "CSDN存档/103278229.html",
+       "title": "Sentinel 实战-控制台篇",
+       "collabKey": "6ca57e92-42cb-4fb4-aac0-185b1bb26821",
+       "sortOrder": 11,
+       "docId": 387
+      },
+      {
+       "file": "CSDN存档/103278478.html",
+       "title": "Sentinel 实战-限流篇",
+       "collabKey": "461d90e5-abb6-49a8-b7af-2a85ce979c8a",
+       "sortOrder": 12,
+       "docId": 388
+      },
+      {
+       "file": "CSDN存档/103277988.html",
+       "title": "限流降级神器「sentinel」基于滑动时间窗口的实时指标统计分析",
+       "collabKey": "47487bcd-6e34-4b13-9342-b301520df946",
+       "sortOrder": 13,
+       "docId": 389
+      },
+      {
+       "file": "CSDN存档/103277601.html",
+       "title": "限流降级神器-哨兵(sentinel)的资源调用链原理分析",
+       "collabKey": "13a419fa-ae63-415e-b45b-c9a56571ca14",
+       "sortOrder": 14,
+       "docId": 390
+      },
+      {
+       "file": "CSDN存档/103278008.html",
+       "title": "带你了解「sentinel」中的概念实体",
+       "collabKey": "5487c229-4886-4a0d-9d64-eadedd982ae9",
+       "sortOrder": 15,
+       "docId": 391
+      },
+      {
+       "file": "CSDN存档/103277588.html",
+       "title": "限流降级神器-哨兵(sentinel)原理分析",
+       "collabKey": "3b7e29f7-7f6e-47dc-a824-17794bd70d57",
+       "sortOrder": 16,
+       "docId": 392
+      },
+      {
+       "file": "CSDN存档/103277528.html",
+       "title": "在生产环境中使用 Sentinel 控制台",
+       "collabKey": "0d6c66f4-14f9-4ac4-a33d-bb1786762fb2",
+       "sortOrder": 17,
+       "docId": 393
+      },
+      {
+       "file": "CSDN存档/103277514.html",
+       "title": "Sentinel 与 Hystrix 的对比",
+       "collabKey": "1385c0a5-9831-4b29-9369-77a2887a099a",
+       "sortOrder": 18,
+       "docId": 394
+      },
+      {
+       "file": "CSDN存档/103276101.html",
+       "title": "Sentinel 为 RocketMQ 服务保驾护航",
+       "collabKey": "4a70b1b8-35cc-48c2-a536-9b34073904cf",
+       "sortOrder": 19,
+       "docId": 395
+      },
+      {
+       "file": "CSDN存档/103275910.html",
+       "title": "Sentinel 为 Dubbo 服务保驾护航",
+       "collabKey": "ec89195b-8e87-4a34-a6ed-8a79dc0a392e",
+       "sortOrder": 20,
+       "docId": 396
+      },
+      {
+       "file": "CSDN存档/103275876.html",
+       "title": "阿里巴巴开源限流系统 Sentinel 全解析",
+       "collabKey": "506b39a1-c6a3-415a-b590-5b6f68af0467",
+       "sortOrder": 21,
+       "docId": 397
+      },
+      {
+       "file": "CSDN存档/102950705.html",
+       "title": "正向代理与反向代理",
+       "collabKey": "5c3c0fcb-45c2-43b4-aa0f-9356d5e5be46",
+       "sortOrder": 22,
+       "docId": 398
+      },
+      {
+       "file": "CSDN存档/100938038.html",
+       "title": "账户系统如何应对高并发、热点账户等问题",
+       "collabKey": "c15cc2fd-92c4-4512-9016-793b4e7cde7e",
+       "sortOrder": 23,
+       "docId": 399
+      },
+      {
+       "file": "CSDN存档/99697496.html",
+       "title": "吞吐量（TPS）、QPS、并发数、响应时间（RT）概念",
+       "collabKey": "1ac15e9e-fc42-4f82-aa74-88920a207df8",
+       "sortOrder": 24,
+       "docId": 400
+      },
+      {
+       "file": "CSDN存档/95591943.html",
+       "title": "排坑（二）：线上问题排查流程",
+       "collabKey": "1f53f29a-3470-42fe-a461-fb3aeb1a3c0f",
+       "sortOrder": 25,
+       "docId": 401
+      },
+      {
+       "file": "CSDN存档/93873478.html",
+       "title": "硬件（磁盘）：机械硬盘内部硬件结构和工作原理详解",
+       "collabKey": "ae638b96-7e7e-41b5-a301-a32a01e010d7",
+       "sortOrder": 26,
+       "docId": 402
+      },
+      {
+       "file": "CSDN存档/93511930.html",
+       "title": "浅谈CSRF",
+       "collabKey": "7bf3c3e7-d68f-4829-a2b1-e629b7ba63b0",
+       "sortOrder": 27,
+       "docId": 403
+      },
+      {
+       "file": "CSDN存档/90054297.html",
+       "title": "记录一次高并发业务场景的性能优化",
+       "collabKey": "0ed4e4e3-bb11-4d44-9cca-c45762aa034f",
+       "sortOrder": 28,
+       "docId": 404
+      },
+      {
+       "file": "CSDN存档/88171376.html",
+       "title": "热点账户高并发解决方案",
+       "collabKey": "5b3d6755-8afc-41ae-88eb-a40147d81009",
+       "sortOrder": 29,
+       "docId": 405
+      },
+      {
+       "file": "CSDN存档/86006238.html",
+       "title": "秒杀系统架构分析与实战",
+       "collabKey": "1dadde53-41d2-4f1c-9c54-30b4c1443c92",
+       "sortOrder": 30,
+       "docId": 406
+      },
+      {
+       "file": "CSDN存档/80084416.html",
+       "title": "幂等项目接触的新东西",
+       "collabKey": "8c7300af-dab6-4d71-b2ea-af110ff2b320",
+       "sortOrder": 31,
+       "docId": 407
+      },
+      {
+       "file": "CSDN存档/79388277.html",
+       "title": "从前端技术到体验科技",
+       "collabKey": "236e7d1f-1329-4870-8c9c-64804261f356",
+       "sortOrder": 32,
+       "docId": 408
+      }
+     ],
+     "collabKey": "ec176bb0-b8fb-43e5-b695-bb38f9d719bb",
+     "sortOrder": 20,
+     "docId": 376
+    }
+   ],
+   "collabKey": "8eca1362-0e85-420f-b176-94ff602a0f7a",
+   "sortOrder": 1,
+   "docId": 126
+  },
+  {
+   "key": "yuque",
+   "title": "语雀存档",
+   "indexFile": "语雀/语雀全库索引.html",
+   "imgBase": "/scofendoc/files/archive/yuque/",
+   "groups": [
+    {
+     "title": "java基础",
+     "items": [
+      {
+       "file": "语雀/nbrcgz.html",
+       "title": "基础",
+       "collabKey": "b60a05b9-2d21-4bcc-82b3-2806c7469b38",
+       "sortOrder": 1,
+       "docId": 411
+      },
+      {
+       "file": "语雀/zudr5gtp9sozgpsl.html",
+       "title": "Java 基础 - 知识点",
+       "collabKey": "abc60061-1de5-484b-8964-709cc26eb8ea",
+       "sortOrder": 2,
+       "docId": 412
+      },
+      {
+       "file": "语雀/cmgp4hddo9k6fsd5.html",
+       "title": "Java 基础 - 面向对象",
+       "collabKey": "2f1bcdad-b519-4be6-96f2-08f163f47aad",
+       "sortOrder": 3,
+       "docId": 413
+      },
+      {
+       "file": "语雀/ovnbowdkfvum7ogs.html",
+       "title": "Java 基础 - 泛型机制详解",
+       "collabKey": "f0cd6eec-1ed2-4e89-94c8-9d811adfad45",
+       "sortOrder": 4,
+       "docId": 414
+      },
+      {
+       "file": "语雀/yhkgb9t7tlsefn50.html",
+       "title": "Java 基础 - 注解机制详解",
+       "collabKey": "323d04fd-2bf9-4ac5-85f4-e46e1fcf0664",
+       "sortOrder": 5,
+       "docId": 415
+      },
+      {
+       "file": "语雀/hdss3m2g3uf3wiac.html",
+       "title": "Java 基础 - 异常机制详解",
+       "collabKey": "5573d771-5f55-48d0-9fbc-4844f8b208c9",
+       "sortOrder": 6,
+       "docId": 416
+      },
+      {
+       "file": "语雀/xn05x0ypxvlhbboe.html",
+       "title": "Java 基础 - 反射机制详解",
+       "collabKey": "f0c1bed1-112a-4b72-bd49-9ad8ed9c52de",
+       "sortOrder": 7,
+       "docId": 417
+      },
+      {
+       "file": "语雀/fw5rcrwc1kqnksxu.html",
+       "title": "Java常用机制 - SPI机制详解",
+       "collabKey": "e2f4d326-7dde-4619-9924-6a036ce5f15e",
+       "sortOrder": 8,
+       "docId": 418
+      },
+      {
+       "file": "语雀/ucwfg2.html",
+       "title": "集合",
+       "collabKey": "0dd64f0b-2602-4a7a-8ec4-780700b744cb",
+       "sortOrder": 9,
+       "docId": 419
+      },
+      {
+       "file": "语雀/hglmaecpp213shzb.html",
+       "title": "Collection 类关系图",
+       "collabKey": "f0c5739a-7dab-490e-a0b8-db1d497ec629",
+       "sortOrder": 10,
+       "docId": 420
+      },
+      {
+       "file": "语雀/fmouerz6hogf22zi.html",
+       "title": "Collection - ArrayList 源码解析",
+       "collabKey": "413d9460-80fa-4283-99a8-968db615bbaa",
+       "sortOrder": 11,
+       "docId": 421
+      },
+      {
+       "file": "语雀/na8ufavkr1e9yn3m.html",
+       "title": "Collection - LinkedList源码解析",
+       "collabKey": "32ae6a57-868a-4fa7-a43c-5fa251972921",
+       "sortOrder": 12,
+       "docId": 422
+      },
+      {
+       "file": "语雀/uaq6l9g2mgmsgues.html",
+       "title": "Collection - Stack & Queue 源码解析",
+       "collabKey": "8fa239bd-d65d-40f0-89b1-c7d8ffb07708",
+       "sortOrder": 13,
+       "docId": 423
+      },
+      {
+       "file": "语雀/rm53cgfumtond3bx.html",
+       "title": "Collection - PriorityQueue源码解析",
+       "collabKey": "54daf81b-e0ce-4e84-858a-b7deb287dd9c",
+       "sortOrder": 14,
+       "docId": 424
+      },
+      {
+       "file": "语雀/ywsv7vzoc3nym6ir.html",
+       "title": "Map - HashSet & HashMap 源码解析",
+       "collabKey": "35ebf17d-f7ac-4af6-b338-50c6902fbdb1",
+       "sortOrder": 15,
+       "docId": 425
+      },
+      {
+       "file": "语雀/ctk7arrcg7ppgr2c.html",
+       "title": "Map - LinkedHashSet&Map源码解析",
+       "collabKey": "4677b679-6b56-45ff-bfe1-62d346cc758f",
+       "sortOrder": 16,
+       "docId": 426
+      },
+      {
+       "file": "语雀/xcg2sbtdk3mafx2p.html",
+       "title": "Map - TreeSet & TreeMap 源码解析",
+       "collabKey": "b032e054-15eb-49c1-97f6-82428dec448d",
+       "sortOrder": 17,
+       "docId": 427
+      },
+      {
+       "file": "语雀/iyqeydz44fromwzn.html",
+       "title": "Map - WeakHashMap源码解析",
+       "collabKey": "25af38ed-3a91-40b5-9370-605486421cce",
+       "sortOrder": 18,
+       "docId": 428
+      },
+      {
+       "file": "语雀/vp0qgn.html",
+       "title": "线程并发",
+       "collabKey": "949ba193-1a79-477f-894e-0de6bcd93e0b",
+       "sortOrder": 19,
+       "docId": 429
+      },
+      {
+       "file": "语雀/wa8zl7fg57ciayze.html",
+       "title": "Java并发知识体系详解",
+       "collabKey": "db710872-92ad-4cd1-8f5a-48609fb0bd7d",
+       "sortOrder": 20,
+       "docId": 430
+      },
+      {
+       "file": "语雀/dwwhcbvcpxxae006.html",
+       "title": "Java 并发 - 理论基础",
+       "collabKey": "48ed3d92-f24a-4c84-8235-c8da56ce539d",
+       "sortOrder": 21,
+       "docId": 431
+      },
+      {
+       "file": "语雀/mx565i0dfyf28upg.html",
+       "title": "Java 并发 - 线程基础",
+       "collabKey": "8f406993-f125-4056-981d-2593886d1528",
+       "sortOrder": 22,
+       "docId": 432
+      },
+      {
+       "file": "语雀/oi4ca8rcsldalb4q.html",
+       "title": "Java并发 - Java中所有的锁",
+       "collabKey": "c1a6ea68-69e5-4c4c-9730-33ca445c9054",
+       "sortOrder": 23,
+       "docId": 433
+      },
+      {
+       "file": "语雀/mhwdh8zgbfxqsdzx.html",
+       "title": "关键字: synchronized详解",
+       "collabKey": "dc9075c2-827d-4647-a0c7-733621812eb1",
+       "sortOrder": 24,
+       "docId": 434
+      },
+      {
+       "file": "语雀/icosdacqc9gugr9l.html",
+       "title": "关键字: volatile详解",
+       "collabKey": "b0fabf50-63fa-4245-b2c9-51d44c00551d",
+       "sortOrder": 25,
+       "docId": 435
+      },
+      {
+       "file": "语雀/gydg04cq1icyicr8.html",
+       "title": "关键字: final详解",
+       "collabKey": "7598c773-46c8-47b5-9f10-589ef2a0b0f4",
+       "sortOrder": 26,
+       "docId": 436
+      },
+      {
+       "file": "语雀/ttd07msphcqcblmq.html",
+       "title": "JUC - 类汇总和学习指南",
+       "collabKey": "5f2b41eb-598d-4f6b-b78b-31682210e055",
+       "sortOrder": 27,
+       "docId": 437
+      },
+      {
+       "file": "语雀/hszg0lb2l8g7tfyg.html",
+       "title": "JUC原子类: CAS, Unsafe和原子类详解",
+       "collabKey": "1a8a2e02-e89f-4efe-ada6-6fa27dfa1d02",
+       "sortOrder": 28,
+       "docId": 438
+      },
+      {
+       "file": "语雀/gteg4ik7fg7i5fzu.html",
+       "title": "JUC锁: LockSupport详解",
+       "collabKey": "2021d50b-504c-43a4-99d8-67edb564bbbb",
+       "sortOrder": 29,
+       "docId": 439
+      },
+      {
+       "file": "语雀/fllqvfyh1arurcuz.html",
+       "title": "JUC锁: 锁核心类AQS详解",
+       "collabKey": "52f13925-de2e-48ff-b759-fc57fe4f692a",
+       "sortOrder": 30,
+       "docId": 440
+      },
+      {
+       "file": "语雀/phpgt1v8fc2yad22.html",
+       "title": "JUC锁: ReentrantLock详解",
+       "collabKey": "251f3e0f-985c-4ff1-aff2-ecfeaaf474c1",
+       "sortOrder": 31,
+       "docId": 441
+      },
+      {
+       "file": "语雀/ztgo1fci8fhz2dfg.html",
+       "title": "JUC锁: ReentrantReadWriteLock详解",
+       "collabKey": "364c70b4-98a0-4156-9108-44304ccca425",
+       "sortOrder": 32,
+       "docId": 442
+      },
+      {
+       "file": "语雀/nxrz63tzqzf2qktx.html",
+       "title": "JUC集合: ConcurrentHashMap详解",
+       "collabKey": "bcaac4dd-51fa-4688-8e8a-8274d5e4365e",
+       "sortOrder": 33,
+       "docId": 443
+      },
+      {
+       "file": "语雀/lnmgd8c6kb431g78.html",
+       "title": "JUC线程池: ThreadPoolExecutor详解",
+       "collabKey": "41f4e5df-351c-49a9-a9b1-b3f69bbe7142",
+       "sortOrder": 34,
+       "docId": 444
+      },
+      {
+       "file": "语雀/svr0s0vb620gm643.html",
+       "title": "JUC线程池: Fork/Join框架详解",
+       "collabKey": "df1ba118-4393-4393-b584-bab3fc388afe",
+       "sortOrder": 35,
+       "docId": 445
+      },
+      {
+       "file": "语雀/wdp527wbgy1cz3gp.html",
+       "title": "Java 并发 - ThreadLocal详解",
+       "collabKey": "457977ff-1f0b-4a04-9c52-61689263c721",
+       "sortOrder": 36,
+       "docId": 446
+      },
+      {
+       "file": "语雀/fn4514.html",
+       "title": "IO",
+       "collabKey": "beb1c842-3bbc-4d5f-8a76-8ebfdd0d12c2",
+       "sortOrder": 37,
+       "docId": 447
+      },
+      {
+       "file": "语雀/ksdfohoh5q1t37uy.html",
+       "title": "IO知识体系详解",
+       "collabKey": "0ca27f10-aecc-4470-a348-67d75020632f",
+       "sortOrder": 38,
+       "docId": 448
+      },
+      {
+       "file": "语雀/gp6k0nfixgzhtcg3.html",
+       "title": "IO - 设计模式(装饰者模式)",
+       "collabKey": "2d3d6a5d-78cd-436f-b9dd-a0c29a9f8170",
+       "sortOrder": 39,
+       "docId": 449
+      },
+      {
+       "file": "语雀/key01gecftbtqyqq.html",
+       "title": "IO - 源码: InputStream",
+       "collabKey": "442e9f8b-1ac2-41a0-84ee-1e697d7a3003",
+       "sortOrder": 40,
+       "docId": 450
+      },
+      {
+       "file": "语雀/idm7q82cblnpe24s.html",
+       "title": "IO - 源码: OutputStream",
+       "collabKey": "2f1b5a09-9469-47e1-a3ff-a7562ce20da8",
+       "sortOrder": 41,
+       "docId": 451
+      },
+      {
+       "file": "语雀/sim677y9ro4e3tnh.html",
+       "title": "IO - 常见类使用",
+       "collabKey": "dc5b5027-960c-4b75-8721-df8e69f67b56",
+       "sortOrder": 42,
+       "docId": 452
+      },
+      {
+       "file": "语雀/xqhwuvi1hu38zof7.html",
+       "title": "IO 模型 - Unix IO 模型",
+       "collabKey": "5144e1df-0409-4064-8b41-f9c8a5e27739",
+       "sortOrder": 43,
+       "docId": 453
+      },
+      {
+       "file": "语雀/dsryq8kof49xysz8.html",
+       "title": "IO - BIO 详解",
+       "collabKey": "595992a2-9451-4a7f-982e-0c51aa9c7b2e",
+       "sortOrder": 44,
+       "docId": 454
+      },
+      {
+       "file": "语雀/txfhp2ikugfslpi8.html",
+       "title": "NIO - 基础详解",
+       "collabKey": "24216e22-9fcd-4f36-a731-a63818f0a6fc",
+       "sortOrder": 45,
+       "docId": 455
+      },
+      {
+       "file": "语雀/lfbhw4tlxeb6kd2s.html",
+       "title": "NIO - IO多路复用详解",
+       "collabKey": "f0f3dc75-927a-430f-9988-c5bb4d926429",
+       "sortOrder": 46,
+       "docId": 456
+      },
+      {
+       "file": "语雀/nq8lz93bv0g9kpzs.html",
+       "title": "AIO - 异步IO详解",
+       "collabKey": "ec45990d-2475-4d37-b9d2-6dfa91f75b75",
+       "sortOrder": 47,
+       "docId": 457
+      },
+      {
+       "file": "语雀/bipioh22l42kicfu.html",
+       "title": "N(A)IO - 框架: Netty",
+       "collabKey": "9fd90c73-79dc-43de-a237-e2293bc8e96e",
+       "sortOrder": 48,
+       "docId": 458
+      },
+      {
+       "file": "语雀/bu72f0ed8lek0dtw.html",
+       "title": "NIO - 零拷贝实现",
+       "collabKey": "aa81f458-3eb2-4896-b0e9-29f8b5666d6e",
+       "sortOrder": 49,
+       "docId": 459
+      },
+      {
+       "file": "语雀/grnyb5.html",
+       "title": "JVM",
+       "collabKey": "364a9ade-f37f-49b8-9166-cb38d9f78168",
+       "sortOrder": 50,
+       "docId": 460
+      },
+      {
+       "file": "语雀/qdqlcl4l83b60nzv.html",
+       "title": "JVM 基础 - 类字节码详解",
+       "collabKey": "99cce711-ae63-41ae-a7a2-653283fb5319",
+       "sortOrder": 51,
+       "docId": 461
+      },
+      {
+       "file": "语雀/gyi6hroaftyhskro.html",
+       "title": "JVM 基础 - 字节码的增强技术",
+       "collabKey": "b5d3b39c-ef46-4601-952b-24c5d9da97e1",
+       "sortOrder": 52,
+       "docId": 462
+      },
+      {
+       "file": "语雀/fvt2gu438a4vegpg.html",
+       "title": "JVM 基础 - Java 类加载机制",
+       "collabKey": "11f98c1d-ca6d-448b-ac74-db31710a82bc",
+       "sortOrder": 53,
+       "docId": 463
+      },
+      {
+       "file": "语雀/tazu5oqaleh5dn0c.html",
+       "title": "JVM 基础 - JVM 内存结构",
+       "collabKey": "8c8e72ed-48e8-4e0f-9f75-82712532f34f",
+       "sortOrder": 54,
+       "docId": 464
+      },
+      {
+       "file": "语雀/gqe0cfl9l7v3bkmk.html",
+       "title": "JVM 基础 - Java 内存模型引入",
+       "collabKey": "c7950605-b987-4530-99f1-cce19c743d6c",
+       "sortOrder": 55,
+       "docId": 465
+      },
+      {
+       "file": "语雀/knbll0pstwmog71y.html",
+       "title": "JVM 基础 - Java 内存模型详解",
+       "collabKey": "7bc70584-d879-47c0-bebf-e32d277ebbb6",
+       "sortOrder": 56,
+       "docId": 466
+      },
+      {
+       "file": "语雀/cr0iqcwc6wf08n5y.html",
+       "title": "GC - Java 垃圾回收基础知识",
+       "collabKey": "b88f441b-bbbd-463c-a1af-3d4751382511",
+       "sortOrder": 57,
+       "docId": 467
+      },
+      {
+       "file": "语雀/vy1dpl9ed7enum9q.html",
+       "title": "GC - Java 垃圾回收器之ZGC详解",
+       "collabKey": "da33736d-f8d3-499f-a230-43dab8928372",
+       "sortOrder": 58,
+       "docId": 468
+      },
+      {
+       "file": "语雀/zv67pk7sib4tlx5g.html",
+       "title": "GC - CMS GC问题分析与解决",
+       "collabKey": "de3cd965-71d0-4423-8277-527b9a48c58c",
+       "sortOrder": 59,
+       "docId": 469
+      },
+      {
+       "file": "语雀/sug16ygrghx30xq3.html",
+       "title": "调试排错 - JVM 调优参数",
+       "collabKey": "9534d8f7-1afd-4f2a-bccc-a773689f00dd",
+       "sortOrder": 60,
+       "docId": 470
+      },
+      {
+       "file": "语雀/nq5cn95goqgy5fbg.html",
+       "title": "调试排错 - Java 内存分析之堆内存和MetaSpace内存",
+       "collabKey": "500a4bbd-1afe-49e4-a323-81d4a689a619",
+       "sortOrder": 61,
+       "docId": 471
+      },
+      {
+       "file": "语雀/xfpyynog6vvhx5v0.html",
+       "title": "调试排错 - Java 内存分析之堆外内存",
+       "collabKey": "792d448a-c9f0-4fe8-acf2-dfd44d5aa448",
+       "sortOrder": 62,
+       "docId": 472
+      },
+      {
+       "file": "语雀/wqm2pmod8mahiwx2.html",
+       "title": "调试排错 - Java 线程分析之线程Dump分析",
+       "collabKey": "c1abcd46-2fba-492d-ab85-c67bf21ae5e0",
+       "sortOrder": 63,
+       "docId": 473
+      },
+      {
+       "file": "语雀/gga7or.html",
+       "title": "网络通信",
+       "collabKey": "7e48bd9b-b25d-4853-8989-dc6313f6cc37",
+       "sortOrder": 64,
+       "docId": 474
+      }
+     ],
+     "collabKey": "85f8247c-ae66-4117-8c5b-b0782506f79a",
+     "sortOrder": 1,
+     "docId": 410
+    },
+    {
+     "title": "数据库",
+     "items": [
+      {
+       "file": "语雀/eiqgawbx312ow47y.html",
+       "title": "SQL DB - 关系型数据库是如何工作的",
+       "collabKey": "7f66afde-125c-480f-8e10-45c631db9740",
+       "sortOrder": 1,
+       "docId": 476
+      },
+      {
+       "file": "语雀/dahgmfowe2b62bie.html",
+       "title": "SQL DB - 关系型数据库设计理论",
+       "collabKey": "d26dde75-4ae9-4dc0-b409-9e2b29fa5675",
+       "sortOrder": 2,
+       "docId": 477
+      },
+      {
+       "file": "语雀/xqa0ogf6ec2zb1nt.html",
+       "title": "SQL DB - 数据库系统核心知识点",
+       "collabKey": "0a1597cd-6bdf-4b7e-9e01-fe1ec4c3f27e",
+       "sortOrder": 3,
+       "docId": 478
+      },
+      {
+       "file": "语雀/htap63.html",
+       "title": "Mysql",
+       "collabKey": "2b794537-5329-43e0-bbca-bc2e7fd41aab",
+       "sortOrder": 4,
+       "docId": 479
+      },
+      {
+       "file": "语雀/flxsl20emxwkg48e.html",
+       "title": "MySQL知识体系详解",
+       "collabKey": "a909c435-ea15-4ad4-a112-40808e87c854",
+       "sortOrder": 5,
+       "docId": 480
+      },
+      {
+       "file": "语雀/ugm49uerntrz8q3b.html",
+       "title": "MySQL - 数据类型",
+       "collabKey": "7270f8cd-4482-4dd9-9094-6e749ea479d3",
+       "sortOrder": 6,
+       "docId": 481
+      },
+      {
+       "file": "语雀/du3dya9c1dbp1pay.html",
+       "title": "MySQL - 存储引擎",
+       "collabKey": "0a08368a-c67f-41a4-941a-e21667d9dac3",
+       "sortOrder": 7,
+       "docId": 482
+      },
+      {
+       "file": "语雀/htp00hyku2wpzrbd.html",
+       "title": "MySQL - 索引(B+树)",
+       "collabKey": "a14ce897-af6a-4a7d-a2a0-7dda28931f5f",
+       "sortOrder": 8,
+       "docId": 483
+      },
+      {
+       "file": "语雀/zu7l4gw5cmrhlrvb.html",
+       "title": "MySQL - 性能优化",
+       "collabKey": "376c8483-971c-4abc-b115-3ef3d6f9ca36",
+       "sortOrder": 9,
+       "docId": 484
+      },
+      {
+       "file": "语雀/gbq2u1yyk7usqoe8.html",
+       "title": "MySQL - 分表分库",
+       "collabKey": "89ac4de9-8060-4dd3-9fd3-4e2cfb801514",
+       "sortOrder": 10,
+       "docId": 485
+      },
+      {
+       "file": "语雀/ooammfcbx3ze0drf.html",
+       "title": "MySQL - 主从复制与读写分离",
+       "collabKey": "c0641228-29fe-4f91-853b-6a5c4cc30cda",
+       "sortOrder": 11,
+       "docId": 486
+      },
+      {
+       "file": "语雀/avg31fesluqxnt4g.html",
+       "title": "MySQL - MySQL InnoDB的MVCC实现机制",
+       "collabKey": "de373d89-1e4b-432d-adc9-68fee7e55d5b",
+       "sortOrder": 12,
+       "docId": 487
+      },
+      {
+       "file": "语雀/lhqoconrz9hoh2na.html",
+       "title": "MySQL - 一条 SQL 的执行过程详解",
+       "collabKey": "9f6ce43f-cd9f-403b-a737-005ffe5c7b01",
+       "sortOrder": 13,
+       "docId": 488
+      },
+      {
+       "file": "语雀/lmot41meevs3lv36.html",
+       "title": "MySQL - MySQL中SQL是如何解析的",
+       "collabKey": "2184933a-790b-4fb2-a6c0-616881637e5f",
+       "sortOrder": 14,
+       "docId": 489
+      },
+      {
+       "file": "语雀/be0col.html",
+       "title": "NoSQL - Redis",
+       "collabKey": "bb772aa1-1144-4581-9e20-4f48b693cd32",
+       "sortOrder": 15,
+       "docId": 490
+      },
+      {
+       "file": "语雀/xt0zet96gyt0eg25.html",
+       "title": "Redis教程 - Redis知识体系详解",
+       "collabKey": "d11ad0d2-e55e-4c9b-8f1b-6722510bb17f",
+       "sortOrder": 16,
+       "docId": 491
+      },
+      {
+       "file": "语雀/em8opkddexat9wpk.html",
+       "title": "Redis入门 - Redis概念和基础",
+       "collabKey": "843cbcc4-0df6-47c3-9683-0ba58fe57f46",
+       "sortOrder": 17,
+       "docId": 492
+      },
+      {
+       "file": "语雀/onfcgs3gsmab2fng.html",
+       "title": "Redis入门 - 数据类型：5种基础数据类型详解",
+       "collabKey": "b1c3fa26-8a95-4169-81e0-ace2ecf54e22",
+       "sortOrder": 18,
+       "docId": 493
+      },
+      {
+       "file": "语雀/agoiaq925v2bzr5x.html",
+       "title": "Redis入门 - 数据类型：3种特殊类型详解",
+       "collabKey": "15e0ad8d-f241-4dd0-ade8-e5fa71f32b46",
+       "sortOrder": 19,
+       "docId": 494
+      },
+      {
+       "file": "语雀/twcwvuz3lqb00w9u.html",
+       "title": "Redis入门 - 数据类型：Stream详解",
+       "collabKey": "184ca1fd-eef3-406e-9fee-b73eae3759ae",
+       "sortOrder": 20,
+       "docId": 495
+      },
+      {
+       "file": "语雀/xic3zmudckrxvdn1.html",
+       "title": "Redis进阶 - 数据结构：对象机制详解",
+       "collabKey": "4026b155-cf1e-4cf2-a15c-19124cb8bec6",
+       "sortOrder": 21,
+       "docId": 496
+      },
+      {
+       "file": "语雀/tgv3846wbhin7fog.html",
+       "title": "Redis进阶 - 数据结构：底层数据结构详解",
+       "collabKey": "cb4e6080-14a8-40c4-afa4-4b87baf9aea4",
+       "sortOrder": 22,
+       "docId": 497
+      },
+      {
+       "file": "语雀/chqhkb5m2p3bm8c8.html",
+       "title": "Redis进阶 - 数据结构：redis对象与编码(底层结构)对应关系详解",
+       "collabKey": "d3c9555d-9577-474e-a03d-f3ed31e3a36c",
+       "sortOrder": 23,
+       "docId": 498
+      },
+      {
+       "file": "语雀/bys1begiu0rrruzl.html",
+       "title": "Redis进阶 - 持久化：RDB和AOF机制详解",
+       "collabKey": "c4ef68fd-b799-4a80-8bfc-09c4a53d2298",
+       "sortOrder": 24,
+       "docId": 499
+      },
+      {
+       "file": "语雀/quvkgpma7bwb7ls7.html",
+       "title": "Redis进阶 - 消息传递：发布订阅模式详解",
+       "collabKey": "c66a85a5-87c2-4c99-a6ac-e2de880bc7fb",
+       "sortOrder": 25,
+       "docId": 500
+      },
+      {
+       "file": "语雀/ptwldn8qssd6rx99.html",
+       "title": "Redis进阶 - 高可用：主从复制详解",
+       "collabKey": "c3d3f71c-d6a8-48a7-a9c2-719e3babb06a",
+       "sortOrder": 26,
+       "docId": 501
+      },
+      {
+       "file": "语雀/lmefugbqvpepm252.html",
+       "title": "Redis进阶 - 高可用：哨兵机制（Redis Sentinel）详解",
+       "collabKey": "e9d1328a-47fb-475b-a07f-17b6fbe88210",
+       "sortOrder": 27,
+       "docId": 502
+      },
+      {
+       "file": "语雀/qis6nav5e9fdcovv.html",
+       "title": "Redis进阶 - 高可拓展：分片技术（Redis Cluster）详解",
+       "collabKey": "9a63769a-f4d1-4fdb-8181-3b2583e9c5af",
+       "sortOrder": 28,
+       "docId": 503
+      },
+      {
+       "file": "语雀/ut0c1b6qawm33wwe.html",
+       "title": "Redis进阶 - 缓存问题：一致性, 穿击, 穿透, 雪崩, 污染等",
+       "collabKey": "6fe193b0-bf1d-438b-966e-eff6b13aed62",
+       "sortOrder": 29,
+       "docId": 504
+      },
+      {
+       "file": "语雀/rmg7a6awzqq7wta5.html",
+       "title": "Redis进阶 - 版本特性: Redis4.0、5.0、6.0特性整理",
+       "collabKey": "f33b387d-0968-4812-b322-b4569f9f962c",
+       "sortOrder": 30,
+       "docId": 505
+      },
+      {
+       "file": "语雀/ilnb6a28qgiv2pfi.html",
+       "title": "Redis进阶 - 运维监控：Redis的监控详解",
+       "collabKey": "03978a9a-a9d3-4885-bb43-76fe63459afb",
+       "sortOrder": 31,
+       "docId": 506
+      },
+      {
+       "file": "语雀/ivcl3w7dykywz0ms.html",
+       "title": "Redis进阶 - 性能调优：Redis性能调优详解",
+       "collabKey": "9a40e5f8-9559-48e0-8c2a-ac0c7b4f28c4",
+       "sortOrder": 32,
+       "docId": 507
+      },
+      {
+       "file": "语雀/vol3gnb7ortadwad.html",
+       "title": "MongoDB教程 - Mongo知识体系详解",
+       "collabKey": "5d9b77b0-8759-42f7-a8ce-93c12937c6a4",
+       "sortOrder": 33,
+       "docId": 508
+      },
+      {
+       "file": "语雀/mafnwag0l2td3pup.html",
+       "title": "Mongo入门 - MongoDB基础概念",
+       "collabKey": "6590f58a-86ff-485a-8a11-06b12dc753c3",
+       "sortOrder": 34,
+       "docId": 509
+      },
+      {
+       "file": "语雀/nlbkwxvmxrrsu3lz.html",
+       "title": "Mongo入门 - MongoDB整体生态",
+       "collabKey": "1b607c9f-3021-4606-875b-15a2ff9bc905",
+       "sortOrder": 35,
+       "docId": 510
+      },
+      {
+       "file": "语雀/os04rzc1sby3p8gb.html",
+       "title": "ElasticSearch知识体系详解",
+       "collabKey": "b39c0070-2fa1-41e0-8591-e07337fc1a17",
+       "sortOrder": 36,
+       "docId": 511
+      },
+      {
+       "file": "语雀/cbf7mg8duby4fe1z.html",
+       "title": "ES详解 - 认知：ElasticSearch基础概念",
+       "collabKey": "bace01f4-871c-481e-854d-3ec982bf8d3f",
+       "sortOrder": 37,
+       "docId": 512
+      },
+      {
+       "file": "语雀/syqmdsd4b95crla4.html",
+       "title": "ES详解 - 入门：查询和聚合的基础使用",
+       "collabKey": "2e34e16c-7f9e-4123-842e-418555849340",
+       "sortOrder": 38,
+       "docId": 513
+      },
+      {
+       "file": "语雀/ea8gm1kvi6v1oeqx.html",
+       "title": "ES详解 - 索引：索引管理详解",
+       "collabKey": "a76bbd0d-fa8c-4c3c-b708-eafb84d81bcc",
+       "sortOrder": 39,
+       "docId": 514
+      },
+      {
+       "file": "语雀/pi2fnn7vwezr11y8.html",
+       "title": "ES详解 - 索引：索引模板(Index Template)详解",
+       "collabKey": "6feb8e2b-8057-4b12-9b91-98e1f4aaee87",
+       "sortOrder": 40,
+       "docId": 515
+      },
+      {
+       "file": "语雀/xwek9beg0i01mdog.html",
+       "title": "ES详解 - 查询：DSL查询之复合查询详解",
+       "collabKey": "01398c38-42db-4765-b1a4-ec7ec5d486db",
+       "sortOrder": 41,
+       "docId": 516
+      },
+      {
+       "file": "语雀/bdbrwgqa3iobc6mt.html",
+       "title": "ES详解 - 查询：DSL查询之全文搜索详解",
+       "collabKey": "15f71580-574a-496a-895c-8b899bb10f61",
+       "sortOrder": 42,
+       "docId": 517
+      },
+      {
+       "file": "语雀/gzgnanmgwhqhdy8x.html",
+       "title": "ES详解 - 查询：DSL查询之Term详解",
+       "collabKey": "8c796535-e239-4fb4-82a1-1b04fef3c120",
+       "sortOrder": 43,
+       "docId": 518
+      },
+      {
+       "file": "语雀/gs89qg2781s2vcxt.html",
+       "title": "ES详解 - 聚合：聚合查询之Bucket聚合详解",
+       "collabKey": "531de6cc-1940-4ff6-9c26-95399173ed92",
+       "sortOrder": 44,
+       "docId": 519
+      },
+      {
+       "file": "语雀/rpaag166pi9wcnwg.html",
+       "title": "ES详解 - 聚合：聚合查询之Metric聚合详解",
+       "collabKey": "a085ffc5-4574-40bd-8d75-214602c3a2b4",
+       "sortOrder": 45,
+       "docId": 520
+      },
+      {
+       "file": "语雀/wywz8zeorn1w2o4k.html",
+       "title": "ES详解 - 聚合：聚合查询之Pipline聚合详解",
+       "collabKey": "2ef2dd75-bdab-4b9f-90b7-10a027bd1a22",
+       "sortOrder": 46,
+       "docId": 521
+      },
+      {
+       "file": "语雀/nhcwey6o8q0w9d68.html",
+       "title": "ES详解 - 原理：从图解构筑对ES原理的初步认知",
+       "collabKey": "50f8e58e-215b-4b62-bff4-e1d3d8550307",
+       "sortOrder": 47,
+       "docId": 522
+      },
+      {
+       "file": "语雀/ugwl790cqoimnm3c.html",
+       "title": "ES详解 - 原理：ES原理知识点补充和整体结构",
+       "collabKey": "2dc2c29c-a1b8-4c6a-aaea-63fcb78425d9",
+       "sortOrder": 48,
+       "docId": 523
+      },
+      {
+       "file": "语雀/xf46vrufst2cqysp.html",
+       "title": "ES详解 - 原理：ES原理之索引文档流程详解",
+       "collabKey": "b6039ede-b7c3-4fdb-9659-a67d6aa24c46",
+       "sortOrder": 49,
+       "docId": 524
+      }
+     ],
+     "collabKey": "69e85e58-6ac6-49e8-b0e7-ffe0d3f00459",
+     "sortOrder": 2,
+     "docId": 475
+    },
+    {
+     "title": "框架",
+     "items": [
+      {
+       "file": "语雀/fz4iba.html",
+       "title": "Spring",
+       "collabKey": "9b22fea3-ded3-4733-9679-d24117d0f988",
+       "sortOrder": 1,
+       "docId": 526
+      },
+      {
+       "file": "语雀/pzl2ognpy6n31o7k.html",
+       "title": "Spring框架知识体系详解",
+       "collabKey": "1359b701-e301-4eee-88fa-5bde6d5799fa",
+       "sortOrder": 2,
+       "docId": 527
+      },
+      {
+       "file": "语雀/dxreqilqy05uk2w5.html",
+       "title": "Spring基础 - Spring和Spring框架组成",
+       "collabKey": "07251158-2435-4f83-b845-2b0ee8ca1e15",
+       "sortOrder": 3,
+       "docId": 528
+      },
+      {
+       "file": "语雀/szvq2pinwpnosd4w.html",
+       "title": "Spring基础 - Spring简单例子引入Spring要点",
+       "collabKey": "2961bdd8-a3cd-4024-adab-6f5f73a42acc",
+       "sortOrder": 4,
+       "docId": 529
+      },
+      {
+       "file": "语雀/thgpiynme2owqim9.html",
+       "title": "Spring基础 - SpringMVC请求流程和案例",
+       "collabKey": "07c2abfb-8712-4456-a4af-8a7e184fc938",
+       "sortOrder": 5,
+       "docId": 530
+      },
+      {
+       "file": "语雀/kx36rgs86q8l7t3r.html",
+       "title": "Spring进阶- Spring IOC实现原理详解之Bean实例化(生命周期,循环依赖等)",
+       "collabKey": "74135460-35f0-4b99-b68c-1bb0f4557a37",
+       "sortOrder": 6,
+       "docId": 531
+      },
+      {
+       "file": "语雀/uhhbprssqdfggyab.html",
+       "title": "Spring进阶 - Spring AOP实现原理详解之AOP切面的实现",
+       "collabKey": "791e3778-cad7-4770-94de-15d763f7c42e",
+       "sortOrder": 7,
+       "docId": 532
+      },
+      {
+       "file": "语雀/rg848d78mmderfm1.html",
+       "title": "Spring进阶 - Spring AOP实现原理详解之Cglib代理实现",
+       "collabKey": "713f16b7-14fc-40a6-81ce-908c02660fe4",
+       "sortOrder": 8,
+       "docId": 533
+      },
+      {
+       "file": "语雀/rqhiaqsehihb8dia.html",
+       "title": "Spring进阶 - Spring AOP实现原理详解之JDK代理实现",
+       "collabKey": "34dd035e-0c96-4b50-a25a-b13d2b53651f",
+       "sortOrder": 9,
+       "docId": 534
+      },
+      {
+       "file": "语雀/pad3q07rcpcv9dsp.html",
+       "title": "Spring进阶 - SpringMVC实现原理之DispatcherServlet的初始化过程",
+       "collabKey": "df9a65ba-94b1-45cc-9ea2-7af7a7099b7a",
+       "sortOrder": 10,
+       "docId": 535
+      },
+      {
+       "file": "语雀/hvv3vdlkidg8na5x.html",
+       "title": "Spring进阶 - SpringMVC实现原理之DispatcherServlet处理请求的过程",
+       "collabKey": "d5e4291e-014c-47ce-abbf-0234b2554e73",
+       "sortOrder": 11,
+       "docId": 536
+      },
+      {
+       "file": "语雀/nm8eif.html",
+       "title": "Springboot",
+       "collabKey": "7dab6a2a-6962-4447-8b55-7b12e67dca17",
+       "sortOrder": 12,
+       "docId": 537
+      },
+      {
+       "file": "语雀/bgng25vrdlhsetg6.html",
+       "title": "♥SpringBoot 知识体系详解♥",
+       "collabKey": "6694e168-3752-4b65-a393-a1b3c6bdb4af",
+       "sortOrder": 13,
+       "docId": 538
+      },
+      {
+       "file": "语雀/id6vnpm7u7hhgt13.html",
+       "title": "SpringBoot入门 - SpringBoot简介",
+       "collabKey": "8751ab1a-d2bc-4ca6-b490-c7be13aaa783",
+       "sortOrder": 14,
+       "docId": 539
+      },
+      {
+       "file": "语雀/yrfm2gm79s3my715.html",
+       "title": "SpringBoot进阶 - 自定义starter",
+       "collabKey": "315a2f4a-4472-4693-9135-95a2b823b4c8",
+       "sortOrder": 15,
+       "docId": 540
+      },
+      {
+       "file": "语雀/wgnzp2.html",
+       "title": "Netty",
+       "collabKey": "39f98043-4b03-4e6a-90be-dc00ce047df8",
+       "sortOrder": 16,
+       "docId": 541
+      },
+      {
+       "file": "语雀/lobmqk.html",
+       "title": "Dubbo",
+       "collabKey": "54c85c40-36c0-4a64-99e3-d00601006257",
+       "sortOrder": 17,
+       "docId": 542
+      },
+      {
+       "file": "语雀/ggpluu.html",
+       "title": "Zookeeper",
+       "collabKey": "217adab3-cb98-4b0d-b3aa-7cac89d355af",
+       "sortOrder": 18,
+       "docId": 543
+      },
+      {
+       "file": "语雀/rdt3f1.html",
+       "title": "RocketMQ",
+       "collabKey": "2005577c-371c-43ee-9ceb-7d62363d4539",
+       "sortOrder": 19,
+       "docId": 544
+      }
+     ],
+     "collabKey": "c4c8d662-c92b-42f8-b83a-a83b843ca02e",
+     "sortOrder": 3,
+     "docId": 525
+    },
+    {
+     "title": "架构",
+     "items": [
+      {
+       "file": "语雀/hnghdo.html",
+       "title": "架构",
+       "collabKey": "f4f71bbd-623f-4ca0-8f9a-17a36be2f06c",
+       "sortOrder": 1,
+       "docId": 546
+      },
+      {
+       "file": "语雀/xlnmnd5ko77tmypq.html",
+       "title": "♥架构 - 知识体系详解♥",
+       "collabKey": "b7c4af2a-9819-40f1-b95f-380f6052e261",
+       "sortOrder": 2,
+       "docId": 547
+      },
+      {
+       "file": "语雀/hy05r25isugb3hwn.html",
+       "title": "架构 - 架构基础: 特点,本质...",
+       "collabKey": "e52a3e83-3c4d-4155-9c5c-7fa6032b9028",
+       "sortOrder": 3,
+       "docId": 548
+      },
+      {
+       "file": "语雀/hgk2hwat5hucd8kb.html",
+       "title": "架构 - 理解构架的视角",
+       "collabKey": "616bbc65-2d61-427d-9cda-a41b27182c71",
+       "sortOrder": 4,
+       "docId": 549
+      },
+      {
+       "file": "语雀/aqa9v0ms4eq23kd0.html",
+       "title": "架构 - 理解构架的分层",
+       "collabKey": "acf4ca1b-a5be-42e4-8438-ebaa9847983b",
+       "sortOrder": 5,
+       "docId": 550
+      },
+      {
+       "file": "语雀/oxizgs11ezgymxfl.html",
+       "title": "架构 - 理解架构的演进",
+       "collabKey": "05879aec-ef40-47e8-ac56-5327bddd97a8",
+       "sortOrder": 6,
+       "docId": 551
+      },
+      {
+       "file": "语雀/mdzrac80h6aqw71r.html",
+       "title": "架构 - 理解架构的服务演化",
+       "collabKey": "a60bd5d0-20db-4776-8fed-620917de23b3",
+       "sortOrder": 7,
+       "docId": 552
+      },
+      {
+       "file": "语雀/ars1ctyrl35ci4ap.html",
+       "title": "架构 - 理解架构的模式1",
+       "collabKey": "265a6abc-a2cd-4a90-b3f6-266800deac7f",
+       "sortOrder": 8,
+       "docId": 553
+      },
+      {
+       "file": "语雀/yueyhuegd0nc8g5i.html",
+       "title": "架构 - 理解架构的模式2",
+       "collabKey": "c2296d2c-964a-4138-b23b-5de20b61c624",
+       "sortOrder": 9,
+       "docId": 554
+      },
+      {
+       "file": "语雀/oo46vkc6h6zqrbpp.html",
+       "title": "架构 - 理解架构的核心要素",
+       "collabKey": "89d25dfb-a925-430f-9209-f7c163e3f148",
+       "sortOrder": 10,
+       "docId": 555
+      },
+      {
+       "file": "语雀/ddblbpe9wxkykk15.html",
+       "title": "架构之高并发：缓存",
+       "collabKey": "b02deaec-5ac1-4d27-89da-60fe0ed573bd",
+       "sortOrder": 11,
+       "docId": 556
+      },
+      {
+       "file": "语雀/cegg8mswurvd5450.html",
+       "title": "架构之高并发：限流",
+       "collabKey": "0b10ba64-1591-4e24-8f47-83155564cbdc",
+       "sortOrder": 12,
+       "docId": 557
+      },
+      {
+       "file": "语雀/zpvygqsrgx28zd0l.html",
+       "title": "架构之高并发：降级和熔断",
+       "collabKey": "ef8ff327-8e80-4e03-9e1f-beb1d8a4cbf5",
+       "sortOrder": 13,
+       "docId": 558
+      },
+      {
+       "file": "语雀/itno9ld38vdxqe5y.html",
+       "title": "架构之高可用：负载均衡",
+       "collabKey": "8283365d-1753-42da-a52a-819477a0666d",
+       "sortOrder": 14,
+       "docId": 559
+      },
+      {
+       "file": "语雀/wegxc1oedporbwkv.html",
+       "title": "架构之高可用：容灾备份,故障转移",
+       "collabKey": "1dced8ca-698e-416b-991d-94a1b392b08d",
+       "sortOrder": 15,
+       "docId": 560
+      },
+      {
+       "file": "语雀/zrei0nkd68c0lxo4.html",
+       "title": "架构 - 保障架构安全",
+       "collabKey": "1645687f-4517-488e-8b23-dde9b9005a22",
+       "sortOrder": 16,
+       "docId": 561
+      },
+      {
+       "file": "语雀/urne6t8rwaqbx0xu.html",
+       "title": "架构 - 学习资料",
+       "collabKey": "0da0a4f1-01ef-4f92-af4b-bd63ec0339b4",
+       "sortOrder": 17,
+       "docId": 562
+      }
+     ],
+     "collabKey": "bdc3be7f-277e-448e-be28-2da8c58d69d4",
+     "sortOrder": 4,
+     "docId": 545
+    },
+    {
+     "title": "算法",
+     "items": [
+      {
+       "file": "语雀/wolwt8.html",
+       "title": "算法",
+       "collabKey": "b71b6ff6-6a4b-41b2-8350-a260bf626ea2",
+       "sortOrder": 1,
+       "docId": 564
+      },
+      {
+       "file": "语雀/ypchmm.html",
+       "title": "数组",
+       "collabKey": "580ee525-1830-4695-9970-45df5eb1f875",
+       "sortOrder": 2,
+       "docId": 565
+      },
+      {
+       "file": "语雀/bvbz09.html",
+       "title": "队列",
+       "collabKey": "26873f17-dc18-4ee0-bc55-44d633692b97",
+       "sortOrder": 3,
+       "docId": 566
+      },
+      {
+       "file": "语雀/xf2goc.html",
+       "title": "链表",
+       "collabKey": "ec896107-ade8-49eb-9c11-469d7052940c",
+       "sortOrder": 4,
+       "docId": 567
+      },
+      {
+       "file": "语雀/cmq278.html",
+       "title": "树",
+       "collabKey": "e0b5a092-67b4-4423-b918-26f62eaaedee",
+       "sortOrder": 5,
+       "docId": 568
+      },
+      {
+       "file": "语雀/gm8nfz.html",
+       "title": "双指针",
+       "collabKey": "74c80964-898d-4b63-90ca-04da230eb98b",
+       "sortOrder": 6,
+       "docId": 569
+      },
+      {
+       "file": "语雀/lwq5b3.html",
+       "title": "贪心",
+       "collabKey": "d182656c-9b0b-4e92-adf7-83899ee76ff1",
+       "sortOrder": 7,
+       "docId": 570
+      },
+      {
+       "file": "语雀/dbzhgh.html",
+       "title": "动态规划",
+       "collabKey": "88df52b4-19c4-4f4f-b3f9-d9f7c5c70518",
+       "sortOrder": 8,
+       "docId": 571
+      }
+     ],
+     "collabKey": "8971d531-fad0-400d-8f80-010667ad844e",
+     "sortOrder": 5,
+     "docId": 563
+    },
+    {
+     "title": "为数不多的神仙公司",
+     "items": [
+      {
+       "file": "语雀/tv2cvrk3tkz668ng.html",
+       "title": "为数不多的神仙公司",
+       "collabKey": "512d0406-217f-4bce-b24a-fc646b705b12",
+       "sortOrder": 1,
+       "docId": 573
+      }
+     ],
+     "collabKey": "b97ddd3b-3876-45ad-bbfa-b149b52fdc30",
+     "sortOrder": 6,
+     "docId": 572
+    }
+   ],
+   "collabKey": "32e23fef-169c-43dd-9078-3d3b805fa4dd",
+   "sortOrder": 2,
+   "docId": 409
+  }
+ ]
+}
