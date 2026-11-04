@@ -12,7 +12,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 interface Item {
   level: number
   text: string
-  top: number
+  /** 标题元素本身：位置每次实时计算，避免正文异步渲染（图/表）后快照失效 */
+  el: HTMLElement
 }
 
 const props = defineProps<{
@@ -39,10 +40,17 @@ function collect(): Item[] {
     list.push({
       level: Number(h.tagName.charAt(1)),
       text,
-      top: h.getBoundingClientRect().top - props.scroller.getBoundingClientRect().top + props.scroller.scrollTop,
+      el: h,
     })
   }
   return list
+}
+
+/** 标题相对滚动容器内容顶部的绝对偏移（实时读取，可随正文高度变化自适应） */
+function offsetOf(el: HTMLElement): number {
+  const scroller = props.scroller
+  if (!scroller) return 0
+  return el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
 }
 
 const empty = computed(() => items.value.length === 0)
@@ -51,10 +59,18 @@ function refresh() {
   items.value = collect()
 }
 
+/**
+ * 跳转到某个标题。
+ *
+ * 注意：这里必须用 offsetOf 重新读一次位置，不能再叠加 scrollTop——
+ * offsetOf 返回的已经是「距内容顶部的绝对距离」，而 scrollTo 的 top 也是绝对值。
+ * （旧实现用「预存绝对偏移 + 当前 scrollTop」，每点一次就多滚一个屏高。）
+ */
 function jump(item: Item, i: number) {
-  if (!props.scroller) return
-  const target = props.scroller.scrollTop + item.top - 12
-  props.scroller.scrollTo({ top: target, behavior: 'smooth' })
+  const scroller = props.scroller
+  if (!scroller) return
+  const target = offsetOf(item.el) - 12
+  scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
   activeId.value = i
 }
 
@@ -66,8 +82,9 @@ function spy() {
     if (!props.scroller) return
     const y = props.scroller.scrollTop + 80
     let cur = -1
+    // 实时读位置：正文里的图/表渲染完成后高度会变，用刷新时的快照会高亮错位
     items.value.forEach((it, i) => {
-      if (it.top <= y) cur = i
+      if (offsetOf(it.el) <= y) cur = i
     })
     activeId.value = cur
     // 把当前项保持在面板可视区
