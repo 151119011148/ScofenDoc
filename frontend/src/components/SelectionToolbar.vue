@@ -98,6 +98,72 @@ function hideBar() {
   barVisible.value = false
 }
 
+/* ---------------- 出现时机：等选区收口 ---------------- */
+
+/**
+ * 拖选（按下 → 拖动 → 松开）过程中不弹工具条。
+ * 原因：selectionUpdate 在拖动途中会连续触发，每触发一次就重算一次位置，
+ * 工具条会跟着鼠标在行间上下跳，还正好盖住正在选的那几行 —— 飞书是松手之后才出现。
+ *
+ * 键盘选择（Shift+方向键、⌘A）没有「松手」事件，用一小段停顿（KEY_SETTLE）收口；
+ * 连续敲方向键时不断把计时器往后推，停下来才弹。
+ */
+const KEY_SETTLE = 120
+
+/** 鼠标/手指是否正按在正文里（正在拖选） */
+let pointerDown = false
+let settleTimer = 0
+
+function clearSettle() {
+  if (settleTimer) {
+    window.clearTimeout(settleTimer)
+    settleTimer = 0
+  }
+}
+
+function revealAfter(delay: number) {
+  clearSettle()
+  settleTimer = window.setTimeout(() => {
+    settleTimer = 0
+    updatePosition()
+  }, delay)
+}
+
+function editorDom(): HTMLElement | null {
+  const e = props.editor
+  if (!e || e.isDestroyed) return null
+  return (e.view.dom as HTMLElement) ?? null
+}
+
+function onPointerDown(ev: PointerEvent) {
+  const t = ev.target as HTMLElement | null
+  if (!t?.closest) return
+  // 工具条 / 批注弹层里的点击不是「开始选正文」
+  if (t.closest('.sel-wrap') || t.closest('.cmt-pop')) return
+  const dom = editorDom()
+  if (!dom || !dom.contains(t)) return
+  pointerDown = true
+  clearSettle()
+  // 上一轮的工具条先撤掉：拖选途中它会横在选区的行上跟着一起跳
+  hideBar()
+}
+
+function onPointerUp() {
+  if (!pointerDown) return
+  pointerDown = false
+  clearSettle()
+  // 等一帧，让浏览器把最终选区落定后再量 rect
+  requestAnimationFrame(() => {
+    if (!pointerDown) updatePosition()
+  })
+}
+
+/** 松手发生在窗口外（拖到侧栏、切到别的应用）时收个尾，避免 pointerDown 卡在 true 再也不弹 */
+function resetPointer() {
+  pointerDown = false
+  clearSettle()
+}
+
 function selectionRect(): { left: number; top: number; bottom: number; width: number; height: number } | null {
   const sel = window.getSelection()
   if (sel && sel.rangeCount && !sel.isCollapsed) {
@@ -135,6 +201,8 @@ function schedule() {
 function updatePosition() {
   const e = props.editor
   if (!e || e.isDestroyed || !props.editable) return hideBar()
+  // 还在拖选（手指/鼠标没松）：一律不弹，等 pointerup 再来一次
+  if (pointerDown) return hideBar()
   // 评论弹层打开时，工具条让位，不跟着重新计算
   if (threadId.value) return
   if (e.state.selection.empty && !panel.value) return hideBar()
@@ -563,7 +631,14 @@ function timeText(at: number) {
 let boundEditor: Editor | null = null
 const onSelection = () => {
   tick.value++
-  schedule()
+  // 拖选途中：位置每动一下都变，先不弹（否则工具条一路跟着鼠标跳）
+  if (pointerDown) {
+    clearSettle()
+    hideBar()
+    return
+  }
+  // 松手后 / 键盘选择停顿后，再算位置弹出来
+  revealAfter(KEY_SETTLE)
 }
 const onTransaction = () => {
   tick.value++
@@ -594,15 +669,25 @@ onMounted(() => {
   document.addEventListener('scroll', onDocScroll, true)
   document.addEventListener('mousedown', onDocDown, true)
   document.addEventListener('keydown', onKeyDown)
+  // 拖选的「按下 / 松开」：用 pointer 事件，鼠标和触屏（长按拖选）都覆盖
+  document.addEventListener('pointerdown', onPointerDown, true)
+  window.addEventListener('pointerup', onPointerUp, true)
+  window.addEventListener('pointercancel', resetPointer, true)
+  window.addEventListener('blur', resetPointer)
   window.addEventListener('resize', schedule)
 })
 
 onBeforeUnmount(() => {
   bindEditor(undefined)
   unbindDoc?.()
+  clearSettle()
   document.removeEventListener('scroll', onDocScroll, true)
   document.removeEventListener('mousedown', onDocDown, true)
   document.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('pointerdown', onPointerDown, true)
+  window.removeEventListener('pointerup', onPointerUp, true)
+  window.removeEventListener('pointercancel', resetPointer, true)
+  window.removeEventListener('blur', resetPointer)
   window.removeEventListener('resize', schedule)
   if (rafId) cancelAnimationFrame(rafId)
 })
