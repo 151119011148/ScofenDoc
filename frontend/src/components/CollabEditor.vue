@@ -324,12 +324,18 @@ function placePlusDot(blockStart: number, lineTop?: number) {
   const node = ed.state.doc.nodeAt(blockStart)
   if (!node) return false
   const block = ed.view.coordsAtPos(blockStart)
+  // 图块（mermaid/plantuml 这类 atom node view）上 coordsAtPos 有时给不出有效横坐标，
+  // 直接落到 DOM 盒子上取，否则按钮会被算到屏幕外、看起来像「没出现」
+  const dom = ed.view.nodeDOM(blockStart)
+  const rect = dom instanceof HTMLElement ? dom.getBoundingClientRect() : null
+  const left = block && block.left > 0 ? block.left : rect?.left ?? 0
+  if (!left) return false
   plusHoverBlock.value = blockStart
   plusBlockFrom.value = blockStart
   plusBlockTo.value = blockStart + node.nodeSize
   // 贴着正文内容左边缘往左挪一格（26px = 按钮 20 + 缝 6）
-  plusDotX.value = Math.round(block.left - 26)
-  plusDotY.value = Math.round(lineTop == null ? block.top : lineTop)
+  plusDotX.value = Math.round(left - 26)
+  plusDotY.value = Math.round(lineTop == null ? rect?.top ?? block.top : lineTop)
   return true
 }
 
@@ -373,14 +379,50 @@ function applyPlusHover(x: number, y: number) {
     return
   }
   const $pos = ed.state.doc.resolve(hit.pos)
-  if ($pos.depth < 1) {
+
+  // 顶层块起点。光标在块内时 before(1) 即可；但鼠标停在图块、图片、表格的外框上，
+  // 或落在两个块之间的空白里时，posAtCoords 给到的 pos 在 doc 层（depth=0），
+  // 这时要退到相邻节点上 —— 否则「鼠标不在光标那儿」时一片区域都点不出 ＋。
+  let start = -1
+  if ($pos.depth >= 1) start = $pos.before(1)
+  else if ($pos.nodeAfter) start = $pos.pos
+  else if ($pos.nodeBefore) start = $pos.pos - $pos.nodeBefore.nodeSize
+  if (start < 0) {
     schedulePlusHide()
     return
   }
-  const line = ed.view.coordsAtPos(hit.pos)
-  // 与鼠标所在那行垂直居中：行高一般 24~30，按钮 20
-  const lineTop = line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2)
-  if (placePlusDot($pos.before(1), lineTop)) {
+
+  const dom = ed.view.nodeDOM(start)
+  const rect = dom instanceof HTMLElement ? dom.getBoundingClientRect() : null
+  if (rect && rect.height > 0) {
+    // 块与块之间的缝（标题上下、图块外框）也算「在这一块上」，20px 内不闪断
+    const over = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+    if (over > 20) {
+      schedulePlusHide()
+      return
+    }
+  }
+
+  let lineTop: number | undefined
+  const node = ed.state.doc.nodeAt(start)
+  if (node && !node.isTextblock) {
+    // 图块 / 图片 / 表格 / 分割线这类没有「行」的概念：贴它可见内容的顶边，
+    // 否则会停在 node view 外框的 padding 里，看着像挂在上一个块旁边
+    const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
+    const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
+    lineTop = innerRect && innerRect.height > 0 ? innerRect.top : rect?.top
+  } else if (rect && rect.height > 0 && (y < rect.top || y > rect.bottom)) {
+    lineTop = y < rect.top ? rect.top : rect.bottom - PLUS_SIZE
+  } else {
+    const line = ed.view.coordsAtPos(hit.pos)
+    // 与鼠标所在那行垂直居中：行高一般 24~30，按钮 20
+    lineTop = line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2)
+  }
+  if (rect && rect.height > 0 && lineTop != null) {
+    lineTop = Math.min(Math.max(lineTop, rect.top), rect.bottom - PLUS_SIZE)
+  }
+
+  if (placePlusDot(start, lineTop)) {
     plusHovering.value = true
     plusDotVisible.value = true
     cancelPlusHide()
@@ -417,8 +459,8 @@ function syncPlusDot() {
     return
   }
   if (plusHovering.value && plusHoverBlock.value >= 0) {
-    const line = ed.view.coordsAtPos(plusHoverBlock.value)
-    placePlusDot(plusHoverBlock.value, line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2))
+    // 鼠标压着某块时按块重算（滚动后位置会变），行内精细对齐交给下一次 mousemove
+    placePlusDot(plusHoverBlock.value)
     return
   }
   const { state } = ed
