@@ -258,21 +258,22 @@ function closeSlash() {
   submenuOf.value = ''
 }
 
-/* ---------- 行内 ＋ 按钮：飞书式「鼠标到哪儿跟哪儿」 ----------
+/* ---------- 行内 ＋ 按钮：只挂在「光标所在块」上 ----------
  * 规则（与飞书一致）：
- *   鼠标压在某一行正文上 → ＋ 出现在该行左侧（长段落里跟着行往下走）
- *   鼠标停在 ＋ 或它的块菜单上 → 保持不动
- *   鼠标离开正文/＋/菜单 → 160ms 后连同块菜单一起收掉
- * 位置由鼠标决定，显隐由鼠标决定；光标/滚动只负责在可见时把位置对齐。
+ *   ＋ 的位置永远跟着光标：光标在哪一块的哪一行，＋ 就贴在那一行左侧
+ *   鼠标压在这一块上（或 ＋ 本身、它的块菜单上）→ 显示
+ *   鼠标跑到别的块 / 别的地方 → 160ms 后收起，块菜单一起收
+ * 也就是：鼠标和光标不在一块儿时，＋ 不该出现。
  */
 
 /** 行内 + 的块菜单是否正开着（用于让 + 保持可见、保持高亮） */
 const plusMenuOpen = computed(() => slashOpen.value && menuSource.value === 'plus')
 
-/** 鼠标是否正压在「正文 / ＋ / 块菜单」上 */
+/** 鼠标是否正压在「光标所在块 / ＋ / 块菜单」上 */
 const plusHovering = ref(false)
-/** 当前 + 锚定的块起始 pos */
-const plusHoverBlock = ref(-1)
+
+/** 光标所在块的几何范围（＋ 的可见区间）；ok=false 表示当前位置不该有 ＋ */
+const plusAnchor = { ok: false, top: 0, bottom: 0, left: 0 }
 
 const PLUS_SIZE = 20
 /** 收起延迟：正文和 ＋ 之间还有 6px 缝，留一点缓冲，否则手还没点上去按钮先没了 */
@@ -280,7 +281,16 @@ const PLUS_HIDE_DELAY = 160
 
 let plusHideTimer = 0
 let plusRaf = 0
-const plusPointer = { x: 0, y: 0 }
+/** 最后一次鼠标位置；seen=false 表示还没动过鼠标，此时 ＋ 一律不显示 */
+const plusPointer = { x: 0, y: 0, seen: false }
+
+function hidePlusDotNow() {
+  // 块菜单是从 ＋ 长出来的，按钮收掉时菜单也得跟着走，不然会留一个没有锚点的浮窗；
+  // 斜杠菜单（键入 / 触发）不归这里管，保持原有关闭逻辑
+  if (plusMenuOpen.value) closeSlash()
+  plusHovering.value = false
+  plusDotVisible.value = false
+}
 
 function cancelPlusHide() {
   if (plusHideTimer) {
@@ -293,12 +303,7 @@ function schedulePlusHide() {
   if (plusHideTimer) return
   plusHideTimer = window.setTimeout(() => {
     plusHideTimer = 0
-    // 块菜单是从 ＋ 长出来的，按钮收掉时菜单也得跟着走，不然会留一个没有锚点的浮窗；
-    // 斜杠菜单（键入 / 触发）不归这里管，保持原有关闭逻辑。
-    if (plusMenuOpen.value) closeSlash()
-    plusHovering.value = false
-    plusHoverBlock.value = -1
-    plusDotVisible.value = false
+    hidePlusDotNow()
   }, PLUS_HIDE_DELAY)
 }
 
@@ -313,33 +318,20 @@ function nearPlusDot(x: number, y: number) {
   )
 }
 
-/**
- * 把 ＋ 摆到某个块的左侧。
- * lineTop 传了就跟这一行垂直居中（鼠标停在第几行就贴第几行），不传则贴块首行。
- * 只摆位置，不决定显隐 —— 显隐归鼠标。
- */
-function placePlusDot(blockStart: number, lineTop?: number) {
-  const ed = editor.value
-  if (!ed || ed.isDestroyed || !props.editable) return false
-  const node = ed.state.doc.nodeAt(blockStart)
-  if (!node) return false
-  const block = ed.view.coordsAtPos(blockStart)
-  // 图块（mermaid/plantuml 这类 atom node view）上 coordsAtPos 有时给不出有效横坐标，
-  // 直接落到 DOM 盒子上取，否则按钮会被算到屏幕外、看起来像「没出现」
-  const dom = ed.view.nodeDOM(blockStart)
-  const rect = dom instanceof HTMLElement ? dom.getBoundingClientRect() : null
-  const left = block && block.left > 0 ? block.left : rect?.left ?? 0
-  if (!left) return false
-  plusHoverBlock.value = blockStart
-  plusBlockFrom.value = blockStart
-  plusBlockTo.value = blockStart + node.nodeSize
-  // 贴着正文内容左边缘往左挪一格（26px = 按钮 20 + 缝 6）
-  plusDotX.value = Math.round(left - 26)
-  plusDotY.value = Math.round(lineTop == null ? rect?.top ?? block.top : lineTop)
-  return true
+/** 指针是否落在「光标所在块」上（含块左侧那条专门给 ＋ 留的缝，不然够不着按钮） */
+function pointerOnAnchorBlock(x: number, y: number, el: HTMLElement | null) {
+  if (!plusAnchor.ok) return false
+  if (y < plusAnchor.top - 4 || y > plusAnchor.bottom + 4) return false
+  const pm = editor.value?.view.dom
+  if (pm && el && pm.contains(el)) return true
+  return x >= plusAnchor.left - 40 && x <= plusAnchor.left + 2
 }
 
-/** 鼠标在哪儿就怎么处理：正文跟随 / ＋ 与菜单保持 / 其它延时收起 */
+/**
+ * 鼠标判定：只认「光标所在块 / ＋ / 块菜单」三处，别处一律收起。
+ * 不再跟随鼠标所在的块 —— ＋ 的插入位置取自光标，位置和判定都必须是同一个块，
+ * 否则会出现「看着挂在 A 行、实际插到 B 行」。
+ */
 function applyPlusHover(x: number, y: number) {
   const ed = editor.value
   if (!ed || ed.isDestroyed || !props.editable) {
@@ -355,74 +347,7 @@ function applyPlusHover(x: number, y: number) {
     return
   }
 
-  // 块菜单开着时只做「留 / 收」，不再改锚点：否则鼠标扫过别的行会把 ＋ 挪走，
-  // 插入位置（plusBlockFrom）也跟着变，点下去就插错地方了。
-  if (plusMenuOpen.value) {
-    if (onPlusOrMenu || nearPlusDot(x, y)) cancelPlusHide()
-    else schedulePlusHide()
-    return
-  }
-
-  if (onPlusOrMenu || nearPlusDot(x, y)) {
-    cancelPlusHide()
-    return
-  }
-
-  if (!el || !ed.view.dom.contains(el)) {
-    schedulePlusHide()
-    return
-  }
-
-  const hit = ed.view.posAtCoords({ left: x, top: y })
-  if (!hit) {
-    schedulePlusHide()
-    return
-  }
-  const $pos = ed.state.doc.resolve(hit.pos)
-
-  // 顶层块起点。光标在块内时 before(1) 即可；但鼠标停在图块、图片、表格的外框上，
-  // 或落在两个块之间的空白里时，posAtCoords 给到的 pos 在 doc 层（depth=0），
-  // 这时要退到相邻节点上 —— 否则「鼠标不在光标那儿」时一片区域都点不出 ＋。
-  let start = -1
-  if ($pos.depth >= 1) start = $pos.before(1)
-  else if ($pos.nodeAfter) start = $pos.pos
-  else if ($pos.nodeBefore) start = $pos.pos - $pos.nodeBefore.nodeSize
-  if (start < 0) {
-    schedulePlusHide()
-    return
-  }
-
-  const dom = ed.view.nodeDOM(start)
-  const rect = dom instanceof HTMLElement ? dom.getBoundingClientRect() : null
-  if (rect && rect.height > 0) {
-    // 块与块之间的缝（标题上下、图块外框）也算「在这一块上」，20px 内不闪断
-    const over = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
-    if (over > 20) {
-      schedulePlusHide()
-      return
-    }
-  }
-
-  let lineTop: number | undefined
-  const node = ed.state.doc.nodeAt(start)
-  if (node && !node.isTextblock) {
-    // 图块 / 图片 / 表格 / 分割线这类没有「行」的概念：贴它可见内容的顶边，
-    // 否则会停在 node view 外框的 padding 里，看着像挂在上一个块旁边
-    const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
-    const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
-    lineTop = innerRect && innerRect.height > 0 ? innerRect.top : rect?.top
-  } else if (rect && rect.height > 0 && (y < rect.top || y > rect.bottom)) {
-    lineTop = y < rect.top ? rect.top : rect.bottom - PLUS_SIZE
-  } else {
-    const line = ed.view.coordsAtPos(hit.pos)
-    // 与鼠标所在那行垂直居中：行高一般 24~30，按钮 20
-    lineTop = line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2)
-  }
-  if (rect && rect.height > 0 && lineTop != null) {
-    lineTop = Math.min(Math.max(lineTop, rect.top), rect.bottom - PLUS_SIZE)
-  }
-
-  if (placePlusDot(start, lineTop)) {
+  if (onPlusOrMenu || nearPlusDot(x, y) || pointerOnAnchorBlock(x, y, el)) {
     plusHovering.value = true
     plusDotVisible.value = true
     cancelPlusHide()
@@ -431,10 +356,11 @@ function applyPlusHover(x: number, y: number) {
   }
 }
 
-/** 文档级 mousemove：rAF 节流，一帧最多算一次 posAtCoords */
+/** 文档级 mousemove：rAF 节流，一帧最多算一次 */
 function onDocMouseMove(ev: MouseEvent) {
   plusPointer.x = ev.clientX
   plusPointer.y = ev.clientY
+  plusPointer.seen = true
   if (plusRaf) return
   plusRaf = requestAnimationFrame(() => {
     plusRaf = 0
@@ -443,34 +369,64 @@ function onDocMouseMove(ev: MouseEvent) {
 }
 
 /**
- * 光标/滚动变化后重新对齐 +（只对位置负责，不负责显隐）。
- * 鼠标还压在正文上时跟随鼠标所在块，否则跟随光标所在块。
+ * 把 ＋ 对齐到「光标所在块的那一行」。
+ * 只负责位置和锚点范围，显不显示仍由鼠标决定（鼠标不在这一块就收起来）。
  */
 function syncPlusDot() {
   const ed = editor.value
-  if (!ed || ed.isDestroyed) {
-    plusDotVisible.value = false
-    plusHovering.value = false
-    return
-  }
-  if (!props.editable) {
-    plusDotVisible.value = false
-    plusHovering.value = false
-    return
-  }
-  if (plusHovering.value && plusHoverBlock.value >= 0) {
-    // 鼠标压着某块时按块重算（滚动后位置会变），行内精细对齐交给下一次 mousemove
-    placePlusDot(plusHoverBlock.value)
+  if (!ed || ed.isDestroyed || !props.editable) {
+    plusAnchor.ok = false
+    hidePlusDotNow()
     return
   }
   const { state } = ed
   const { $from } = state.selection
-  // 根文档或空文档不显示 + 按钮
-  if ($from.depth === 0 && $from.parent.type.name === 'doc' && $from.parent.childCount === 0) {
-    plusDotVisible.value = false
+  // 有选区 / 在代码块里 / 光标不在任何顶层块内（比如选中了一张图）→ 不给 ＋
+  if (!state.selection.empty || $from.depth < 1 || $from.parent.type.name === 'codeBlock') {
+    plusAnchor.ok = false
+    hidePlusDotNow()
     return
   }
-  placePlusDot($from.before($from.depth))
+  const start = $from.before(1)
+  const node = state.doc.nodeAt(start)
+  const dom = node ? ed.view.nodeDOM(start) : null
+  const rect = dom instanceof HTMLElement ? dom.getBoundingClientRect() : null
+  if (!node || !rect || rect.height === 0) {
+    plusAnchor.ok = false
+    hidePlusDotNow()
+    return
+  }
+  const block = ed.view.coordsAtPos(start)
+  // 贴着正文内容左边缘往左挪一格（26px = 按钮 20 + 缝 6）；图块这类 coordsAtPos
+  // 给不出横坐标的，退到 DOM 盒子上取，否则按钮会被算到屏幕外、看起来像「没出现」
+  const left = block && block.left > 0 ? block.left : rect.left
+
+  let dotTop: number
+  if (!node.isTextblock) {
+    // 图块 / 图片 / 表格 / 分割线没有「行」的概念：贴它可见内容的顶边，
+    // 否则会停在 node view 外框的 padding 里，看着像挂在上一块旁边
+    const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
+    const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
+    dotTop = innerRect && innerRect.height > 0 ? innerRect.top : rect.top
+  } else {
+    // 光标所在那一行：行高一般 24~30，按钮 20
+    const line = ed.view.coordsAtPos($from.pos)
+    dotTop =
+      line && line.bottom > line.top ? line.top + Math.max(0, (line.bottom - line.top - PLUS_SIZE) / 2) : rect.top
+  }
+  dotTop = Math.min(Math.max(dotTop, rect.top), rect.bottom - PLUS_SIZE)
+
+  plusAnchor.ok = true
+  plusAnchor.top = rect.top
+  plusAnchor.bottom = rect.bottom
+  plusAnchor.left = left
+  plusBlockFrom.value = start
+  plusBlockTo.value = start + node.nodeSize
+  plusDotX.value = Math.round(left - 26)
+  plusDotY.value = Math.round(dotTop)
+
+  // 光标挪走以后，鼠标可能已经不在这一块上了：按最新的锚点重判一次显隐
+  if (plusPointer.seen) applyPlusHover(plusPointer.x, plusPointer.y)
 }
 
 /** 点击/悬停行内 + 按钮：打开块菜单（复用斜杠菜单渲染，但插入语义为「块后插入」） */
