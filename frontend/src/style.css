@@ -2461,3 +2461,87 @@ body {
   .sel-comment { width: calc(100vw - 40px); }
   .cmt-pop { width: calc(100vw - 16px); }
 }
+
+/* ============================================================================
+   代码块「能画就画」：flowchart / sequenceDiagram 等直接渲染成图
+   节点仍是 codeBlock（不引入新 schema），所以历史数据与协同两端都兼容
+   ============================================================================ */
+.diagram-code { margin: 18px 0; }
+
+/* 只有识别出图类型才做成卡片；普通代码块保持原来的深色块外观 */
+.diagram-code[data-diagram]:not([data-diagram='']) {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfe;
+  overflow: hidden;
+}
+
+.dcb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.dcb-head-src { border-bottom: none; border-top: 1px solid var(--line); }
+.dcb-lang {
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.4px;
+}
+.dcb-btn {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 5px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.dcb-btn:hover { color: var(--brand); border-color: #bcd4ff; }
+
+.dcb-canvas {
+  padding: 14px 10px;
+  text-align: center;
+  overflow-x: auto;
+}
+.dcb-svg { display: inline-block; max-width: 100%; cursor: zoom-in; }
+.dcb-svg svg { max-width: 100%; height: auto; }
+.dcb-svg:hover { opacity: 0.92; }
+.dcb-tip { padding: 8px 0; font-size: 12px; color: var(--text-3); }
+
+.dcb-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--danger);
+  background: #fff1f0;
+  border-radius: 6px;
+}
+.dcb-error b { font-weight: 600; }
+.dcb-error span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  opacity: 0.85;
+}
+.dcb-error .dcb-btn { margin-left: 0; }
+
+/* 卡片里的源码态用浅色，和图的底色连成一体 */
+.diagram-code[data-diagram]:not([data-diagram='']) .dcb-src {
+  margin: 0;
+  padding: 12px 14px;
+  background: #f6f8fa;
+  color: var(--text);
+  border-radius: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}

@@ -18,6 +18,7 @@ import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import MermaidBlock from '../extensions/MermaidBlock'
 import PlantUMLBlock from '../extensions/PlantUMLBlock'
+import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
@@ -380,7 +381,10 @@ onMounted(() => {
   editor.value = new Editor({
     extensions: [
       // 使用 Yjs 协同时必须关闭 Tiptap 自带 history（冲突解决交给 CRDT）
-      StarterKit.configure({ history: false }),
+      // codeBlock 交给下面的 DiagramCodeBlock：节点名不变，只换渲染层，
+      // 这样粘贴进来的 flowchart / sequenceDiagram 代码块能直接出图
+      StarterKit.configure({ history: false, codeBlock: false }),
+      DiagramCodeBlock,
       TaskList,
       TaskItem.configure({ nested: true }),
       // 表格：履历、方案这类文档大量用表格承载对照关系，没有表格节点就只能退化成纯文本
