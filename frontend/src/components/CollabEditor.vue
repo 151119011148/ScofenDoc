@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import type { ChainedCommands } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -163,8 +164,7 @@ const slashIndex = ref(0)
 
 /** 菜单来源：'slash' 由 / 触发（选中后替换 /xxx），'plus' 由行内 + 触发（在当前块后插入） */
 const menuSource = ref<'slash' | 'plus'>('slash')
-/** 块菜单要在「当前块之后」插入，记录目标块的起止 pos */
-const plusBlockFrom = ref(0)
+/** 块菜单要在「当前块之后」插入，记录目标块的结束 pos */
 const plusBlockTo = ref(0)
 /** 行内 + 按钮本身的位置（相对正文容器） */
 const plusDotX = ref(0)
@@ -454,15 +454,12 @@ function syncPlusDot(reveal = false) {
   let dotTop: number
   let lineTop: number
   let lineBottom: number
-  if (!node.isTextblock) {
-    // 图块 / 图片 / 表格 / 分割线没有「行」的概念：贴它可见内容的顶边，
-    // 否则会停在 node view 外框的 padding 里，看着像挂在上一块旁边
-    const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
-    const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
-    dotTop = innerRect && innerRect.height > 0 ? innerRect.top : rect.top
-    lineTop = rect.top
-    lineBottom = rect.bottom
-  } else {
+  // 关键：能不能按「行」对齐，看的是**光标所在的那个文本块**，不是顶层块。
+  // 列表里 before(1) 拿到的是整个 bulletList、引用块里拿到的是 blockquote，
+  // 这两者都不是文本块；按「顶层块不是文本块 → 贴它顶边」处理，
+  // 就会把 ＋ 顶到列表第一行 / 引用首行去（用户实测到的就是这个）。
+  const caretBlock = $from.parent
+  if (caretBlock.isTextblock) {
     // 光标所在那一行：行高一般 24~30，按钮 20
     const line = ed.view.coordsAtPos($from.pos)
     if (line && line.bottom > line.top) {
@@ -474,6 +471,14 @@ function syncPlusDot(reveal = false) {
       lineBottom = rect.bottom
       dotTop = rect.top
     }
+  } else {
+    // 图块 / 图片 / 表格 / 分割线没有「行」的概念：贴它可见内容的顶边，
+    // 否则会停在 node view 外框的 padding 里，看着像挂在上一块旁边
+    const inner = dom instanceof HTMLElement ? dom.firstElementChild : null
+    const innerRect = inner instanceof HTMLElement ? inner.getBoundingClientRect() : null
+    dotTop = innerRect && innerRect.height > 0 ? innerRect.top : rect.top
+    lineTop = rect.top
+    lineBottom = rect.bottom
   }
   dotTop = Math.min(Math.max(dotTop, rect.top), rect.bottom - PLUS_SIZE)
 
@@ -483,7 +488,8 @@ function syncPlusDot(reveal = false) {
   plusAnchor.left = left
   plusAnchor.lineTop = lineTop
   plusAnchor.lineBottom = lineBottom
-  plusBlockFrom.value = start
+  // 插入位置：顶层块末尾。列表里也按「整个列表之后」算 —— 往列表内部插（li 内、
+  // 或新建 li）会让后续命令在越界选区上做 nodesBetween，抛 RangeError，实测不可靠。
   plusBlockTo.value = start + node.nodeSize
   plusDotX.value = Math.round(left - 26)
   plusDotY.value = Math.round(dotTop)
@@ -517,14 +523,15 @@ function openPlusMenu() {
   slashQuery.value = ''
   submenuOf.value = ''
   slashIndex.value = 0
-  const coords = ed.view.coordsAtPos(plusBlockFrom.value)
+  // 菜单从 ＋ 的右侧长出来：按按钮的实际位置算，别按「块起点」——
+  // 列表 / 引用里块起点是第一行，菜单会跑到离光标很远的地方
   const menuW = 280
   const menuH = 360
-  slashX.value = Math.max(8, Math.min(coords.left, window.innerWidth - menuW - 8))
+  const anchorX = plusDotX.value + PLUS_SIZE + 8
+  const anchorY = plusDotY.value
+  slashX.value = Math.max(8, Math.min(anchorX, window.innerWidth - menuW - 8))
   slashY.value =
-    coords.bottom + menuH > window.innerHeight
-      ? Math.max(8, coords.top - menuH - 6)
-      : coords.bottom + 6
+    anchorY + menuH > window.innerHeight ? Math.max(8, anchorY - menuH + PLUS_SIZE) : anchorY
   slashOpen.value = true
   // 注意：这里不要隐藏 + 按钮。菜单是从它身上长出来的，按钮一消失，
   // 用户会以为操作已结束，也失去「再点一次收起」的锚点。
@@ -555,8 +562,27 @@ function applySlash(item: SlashItem) {
   const to = source === 'plus' ? plusBlockTo.value : slashTo.value
   closeSlash()
   if (source === 'plus') {
-    // 行内 + 触发：在当前块之后插入新块
-    item.run(ed.chain().focus().insertContentAt(from, { type: 'paragraph' })).run()
+    // 行内 + 触发：在当前块之后插入新块（列表里插到列表之后，正文里插在当前段之后）
+    const chain = ed
+      .chain()
+      .focus()
+      .insertContentAt(from, { type: 'paragraph' })
+      // 插入后把光标放进新块。Tiptap 自带的 selectionToInsertionEnd 在「列表末尾」这种位置
+      // 会把选区末端算到文档之外，后续命令（比如「正文」的 setParagraph）再拿这个选区
+      // 做 nodesBetween 就会抛 RangeError: Position xx out of range，表现成点了没反应。
+      .command(({ tr }) => {
+        const size = tr.doc.content.size
+        tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(Math.max(1, from + 1), size)), 1))
+        return true
+      })
+    try {
+      // 「正文」这一项本身就是 setParagraph；插入的已经是空段落，再转一次在列表末尾
+      // 会把选区末端算到文档之外（RangeError: Position xx out of range），结果也一样，直接跳过。
+      if (item.key === 'text') chain.run()
+      else item.run(chain).run()
+    } catch (err) {
+      console.error('[plus] insert failed', (err as Error)?.stack || err, { from })
+    }
   } else {
     // 斜杠触发：先删掉输入的 "/xxx"，再执行块转换
     item.run(ed.chain().focus().deleteRange({ from, to })).run()

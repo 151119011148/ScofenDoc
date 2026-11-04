@@ -177,6 +177,32 @@ check(
   `dot ${s7.top} / 段 ${cb7?.top}..${cb7?.bottom}「${cb7?.text}」`,
 )
 
+/* 8) 列表项：＋ 必须跟着光标那一行，不能顶到列表第一行 */
+const lis = await page.evaluate(() =>
+  [...document.querySelectorAll('.ProseMirror ul > li, .ProseMirror ol > li')]
+    .map((el) => {
+      const r = el.getBoundingClientRect()
+      return { x: Math.round(r.left + 60), y: Math.round(r.top + 12), top: Math.round(r.top), bottom: Math.round(r.bottom), text: (el.textContent || '').slice(0, 14) }
+    })
+    .filter((b) => b.top > 160 && b.top < 700 && b.bottom - b.top > 14),
+)
+if (lis.length >= 2) {
+  const target = lis[lis.length - 1]
+  await page.mouse.click(target.x, target.y)
+  await wait(320)
+  await page.mouse.move(target.x, target.y, { steps: 5 })
+  await wait(300)
+  const s8 = await stat()
+  check(
+    '列表项内 ＋ 贴在光标那一行',
+    s8.visible === true && s8.top >= target.top - 8 && s8.top <= Math.min(target.bottom, target.top + 34),
+    `dot ${s8.top} / 该项 ${target.top}..${target.bottom}「${target.text}」/ 列表首项 top ${lis[0].top}`,
+  )
+  await page.screenshot({ path: `${outDir}/caret-list.png` })
+} else {
+  console.log('SKIP  列表项用例（视口内没找到列表）')
+}
+
 console.log('')
 const bad = results.filter((r) => !r.ok)
 console.log(bad.length ? `${bad.length} 项未通过` : '全部通过')
