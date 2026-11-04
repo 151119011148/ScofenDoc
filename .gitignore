@@ -24,3 +24,6 @@ collab/data/
 
 # TypeScript 构建缓存
 *.tsbuildinfo
+
+# 验收脚本产出的截图
+tools/verify-browser/*.png
