@@ -2509,7 +2509,7 @@ body {
   text-align: center;
   overflow-x: auto;
 }
-.dcb-svg { display: inline-block; max-width: 100%; cursor: zoom-in; }
+.dcb-svg { display: block; width: 100%; cursor: zoom-in; text-align: center; }
 .dcb-svg svg { max-width: 100%; height: auto; }
 .dcb-svg:hover { opacity: 0.92; }
 .dcb-tip { padding: 8px 0; font-size: 12px; color: var(--text-3); }

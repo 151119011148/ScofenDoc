@@ -102,6 +102,27 @@ const lightbox = ref(false)
 let timer: number | undefined
 let seq = 0
 
+/**
+ * 把 mermaid/kroki 产出的 `<svg width="100%" style="max-width:...">` 换成按 viewBox 的固定尺寸。
+ *
+ * 不处理会出事：容器是 inline-block（宽度由内容撑），而 svg 自己写 width="100%"，
+ * 百分比相对「宽度还没定」的父级，结果整张图塌缩成一小团，节点文字看不清。
+ */
+function normalizeSvg(raw: string): string {
+  const vb = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(raw)
+  if (!vb) return raw
+  const w = Math.ceil(parseFloat(vb[1]))
+  const h = Math.ceil(parseFloat(vb[2]))
+  if (!w || !h) return raw
+  return raw.replace(/<svg\b([^>]*)>/, (_m, attrs: string) => {
+    const rest = String(attrs)
+      .replace(/\swidth="[^"]*"/g, '')
+      .replace(/\sheight="[^"]*"/g, '')
+      .replace(/\sstyle="[^"]*"/g, '')
+    return `<svg${rest} width="${w}" height="${h}" style="max-width:100%;height:auto">`
+  })
+}
+
 async function draw() {
   const k = kind.value
   const src = code.value
@@ -116,7 +137,7 @@ async function draw() {
       const id = 'dcb-' + Math.random().toString(36).slice(2, 10)
       const res = await mermaid.render(id, src)
       if (mine !== seq) return
-      svg.value = res.svg
+      svg.value = normalizeSvg(res.svg)
     } else {
       const ctrl = new AbortController()
       const to = window.setTimeout(() => ctrl.abort(), 12000)
@@ -130,7 +151,7 @@ async function draw() {
         throw new Error(text.trim().slice(0, 160) || `kroki 返回 ${res.status}`)
       }
       if (mine !== seq) return
-      svg.value = text
+      svg.value = normalizeSvg(text)
     }
   } catch (e: any) {
     if (mine !== seq) return
