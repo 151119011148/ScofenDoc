@@ -25,6 +25,7 @@ import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
 import HeadingNumber from '../extensions/HeadingNumber'
+import TabIndent from '../extensions/TabIndent'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
 import TableTools from './TableTools.vue'
@@ -883,6 +884,8 @@ onMounted(() => {
         provider,
         user: { name: props.userName, color: props.userColor },
       }),
+      // 放最后：列表缩进、表格跳格、斜杠菜单确认都优先，只有剩下的普通文本块才轮到「空两格」
+      TabIndent,
     ],
     content: '',
     editable: props.editable,
@@ -1108,7 +1111,7 @@ function onContentClick(e: MouseEvent) {
         <div class="num-dd">
           <button
             :class="['num-main', { active: barState.numbered }]"
-            title="标题自动编号：当前标题切换 1 / 1.1 序号"
+            title="标题 + 有序编号：当前标题切换 1 / 1.1；在列表项里会把该项转为独立编号标题"
             @mousedown.prevent
             @click="toggleCurrentNumber"
           >№</button>

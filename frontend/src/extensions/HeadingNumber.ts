@@ -84,7 +84,7 @@ export const HeadingNumber = Extension.create({
     return {
       toggleHeadingNumber:
         (value?: boolean) =>
-        ({ tr, dispatch }) => {
+        ({ tr, dispatch, commands }) => {
           const headingType = tr.doc.type.schema.nodes.heading
           if (!headingType) return false
 
@@ -108,11 +108,28 @@ export const HeadingNumber = Extension.create({
               })
             }
           } else if (next) {
-            // 光标在普通段落里点「编号标题」：直接变成二级标题，不用先手动设标题再开编号
-            const d = $from.depth
-            if (d > 0 && $from.parent.isTextblock) {
-              tr.setBlockType($from.before(d), $from.after(d), headingType, {
-                ...$from.parent.attrs,
+            // 光标在列表项里时，listItem 的首子节点必须是 paragraph：直接在里面
+            // 换成 heading 会被 ProseMirror 判为非法结构并整块拆出去，命令返回 true
+            // 却什么都没发生（用户点「编号标题」没反应就是这里）。
+            // 所以先把这一项提升成顶层文本块，再转成带编号的标题。
+            const listItemType = tr.doc.type.schema.nodes.listItem
+            let inListItem = false
+            if (listItemType) {
+              for (let d = $from.depth - 1; d > 0; d--) {
+                if ($from.node(d).type === listItemType) {
+                  inListItem = true
+                  break
+                }
+              }
+            }
+            if (inListItem) commands.liftListItem(listItemType)
+
+            // lift 之后选区位置会变，必须重新从 tr 取，不能沿用上面的旧 $from
+            const $at = tr.selection.$from
+            const d = $at.depth
+            if (d > 0 && $at.parent.isTextblock) {
+              tr.setBlockType($at.before(d), $at.after(d), headingType, {
+                ...$at.parent.attrs,
                 level: 2,
                 numbered: true,
               })

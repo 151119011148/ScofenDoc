@@ -72,8 +72,8 @@ const linkInput = ref<HTMLInputElement | null>(null)
 const commentDraft = ref('')
 const commentInput = ref<HTMLTextAreaElement | null>(null)
 
+/** 字体颜色色板（飞书式色块；「恢复默认」单独放底部） */
 const COLOR_SWATCHES = [
-  { name: '默认', value: '' },
   { name: '红', value: '#f54a45' },
   { name: '橙', value: '#ff8800' },
   { name: '黄', value: '#f5c400' },
@@ -84,8 +84,8 @@ const COLOR_SWATCHES = [
   { name: '灰', value: '#8f959e' },
 ]
 
-/** 上次用过的颜色：色板上加个角标，方便一眼看出「现在续的是哪个色」 */
-const recentColor = ref(getLastColor())
+/* 最近一次用过的颜色见下方「状态」区块：它挂在同一份 tick 上，
+ * 编辑器写入记忆色后横线会自动跟着变，不会出现「横线是蓝的、点下去却是红的」。 */
 
 /** 工具栏/面板内按下鼠标不能抢走正文选区，否则点一下就丢选 */
 function keepSelection(e: MouseEvent) {
@@ -274,6 +274,18 @@ function onKeyDown(e: KeyboardEvent) {
 
 const tick = ref(0)
 
+/**
+ * 上次用过的颜色（＝飞书 A 按钮下面那根横线的颜色）。
+ *
+ * 用 computed 而不是 ref：颜色不只由本组件写入，编辑器在「光标落进有色文字」
+ * 时也会更新记忆色（applyColorMemory）。挂在 tick 上就能跟着每次 transaction
+ * 自动刷新，横线、色板角标、A 的一键上色永远指向同一个颜色。
+ */
+const recentColor = computed(() => (void tick.value, getLastColor()))
+const recentColorName = computed(
+  () => COLOR_SWATCHES.find((c) => c.value === recentColor.value)?.name ?? '自定义',
+)
+
 const headingLabel = computed(() => {
   void tick.value
   const e = props.editor
@@ -310,7 +322,7 @@ const colorValue = computed(() => {
 const PANEL_HEIGHT: Record<string, number> = {
   heading: 280,
   list: 200,
-  color: 118,
+  color: 150,
   link: 70,
   more: 220,
   comment: 232,
@@ -328,7 +340,6 @@ const panelUp = computed(() => {
 function togglePanel(p: typeof panel.value) {
   const next = panel.value === p ? '' : p
   panel.value = next
-  if (next === 'color') recentColor.value = getLastColor()
   if (next === 'link') {
     const href = (props.editor?.getAttributes('link').href as string) || ''
     linkUrl.value = href
@@ -367,6 +378,17 @@ function setList(kind: 'bullet' | 'ordered' | 'task') {
   panel.value = ''
 }
 
+/**
+ * 飞书式「一键上色」：单击 A 直接把上次选的颜色刷到选区上。
+ * 第一次用（还没有记忆色）时退化成打开色板，避免点一下毫无反应。
+ * 想换颜色点右侧的 ▾，不影响记忆色被重复使用的路径。
+ */
+function applyRecentColor() {
+  const remembered = getLastColor()
+  if (!remembered) return togglePanel('color')
+  applyColor(remembered)
+}
+
 function applyColor(value: string) {
   const e = props.editor
   if (!e) return
@@ -374,7 +396,6 @@ function applyColor(value: string) {
   else e.chain().focus().setColor(value).run()
   // 记住这次的选择：紧接着敲的字自动用同一个颜色，不用再点一次色板
   setLastColor(value)
-  recentColor.value = value
   panel.value = ''
   tick.value++
 }
@@ -411,7 +432,6 @@ function clearFormat() {
     .run()
   // 清格式连记忆一起清，否则后面每段都会被上一次的颜色续上
   setLastColor('')
-  recentColor.value = ''
   panel.value = ''
   tick.value++
 }
@@ -786,13 +806,29 @@ defineExpose({ openThread, closeThread })
 
       <span class="sel-sep" />
 
-      <button :class="{ on: panel === 'color' || !!colorValue }" title="字体颜色" @mousedown="keepSelection" @click="togglePanel('color')">
-        <span class="ic-color">
-          <span>A</span>
-          <span class="cbar" :style="{ background: colorValue || '#1f2329' }" />
-        </span>
-        <span class="chev">▾</span>
-      </button>
+      <!-- 字体颜色（飞书式拆分按钮）：单击 A = 直接刷上次的颜色；▾ = 换颜色 -->
+      <span class="color-dd">
+        <button
+          :class="{ on: panel === 'color' || !!colorValue }"
+          :title="recentColor ? `单击应用上次颜色：${recentColorName}（点 ▾ 换颜色）` : '字体颜色（首次请选一个颜色）'"
+          @mousedown="keepSelection"
+          @click="applyRecentColor"
+        >
+          <span class="ic-color">
+            <span>A</span>
+            <span class="cbar" :style="{ background: recentColor || colorValue || '#1f2329' }" />
+          </span>
+        </button>
+        <button
+          class="color-caret"
+          :class="{ on: panel === 'color' }"
+          title="选择其他颜色 / 恢复默认"
+          @mousedown="keepSelection"
+          @click="togglePanel('color')"
+        >
+          <span class="chev">▾</span>
+        </button>
+      </span>
       <button :class="{ on: panel === 'more' }" title="更多" @mousedown="keepSelection" @click="togglePanel('more')">⋯</button>
       <button :class="{ on: hasComment || panel === 'comment' }" title="评论" @mousedown="keepSelection" @click="openComment">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
@@ -836,26 +872,29 @@ defineExpose({ openThread, closeThread })
       </button>
       <span class="sel-sep-line" />
       <button class="sel-item" :class="{ on: isNumbered }" @mousedown="keepSelection" @click="toggleHeadingNumber">
-        <span class="sel-ic">№</span>编号标题（保留标题 + 有序）
+        <span class="sel-ic">№</span>标题 + 有序编号（1 / 1.1）
       </button>
     </div>
 
-    <!-- 颜色 -->
+    <!-- 颜色：只有点 ▾ 才展开；日常改色单击 A 一步完成 -->
     <div v-if="panel === 'color'" class="sel-panel sel-colors">
-      <button
-        v-for="c in COLOR_SWATCHES"
-        :key="c.name"
-        class="swatch"
-        :title="c.value && c.value === recentColor ? `${c.name}（上次使用，继续输入会自动沿用）` : c.name"
-        :style="{ background: c.value || '#ffffff' }"
-        :class="{
-          on: (colorValue || '') === c.value,
-          none: !c.value,
-          recent: !!c.value && c.value === recentColor,
-        }"
-        @mousedown="keepSelection"
-        @click="applyColor(c.value)"
-      />
+      <div class="sel-colors-title">字体颜色</div>
+      <div class="sel-colors-grid">
+        <button
+          v-for="c in COLOR_SWATCHES"
+          :key="c.name"
+          class="swatch"
+          :title="c.value === recentColor ? `${c.name}（上次使用，点 A 可直接复用）` : c.name"
+          :style="{ background: c.value }"
+          :class="{
+            on: (colorValue || '') === c.value,
+            recent: c.value === recentColor,
+          }"
+          @mousedown="keepSelection"
+          @click="applyColor(c.value)"
+        />
+      </div>
+      <button class="sel-colors-reset" @mousedown="keepSelection" @click="applyColor('')">恢复默认</button>
     </div>
 
     <!-- 链接 -->

@@ -544,6 +544,13 @@ body {
 }
 .ProseMirror pre code { background: none; padding: 0; color: inherit; }
 .ProseMirror ul, .ProseMirror ol { padding-left: 24px; }
+/* 有序列表序号用品牌蓝：与文档树章节号、编号标题的 1 / 1.1 同一支颜色。
+   只作用于 ::marker，列表项里的正文颜色不变；嵌套 ol 同样生效。 */
+.ProseMirror ol > li::marker {
+  color: var(--brand);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .ProseMirror hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
 
 /* 正文配图：存档文章一张图常占满宽度，别让它撑破版心 */
@@ -906,6 +913,10 @@ body {
 .sel-bar .ic-color { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .sel-bar .ic-color > span:first-child { font-size: 13px; line-height: 1; }
 .sel-bar .cbar { width: 13px; height: 3px; border-radius: 1px; display: block; }
+/* 颜色拆成「A 一键上色」＋「▾ 换颜色」两个按钮，横线常驻显示上次的颜色 */
+.sel-bar .color-dd { display: inline-flex; align-items: center; gap: 0; }
+.sel-bar .color-dd > button:first-child { min-width: 28px; padding: 0 2px; }
+.sel-bar .color-dd .color-caret { min-width: 15px; padding: 0 1px 0 0; }
 .sel-bar .list-ico { display: inline-flex; flex-direction: column; gap: 2px; width: 14px; }
 .sel-bar .list-ico i { display: block; height: 1.6px; border-radius: 1px; background: currentColor; }
 .sel-bar .list-ico i:nth-child(1) { width: 70%; }
@@ -969,12 +980,33 @@ body {
 .sel-sep-line { display: block; height: 1px; background: var(--line); margin: 4px 6px; }
 
 .sel-colors {
-  display: grid;
-  grid-template-columns: repeat(5, 26px);
-  gap: 6px;
-  padding: 8px;
+  display: block;
+  padding: 9px 10px 10px;
   min-width: 0;
 }
+.sel-colors-title {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 0 2px 9px;
+}
+.sel-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 26px);
+  gap: 8px;
+}
+.sel-colors-reset {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin-top: 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.sel-colors-reset:hover { border-color: var(--brand); color: var(--brand); }
 .swatch {
   width: 26px;
   height: 26px;
@@ -982,21 +1014,6 @@ body {
   border: 1px solid rgba(31, 35, 41, 0.12);
   cursor: pointer;
   padding: 0;
-}
-.swatch.none {
-  position: relative;
-  background: #fff !important;
-  overflow: hidden;
-}
-.swatch.none::after {
-  content: "";
-  position: absolute;
-  left: -3px;
-  top: 11px;
-  width: 32px;
-  height: 1.5px;
-  background: #f54a45;
-  transform: rotate(-45deg);
 }
 .swatch:hover { transform: scale(1.1); }
 .swatch.on { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--brand); }
