@@ -31,6 +31,7 @@ import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
 import TableTools from './TableTools.vue'
 import { getLastColor, setLastColor } from '../colorMemory'
+import { setLastHeading } from '../headingMemory'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { COLLAB_URL } from '../config'
@@ -127,16 +128,25 @@ const TABLE_PRESETS = [
   { rows: 6, cols: 8, label: '6×8', hint: '宽表：6 行 8 列' },
 ]
 
+/**
+ * 斜杠菜单设标题：顺手记住级别，之后正文里选中别的行，
+ * 浮动工具条的标题主键点一下就套用这个级别，不用每次都翻菜单。
+ */
+function markHeading(level: 1 | 2 | 3 | 4 | 5 | 6, c: ChainedCommands) {
+  setLastHeading(level)
+  return c.toggleHeading({ level })
+}
+
 const SLASH_GROUPS: SlashGroup[] = [
   {
     name: '基础',
     items: [
-      { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => c.toggleHeading({ level: 1 }) },
-      { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => c.toggleHeading({ level: 2 }) },
-      { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => c.toggleHeading({ level: 3 }) },
-      { key: 'h4', label: '四级标题', hint: '四级小节', icon: 'H4', keywords: 'h4 siji biaoti title', run: (c) => c.toggleHeading({ level: 4 }) },
-      { key: 'h5', label: '五级标题', hint: '五级小节', icon: 'H5', keywords: 'h5 wuji biaoti title', run: (c) => c.toggleHeading({ level: 5 }) },
-      { key: 'h6', label: '六级标题', hint: '最深一级', icon: 'H6', keywords: 'h6 liuji biaoti title', run: (c) => c.toggleHeading({ level: 6 }) },
+      { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => markHeading(1, c) },
+      { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => markHeading(2, c) },
+      { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => markHeading(3, c) },
+      { key: 'h4', label: '四级标题', hint: '四级小节', icon: 'H4', keywords: 'h4 siji biaoti title', run: (c) => markHeading(4, c) },
+      { key: 'h5', label: '五级标题', hint: '五级小节', icon: 'H5', keywords: 'h5 wuji biaoti title', run: (c) => markHeading(5, c) },
+      { key: 'h6', label: '六级标题', hint: '最深一级', icon: 'H6', keywords: 'h6 liuji biaoti title', run: (c) => markHeading(6, c) },
       { key: 'hnum', label: '有序标题', hint: '标题 + 有序序号 1 / 1.1', icon: '№', keywords: 'youxu biaoti bianhao heading number 有序 编号', run: (c) => c.toggleHeadingNumber(true, 'ordered') },
       { key: 'hbullet', label: '无序标题', hint: '标题 + 层级符号 ● ○ ■', icon: '●', keywords: 'wuxu biaoti heading bullet unordered 无序 符号', run: (c) => c.toggleHeadingNumber(true, 'unordered') },
       { key: 'bullet', label: '无序列表', hint: '圆点列表', icon: '•', keywords: 'wuxu liebiao list bullet ul', run: (c) => c.toggleBulletList() },
@@ -362,6 +372,20 @@ const barState = computed(() => {
       : '',
   }
 })
+
+/**
+ * 顶部格式栏设标题：顺手记住级别，选中工具条的标题主键随后就能一键复用。
+ *
+ * 顶部栏本身是切换按钮（点亮再点回正文），所以保留 toggleHeading 的手感；
+ * 记忆跟着「这一下之后是什么」走 —— 转成标题就记住级别，退回正文就记正文。
+ */
+function applyBarHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
+  const e = editor.value
+  if (!e) return
+  const turningOn = !e.isActive('heading', { level })
+  e.chain().focus().toggleHeading({ level }).run()
+  setLastHeading(turningOn ? level : 0)
+}
 
 function toggleCurrentNumber() {
   editor.value?.chain().focus().toggleHeadingNumber().run()
@@ -1126,8 +1150,8 @@ function onContentClick(e: MouseEvent) {
 
         <span class="bar-sep" />
 
-        <button :class="{ active: barState.h1 }" @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
-        <button :class="{ active: barState.h2 }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
+        <button :class="{ active: barState.h1 }" @click="applyBarHeading(1)">H1</button>
+        <button :class="{ active: barState.h2 }" @click="applyBarHeading(2)">H2</button>
 
         <!-- 标题前缀：有序 1 / 1.1 与无序 ● ○ ■ 两种样式，▾ 里可全文切换 -->
         <div class="num-dd">

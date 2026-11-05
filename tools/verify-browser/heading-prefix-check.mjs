@@ -138,7 +138,8 @@ for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight')
 await page.keyboard.up('Shift')
 await sleep(450)
 await page.waitForSelector('.sel-bar', { timeout: 10000 })
-await page.click('.sel-bar button[title="标题"]')
+// 标题按钮已拆成「主键一键套用 + ▾ 换级别」，打开面板要点 ▾
+await page.click('.heading-dd .heading-caret')
 await page.waitForSelector('.sel-panel', { timeout: 5000 })
 const panel = await page.evaluate(() => ({
   text: document.querySelector('.sel-panel')?.textContent || '',

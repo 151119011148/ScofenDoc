@@ -929,10 +929,13 @@ body {
 .sel-bar .ic-color { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .sel-bar .ic-color > span:first-child { font-size: 13px; line-height: 1; }
 .sel-bar .cbar { width: 13px; height: 3px; border-radius: 1px; display: block; }
-/* 颜色拆成「A 一键上色」＋「▾ 换颜色」两个按钮，横线常驻显示上次的颜色 */
-.sel-bar .color-dd { display: inline-flex; align-items: center; gap: 0; }
-.sel-bar .color-dd > button:first-child { min-width: 28px; padding: 0 2px; }
-.sel-bar .color-dd .color-caret { min-width: 15px; padding: 0 1px 0 0; }
+/* 颜色 / 标题都用「主键一键套用上次的样式」＋「▾ 换样式」两个按钮 */
+.sel-bar .color-dd,
+.sel-bar .heading-dd { display: inline-flex; align-items: center; gap: 0; }
+.sel-bar .color-dd > button:first-child,
+.sel-bar .heading-dd > button:first-child { min-width: 28px; padding: 0 3px; }
+.sel-bar .color-dd .color-caret,
+.sel-bar .heading-dd .heading-caret { min-width: 15px; padding: 0 1px 0 0; }
 .sel-bar .list-ico { display: inline-flex; flex-direction: column; gap: 2px; width: 14px; }
 .sel-bar .list-ico i { display: block; height: 1.6px; border-radius: 1px; background: currentColor; }
 .sel-bar .list-ico i:nth-child(1) { width: 70%; }
@@ -993,6 +996,17 @@ body {
   font-weight: 600;
 }
 .sel-item.on .sel-ic { color: var(--brand); }
+/* 「上次使用」的角标：色板用色格描边，这里用一枚小胶囊，位置在同一行右端 */
+.sel-last {
+  margin-left: auto;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--text-3);
+  background: #eef0f3;
+  border-radius: 8px;
+}
+.sel-item.on .sel-last { background: #d9e6ff; color: var(--brand); }
 .sel-sep-line { display: block; height: 1px; background: var(--line); margin: 4px 6px; }
 
 .sel-colors {

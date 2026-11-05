@@ -170,7 +170,7 @@ out.linkApplied = await page.$$eval('.ProseMirror a', (els) => els.map((e) => ({
 // 6) 标题下拉：选中「丙段落」→ 二级标题
 await selectText('丙段落')
 await page.waitForSelector('.sel-bar', { timeout: 4000 })
-await page.click('.sel-bar button[title="标题"]')
+await page.click('.heading-dd .heading-caret')
 await page.waitForSelector('.sel-panel', { timeout: 3000 })
 await page.screenshot({ path: 'bubble-3-heading.png', clip: { x: 0, y: Math.max(0, out.barRect.top - 160), width: 900, height: 480 } })
 await page.evaluate(() => {

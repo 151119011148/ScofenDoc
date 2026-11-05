@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 import type * as Y from 'yjs'
 import { getLastColor, setLastColor } from '../colorMemory'
+import { getLastHeading, headingName, headingShort, setLastHeading } from '../headingMemory'
 
 /**
  * 选中文字后的浮动格式条（对标飞书/Notion 的 bubble toolbar）。
@@ -295,6 +296,30 @@ const headingLabel = computed(() => {
   }
   return 'T'
 })
+
+/**
+ * 上次用过的标题级别（＝工具条标题按钮主键会刷成的级别）。
+ *
+ * 和 recentColor 一样挂在 tick 上：面板里点一次、顶部格式栏按一下，都会刷新，
+ * 主键的标签与高亮始终跟着「这一下点了会变成什么」走。
+ */
+const recentHeading = computed(() => (void tick.value, getLastHeading()))
+/** 主键上显示的文字：有记忆时显示「将要刷成」的级别，没记忆时退回当前级别 */
+const headingTarget = computed(() =>
+  recentHeading.value === null ? headingLabel.value : headingShort(recentHeading.value),
+)
+/** 选区当前已经是记忆级别（点了也不会有变化，用高亮点出来） */
+const headingApplied = computed(() => {
+  const level = recentHeading.value
+  if (level === null) return false
+  return headingLabel.value === headingShort(level)
+})
+const headingTip = computed(() => {
+  const level = recentHeading.value
+  if (level === null) return '标题（首次请先选一个级别）'
+  if (headingApplied.value) return `当前已是${headingName(level)}，点 ▾ 换级别`
+  return `单击套用上次的${headingName(level)}（点 ▾ 换级别）`
+})
 /** 当前标题的前缀样式：'' 表示没开编号 */
 const headingNumberStyle = computed(() => {
   void tick.value
@@ -359,12 +384,34 @@ function togglePanel(p: typeof panel.value) {
   }
 }
 
+/**
+ * 设置标题级别并记进「上次使用的级别」。
+ *
+ * 注意这里用 setHeading / setParagraph 而不是 toggleHeading：
+ * 主键要做的是「套用上次格式」，同一级别再点一次应当保持不变（幂等），
+ * 不能因为已经是二级标题就把选区打回正文 —— 取消标题请走面板里的「正文」。
+ */
 function setHeading(level: number) {
   const e = props.editor
   if (!e) return
   if (level === 0) e.chain().focus().setParagraph().run()
-  else e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+  else e.chain().focus().setHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+  setLastHeading(level)
   panel.value = ''
+  tick.value++
+}
+
+/**
+ * 飞书式「一键套用」：单击标题按钮直接把上次用的级别刷到选区上。
+ * 第一次用（还没有记忆）时退化成打开面板，避免点一下毫无反应。
+ */
+function applyRecentHeading() {
+  const level = getLastHeading()
+  if (level === null) {
+    togglePanel('heading')
+    return
+  }
+  setHeading(level)
 }
 
 /**
@@ -772,16 +819,26 @@ defineExpose({ openThread, closeThread })
     :style="{ left: barPos.left + 'px', top: barPos.top + 'px' }"
   >
     <div ref="barEl" class="sel-bar">
-      <button
-        class="wide"
-        :class="{ on: panel === 'heading' }"
-        title="标题"
-        @mousedown="keepSelection"
-        @click="togglePanel('heading')"
-      >
-        <span class="dd-label">{{ headingLabel }}</span>
-        <span class="chev">▾</span>
-      </button>
+      <!-- 标题（飞书式拆分按钮）：单击 = 直接刷上次的级别；▾ = 换级别 -->
+      <span class="heading-dd">
+        <button
+          :class="{ on: panel === 'heading' || headingApplied }"
+          :title="headingTip"
+          @mousedown="keepSelection"
+          @click="applyRecentHeading"
+        >
+          <span class="dd-label">{{ headingTarget }}</span>
+        </button>
+        <button
+          class="heading-caret"
+          :class="{ on: panel === 'heading' }"
+          title="选择其他标题级别 / 正文"
+          @mousedown="keepSelection"
+          @click="togglePanel('heading')"
+        >
+          <span class="chev">▾</span>
+        </button>
+      </span>
 
       <button
         class="wide"
@@ -855,6 +912,7 @@ defineExpose({ openThread, closeThread })
     <div v-if="panel === 'heading'" class="sel-panel">
       <button class="sel-item" :class="{ on: headingLabel === 'T' }" @mousedown="keepSelection" @click="setHeading(0)">
         <span class="sel-ic">¶</span>正文
+        <span v-if="recentHeading === 0" class="sel-last">上次</span>
       </button>
       <button
         v-for="lv in [1, 2, 3, 4, 5, 6]"
@@ -866,6 +924,7 @@ defineExpose({ openThread, closeThread })
       >
         <span class="sel-ic" :style="{ fontSize: 17 - lv + 'px' }">H{{ lv }}</span>
         {{ ['一级标题', '二级标题', '三级标题', '四级标题', '五级标题', '六级标题'][lv - 1] }}
+        <span v-if="recentHeading === lv" class="sel-last">上次</span>
       </button>
       <span class="sel-sep-line" />
       <button

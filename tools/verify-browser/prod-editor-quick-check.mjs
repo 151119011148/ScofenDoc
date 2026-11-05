@@ -159,7 +159,7 @@ const palette = await page.evaluate(() => ({
 }))
 check('色板为「字体颜色」8 色 + 恢复默认', palette.swatches === 8 && palette.reset && palette.title === '字体颜色', JSON.stringify(palette))
 /* 选区标题面板：六级入口 + 有序 / 无序两种前缀 */
-await page.click('.sel-bar button[title="标题"]')
+await page.click('.heading-dd .heading-caret')
 await page.waitForSelector('.sel-panel', { timeout: 5000 })
 const hPanel = await page.evaluate(() => document.querySelector('.sel-panel')?.textContent || '')
 check(
