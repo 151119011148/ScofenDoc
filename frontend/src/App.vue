@@ -11,6 +11,7 @@ import AdminUsersModal from './components/AdminUsersModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import CreateSpaceModal from './components/CreateSpaceModal.vue'
 import MembersModal from './components/MembersModal.vue'
+import FindReplacePanel from './components/FindReplacePanel.vue'
 import type { Editor } from '@tiptap/core'
 import {
   api,
@@ -153,6 +154,8 @@ function resetSidebarWidth() {
 const mainScroller = ref<HTMLElement | null>(null)
 const outlineEditor = shallowRef<Editor | null>(null)
 const outlineRefresh = ref(0)
+/** 全文查找替换面板：只在文档视图、编辑器就绪时可用 */
+const findOpen = ref(false)
 
 function onEditorReady(ed: unknown) {
   outlineEditor.value = (ed as unknown as Editor) ?? null
@@ -902,6 +905,14 @@ function onGlobalKeydown(e: KeyboardEvent) {
     return
   }
 
+  // Ctrl/Cmd+F 全文查找替换：浏览器原生查找在长文里只能滚到可见处、不能替换
+  if (key === 'f' && !e.shiftKey) {
+    if (view.value !== 'doc' || !outlineEditor.value) return
+    e.preventDefault()
+    findOpen.value = true
+    return
+  }
+
   if (key !== 'z' && key !== 'y') return
   // 正文有 Yjs 自己的撤销栈（按文档、跨端一致），这里只管文档树这类元数据操作
   if (isTypingTarget(e.target)) return
@@ -1007,6 +1018,11 @@ watch(
   (doc) => ensureCollabToken(doc),
   { immediate: true },
 )
+
+// 切文档 / 切视图时收起面板：命中位置属于上一份正文，留着会跳到错误的地方
+watch([currentDocId, view], () => {
+  findOpen.value = false
+})
 
 watch(error, (v) => {
   if (v) setTimeout(() => (error.value = ''), 6000)
@@ -1275,6 +1291,12 @@ boot()
       v-if="showAdminUsers"
       :current-user-id="session.user.id"
       @close="showAdminUsers = false"
+    />
+
+    <FindReplacePanel
+      v-if="findOpen && view === 'doc' && outlineEditor"
+      :editor="outlineEditor"
+      @close="findOpen = false"
     />
 
     <div v-if="error" class="toast error">{{ error }}</div>
