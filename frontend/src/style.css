@@ -1476,6 +1476,61 @@ body {
   background: #f2f6ff;
 }
 .outline-act:disabled { opacity: 0.35; cursor: default; }
+/* 多选批量条：选中才出现，粘在列表上方，不随列表滚走 */
+.outline-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #eef4ff;
+  border-bottom: 1px solid #dbe6fb;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.ob-count {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--brand);
+}
+.ob-acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ob-btn {
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid #cfdcf5;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ob-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: #f7faff;
+}
+.ob-btn:disabled { opacity: 0.4; cursor: default; }
+/* 多选中的条目：底色比「当前所在章节」更深一档，两者同时存在也能分辨 */
+.outline-item.sel {
+  background: #e8efff;
+  color: var(--text);
+  border-left-color: #9dbcf0;
+}
+.outline-item.sel.on {
+  background: #dbe7ff;
+  color: var(--brand);
+  border-left-color: var(--brand);
+}
 /* 平板等无悬停设备：直接常驻，否则点不到 */
 @media (hover: none) {
   .outline-acts { display: flex; }
