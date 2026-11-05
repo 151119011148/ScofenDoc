@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -102,8 +103,10 @@ public class DocumentService {
 
     public List<DocDto> listDocs(Long workspaceId, Long userId) {
         membership.requireView(workspaceId, userId);
-        return docRepo.findByWorkspaceIdAndDeletedFalseOrderBySortOrderAscIdAsc(workspaceId)
-                .stream().map(this::toDto).toList();
+        List<Doc> all = docRepo.findByWorkspaceIdAndDeletedFalseOrderBySortOrderAscIdAsc(workspaceId);
+        // 一次算完整棵树的章节号，前端拿到就能直接渲染，不必自己再拼一遍
+        Map<Long, String> numbers = DocNumbers.of(all);
+        return all.stream().map(d -> toDto(d, numbers.get(d.getId()))).toList();
     }
 
     public DocDto getDoc(Long id, Long userId) {
@@ -111,11 +114,11 @@ public class DocumentService {
     }
 
     /**
-     * 跨空间搜索文档标题。q 为空时退化成"最近更新"，主页直接复用这个接口。
+     * 跨空间搜索文档标题 / 章节号。q 为空时退化成"最近更新"，主页直接复用这个接口。
      *
      * 只搜索「我加入的空间」，权限判定和列表一致，不会因为搜索绕过成员表。
-     * 正文是 Yjs 二进制，没有全文索引，所以这里只匹配标题 —— 与其做个搜不到
-     * 正文的假全文搜索，不如把标题搜索做准。
+     * 正文是 Yjs 二进制，没有全文索引，所以这里只匹配标题；纯数字查询额外匹配
+     * 派生章节号（搜 1.1 会命中该章及其子文档），补上清理手写编号后的按号检索。
      */
     public List<DocHitDto> searchDocs(String q, int limit, Long userId) {
         List<Long> ids = memberRepo.findByUserId(userId).stream()
@@ -131,11 +134,25 @@ public class DocumentService {
         var nameOf = new java.util.HashMap<Long, String>();
         workspaceRepo.findAllById(ids).forEach(w -> nameOf.put(w.getId(), w.getName()));
 
-        return docRepo.findByWorkspaceIdInAndDeletedFalseOrderByUpdatedAtDesc(ids).stream()
-                .filter(d -> kw.isEmpty() || (d.getTitle() != null && d.getTitle().toLowerCase().contains(kw)))
+        // 搜索本来就查了全部可见文档：直接用这批数据算编号，不用为每个结果再查一次树
+        List<Doc> all = docRepo.findByWorkspaceIdInAndDeletedFalseOrderByUpdatedAtDesc(ids);
+        Map<Long, String> numbers = DocNumbers.of(all);
+
+        // 标题里手写的章节号清理掉之后，纯数字查询就直接匹配派生编号：
+        // 搜「1.1」仍能找到该章节及其子文档，不会因为编号不落库而搜不到。
+        boolean chapterQuery = kw.matches("\\d+(\\.\\d+)*");
+
+        return all.stream()
+                .filter(d -> {
+                    if (kw.isEmpty()) return true;
+                    if (d.getTitle() != null && d.getTitle().toLowerCase().contains(kw)) return true;
+                    if (!chapterQuery) return false;
+                    String n = numbers.get(d.getId());
+                    return n != null && (n.equals(kw) || n.startsWith(kw + "."));
+                })
                 .limit(cap)
                 .map(d -> new DocHitDto(
-                        d.getId(), d.getTitle(), d.getWorkspaceId(),
+                        d.getId(), d.getTitle(), numbers.get(d.getId()), d.getWorkspaceId(),
                         nameOf.getOrDefault(d.getWorkspaceId(), ""), d.getParentId(), d.getUpdatedAt()))
                 .toList();
     }
@@ -321,9 +338,19 @@ public class DocumentService {
         return false;
     }
 
+    /**
+     * 单篇返回（get / 新建 / 改名 / 移动）也要带上章节号。
+     * 移动会同时改掉兄弟节点的 sortOrder，所以必须按「当前库里的最新结构」重算，
+     * 不能用移动前的旧位置——否则刚拖完返回的那一篇编号是错的。
+     */
     private DocDto toDto(Doc d) {
+        List<Doc> all = docRepo.findByWorkspaceIdAndDeletedFalseOrderBySortOrderAscIdAsc(d.getWorkspaceId());
+        return toDto(d, DocNumbers.of(all).get(d.getId()));
+    }
+
+    private DocDto toDto(Doc d, String number) {
         return new DocDto(d.getId(), d.getWorkspaceId(), d.getParentId(),
-                d.getTitle(), d.getCollabKey(), d.getSortOrder(), d.getUpdatedAt());
+                d.getTitle(), number, d.getCollabKey(), d.getSortOrder(), d.getUpdatedAt());
     }
 
     private WorkspaceDto toDto(Workspace w, WorkspaceMember.Role role, long memberCount) {

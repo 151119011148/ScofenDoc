@@ -19,6 +19,8 @@ export interface Doc {
   workspaceId: number
   parentId: number | null
   title: string
+  /** 派生章节号（1 / 1.1 / 1.1.1），后端按树结构实时算，不落库；拖动后自动变 */
+  number?: string
   collabKey: string
   sortOrder: number
   updatedAt: string
@@ -28,6 +30,8 @@ export interface Doc {
 export interface DocHit {
   id: number
   title: string
+  /** 同 Doc.number，跨空间时按各自空间单独编号 */
+  number?: string
   workspaceId: number
   workspaceName: string
   parentId: number | null

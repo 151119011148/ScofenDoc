@@ -210,6 +210,24 @@ body {
   white-space: nowrap;
 }
 
+/* ---- 章节号前缀（1 / 1.1 / 1.1.1）----
+   蓝色、等宽数字；它只是派生出来的显示层文本，不进 title、不参与搜索与重命名。
+   拖动改层级/顺序后由后端重新计算，前端各处（树、面包屑、标题栏、搜索结果）统一渲染。 */
+.doc-no {
+  color: var(--brand);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.tree-no { font-size: 12px; margin-right: 3px; letter-spacing: -0.2px; }
+/* 选中/激活行本身是蓝字蓝底，前缀再深一档才分得出来 */
+.tree-row.active .doc-no,
+.tree-row.selected .doc-no { color: #245bdb; }
+.ctx-no { margin-right: 4px; }
+.hit-no { margin-right: 6px; }
+.crumb-no { margin-right: 4px; }
+
 /* 行内只留窄屏的「⋯」，桌面端操作走右键菜单（常驻删除图标太扎眼） */
 .tree-row .actions {
   display: none;
@@ -362,6 +380,14 @@ body {
 .crumb-link:disabled { cursor: default; }
 .crumb-link.last { color: var(--text-2); font-weight: 500; }
 
+/* 标题行：蓝色章节号 + 可编辑的纯标题（输入框里不含编号，改标题不会把编号写进去） */
+.title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.doc-no-lg { font-size: 24px; line-height: 1.25; }
+
 .title-input {
   width: 100%;
   border: none;
@@ -372,6 +398,7 @@ body {
   padding: 2px 0 6px;
   outline: none;
 }
+.title-line .title-input { flex: 1; min-width: 0; }
 .title-input::placeholder { color: #c9cdd4; }
 .title-input:focus { border-bottom: 1px solid var(--line); }
 
@@ -2451,6 +2478,7 @@ body {
   .crumb .sep { flex: 0 0 auto; }
   .crumb-link { max-width: 46vw; flex: 0 0 auto; }
   .title-input { font-size: 20px; padding-bottom: 8px; }
+  .doc-no-lg { font-size: 20px; }
   .doc-actions { gap: 6px; }
   .doc-actions button { height: 32px; }
 

@@ -34,6 +34,7 @@ function segments(title: string): { text: string; hit: boolean }[] {
       <span class="hit-icon">📄</span>
       <span class="hit-main">
         <span class="hit-title">
+          <span v-if="hit.number" class="doc-no hit-no">{{ hit.number }}</span>
           <template v-for="(seg, i) in segments(hit.title)" :key="i">
             <mark v-if="seg.hit">{{ seg.text }}</mark>
             <template v-else>{{ seg.text }}</template>

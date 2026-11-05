@@ -317,8 +317,12 @@ function syncViewport(e?: MediaQueryListEvent) {
 /** 手机上没有「折叠成窄条」这回事，永远是完整抽屉 */
 const railCollapsed = computed(() => sidebarCollapsed.value && !isMobile.value)
 
-/** 手机顶栏标题：优先当前文档，其次空间名 */
-const mobileTitle = computed(() => currentDoc.value?.title || currentSpace.value?.name || 'scofenDoc')
+/** 手机顶栏标题：优先当前文档（带章节号），其次空间名 */
+const mobileTitle = computed(() => {
+  const doc = currentDoc.value
+  if (doc) return `${doc.number ? doc.number + ' ' : ''}${doc.title}`
+  return currentSpace.value?.name || 'scofenDoc'
+})
 
 function closeNav() {
   if (isMobile.value) {
@@ -462,6 +466,28 @@ async function loadDocs(spaceId: number, preferDocId?: number | null) {
   currentDocId.value = next?.id ?? docs.value.find((d) => d.parentId === null)?.id ?? null
   titleDraft.value = currentDoc.value?.title ?? ''
   syncUrl()
+  // 搜索结果 / 主页最近文档也带派生编号，树结构变了要一起刷新
+  void refreshHits()
+}
+
+/**
+ * 列表里的编号同样是派生的：新建、拖动、删除、撤销之后重拉一次，
+ * 免得搜索页/主页还挂着上一次算出来的旧号。
+ */
+async function refreshHits() {
+  if (view.value === 'home') {
+    loadRecent()
+    return
+  }
+  if (view.value !== 'search') return
+  const kw = searchQuery.value.trim()
+  if (!kw) return
+  try {
+    const res = await api.searchDocs(kw, 30)
+    if (searchQuery.value.trim() === kw) searchResults.value = res
+  } catch (e) {
+    showError(e)
+  }
 }
 
 /* ---------- URL 同步（可分享、可刷新） ---------- */
@@ -1106,19 +1132,22 @@ boot()
                     :disabled="node.id === currentDoc.id"
                     @click="selectDoc(node)"
                   >
-                    {{ node.title }}
+                    <span v-if="node.number" class="doc-no crumb-no">{{ node.number }}</span>{{ node.title }}
                   </button>
                 </template>
                 <span v-if="!canWrite" class="crumb-ro">仅查看</span>
               </div>
-              <input
-                v-model="titleDraft"
-                class="title-input"
-                placeholder="无标题文档"
-                :disabled="!canWrite"
-                @blur="saveTitle"
-                @keyup.enter="($event.target as HTMLInputElement).blur()"
-              />
+              <div class="title-line">
+                <span v-if="currentDoc.number" class="doc-no doc-no-lg">{{ currentDoc.number }}</span>
+                <input
+                  v-model="titleDraft"
+                  class="title-input"
+                  placeholder="无标题文档"
+                  :disabled="!canWrite"
+                  @blur="saveTitle"
+                  @keyup.enter="($event.target as HTMLInputElement).blur()"
+                />
+              </div>
               <div class="doc-actions">
                 <button
                   v-if="isTeam"

@@ -473,6 +473,9 @@ onBeforeUnmount(() => {
 
       <span class="doc-icon">📄</span>
 
+      <!-- 章节号由后端按层级派生：拖动改层级/顺序后重新拉列表就会自动重算 -->
+      <span v-if="row.doc.number" class="doc-no tree-no">{{ row.doc.number }}</span>
+
       <input
         v-if="editingId === row.doc.id"
         v-model="editingTitle"
@@ -517,7 +520,8 @@ onBeforeUnmount(() => {
         :style="{ left: menuPos.x + 'px', top: menuPos.y + 'px' }"
         @contextmenu.prevent
       >
-        <div class="ctx-title" :title="menu.doc.title">
+        <div class="ctx-title" :title="menu.batch ? `已选 ${menu.batch.length} 篇` : menu.doc.title">
+          <span v-if="!menu.batch && menu.doc.number" class="doc-no ctx-no">{{ menu.doc.number }}</span>
           {{ menu.batch ? `已选 ${menu.batch.length} 篇` : menu.doc.title }}
         </div>
         <button class="ctx-item" @click="onMenuPick('child')">
