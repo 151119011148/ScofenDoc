@@ -31,6 +31,8 @@ const replaceMode = ref(false)
 const hits = ref<Hit[]>([])
 const active = ref(0)
 const tip = ref('')
+/** 只读空间只给查找：替换按钮留着会让人以为能改 */
+const canEdit = ref(true)
 const queryEl = ref<HTMLInputElement>()
 const replaceEl = ref<HTMLInputElement>()
 
@@ -161,6 +163,7 @@ function flash(msg: string) {
 }
 
 function replaceOne() {
+  if (!canEdit.value) return
   const ed = props.editor
   const hit = hits.value[active.value]
   if (!ed || !hit) return
@@ -170,6 +173,7 @@ function replaceOne() {
 }
 
 function replaceAll() {
+  if (!canEdit.value) return
   const ed = props.editor
   if (!ed || !hits.value.length) return
   const total = hits.value.length
@@ -236,6 +240,8 @@ function bindEditor(ed: Editor | null) {
       },
     },
   })
+  canEdit.value = ed.isEditable
+  canEdit.value = ed.isEditable
   ed.registerPlugin(plugin)
   const handler = () => onDocUpdate()
   ed.on('update', handler)
@@ -288,11 +294,19 @@ nextTick(() => queryEl.value?.focus())
       >
         Aa
       </button>
-      <button class="fr-ic" :class="{ on: replaceMode }" title="替换" @click="toggleReplace">⇄</button>
+      <button
+        v-if="canEdit"
+        class="fr-ic"
+        :class="{ on: replaceMode }"
+        title="替换"
+        @click="toggleReplace"
+      >
+        ⇄
+      </button>
       <button class="fr-ic" title="关闭（Esc）" @click="emit('close')">✕</button>
     </div>
 
-    <div v-if="replaceMode" class="fr-row">
+    <div v-if="canEdit && replaceMode" class="fr-row">
       <span class="fr-ic fr-static" aria-hidden="true">→</span>
       <input
         ref="replaceEl"
