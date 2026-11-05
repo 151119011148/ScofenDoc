@@ -13,6 +13,7 @@ import Color from '@tiptap/extension-color'
 import * as Y from 'yjs'
 import HeadingNumber from './extensions/HeadingNumber'
 import HeadingFold from './extensions/HeadingFold'
+import ListItemHeading from './extensions/ListItemHeading'
 import TabIndent from './extensions/TabIndent'
 import SelectionToolbar from './components/SelectionToolbar.vue'
 
@@ -23,7 +24,8 @@ let instance: Editor | null = null
 onMounted(() => {
   instance = new Editor({
     extensions: [
-      StarterKit.configure({ history: false }),
+      StarterKit.configure({ history: false, listItem: false }),
+      ListItemHeading,
       Underline,
       TextStyle,
       Color,

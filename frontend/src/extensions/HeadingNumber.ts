@@ -7,10 +7,11 @@ import type { Node as PMNode } from '@tiptap/pm/model'
  * 标题前缀：让同一个块既是标题、又带前缀（1 / 1.1 / 1.1.1，或 ● ○ ■ □ ◆ ◇）。
  *
  * 为什么不复用 orderedList：
- *   heading 和 listItem 在 ProseMirror schema 里是互斥的块类型，toggleOrderedList
- *   会把标题降级成普通段落。这里给 heading 加 numbered / numberStyle 属性（存进文档、
- *   随 Yjs 同步），前缀本身不落库、由装饰派生 —— 中间插入/删除标题时后面所有编号
- *   自动跟着变，协同两端算出来的结果也永远一致。
+ *   heading 和 listItem 在默认 ProseMirror schema 里互斥（ListItem 首子必须是
+ *   paragraph，点有序列表会把标题降级）。项目里用 ListItemHeading 放宽了这个
+ *   限制，让 H1 能真正留在 ol/ul 里；这里则给**独立标题**加前缀 —— 两条路径
+ *   都能让「标题 + 有序/无序」同时存在。前缀本身不落库、由装饰派生，中间
+ *   插入/删除标题时后面所有编号自动跟着变，协同两端算出来的结果也永远一致。
  *
  * 两种前缀：
  *   ordered   按层级计数，1 / 1.1 / 1.1.1 ... 最深 6 段（H6 → 1.1.1.1.1.1）。
@@ -31,7 +32,7 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     headingNumber: {
       /**
-       * 切换选区内标题的前缀；没有标题时把当前块转成二级编号标题。
+       * 切换选区内标题的前缀；没有标题时把当前块转成一级编号标题（H1）。
        * style 只在开启时写入，省略则沿用标题原有样式（旧文档默认有序）。
        */
       toggleHeadingNumber: (value?: boolean, style?: HeadingNumberStyle) => ReturnType
@@ -120,13 +121,13 @@ export const HeadingNumber = Extension.create({
     return {
       toggleHeadingNumber:
         (value?: boolean, style?: HeadingNumberStyle) =>
-        ({ tr, dispatch, commands }) => {
+        ({ tr, dispatch }) => {
           const headingType = tr.doc.type.schema.nodes.heading
           if (!headingType) return false
 
           // 注意用 tr.doc / tr.selection：斜杠菜单是「先删除 /xxx 再执行命令」的 chain，
           // 此时 state 还是删除前的旧文档，拿旧位置会写错节点。
-          const { from, to, $from } = tr.selection
+          const { from, to } = tr.selection
           const hits: { pos: number; node: PMNode }[] = []
           tr.doc.nodesBetween(from, to, (node, pos) => {
             if (node.type === headingType) hits.push({ pos, node })
@@ -148,34 +149,45 @@ export const HeadingNumber = Extension.create({
               })
             }
           } else if (next) {
-            // 光标在列表项里时，listItem 的首子节点必须是 paragraph：直接在里面
-            // 换成 heading 会被 ProseMirror 判为非法结构并整块拆出去，命令返回 true
-            // 却什么都没发生（用户点「编号标题」没反应就是这里）。
-            // 所以先把这一项提升成顶层文本块，再转成带编号的标题。
-            const listItemType = tr.doc.type.schema.nodes.listItem
-            let inListItem = false
-            if (listItemType) {
-              for (let d = $from.depth - 1; d > 0; d--) {
-                if ($from.node(d).type === listItemType) {
-                  inListItem = true
-                  break
-                }
-              }
-            }
-            if (inListItem) commands.liftListItem(listItemType)
-
-            // lift 之后选区位置会变，必须重新从 tr 取，不能沿用上面的旧 $from
+            // 光标在普通段落里点「有序/无序标题」：直接升成 H1 并带前缀，
+            // 不再默认 H2 —— 用户要的是 H1 与有序/无序同时存在，先转成 H2
+            // 再手动改级别这一步会「看起来没生效」。已有标题则走上面的 hits
+            // 分支，一律保留原 level。
+            //
+            // 如果这一段在 listItem 里也不 lift：ListItemHeading 已放宽 content，
+            // 就地换成 heading 能保住列表归属，蓝色 1. / ● 由 ::marker 提供，
+            // 不会和标题前缀重复（build() 只给顶层标题派生前缀）。
             const $at = tr.selection.$from
             const d = $at.depth
             if (d > 0 && $at.parent.isTextblock) {
               tr.setBlockType($at.before(d), $at.after(d), headingType, {
                 ...$at.parent.attrs,
-                level: 2,
+                level: 1,
                 numbered: true,
                 numberStyle: style ?? 'ordered',
               })
             } else {
               return false
+            }
+          }
+
+          // 若这个标题落在列表项里，按所选样式同步列表类型：点「无序标题」不该
+          // 还留着 ol 的数字。只切换最内层所在的那个列表，嵌套外层不动。
+          if (style) {
+            const targetList =
+              style === 'unordered'
+                ? tr.doc.type.schema.nodes.bulletList
+                : tr.doc.type.schema.nodes.orderedList
+            const $p = tr.selection.$from
+            if (targetList) {
+              for (let depth = $p.depth - 1; depth > 0; depth--) {
+                const n = $p.node(depth)
+                if (n.type.name !== 'orderedList' && n.type.name !== 'bulletList') continue
+                if (n.type !== targetList) {
+                  tr.setNodeMarkup(tr.mapping.map($p.before(depth)), targetList, { start: 1 })
+                }
+                break
+              }
             }
           }
           return true

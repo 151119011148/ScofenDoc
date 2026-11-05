@@ -113,7 +113,9 @@ check('标题带 1 / 1.1 / 1.2 / 1.2.1 有序编号', JSON.stringify(nums) === J
 const numColor = await page.$eval('.ProseMirror h1[data-number]', (el) => getComputedStyle(el, '::before').color)
 check('编号标题序号同为品牌蓝', numColor === BLUE, numColor)
 
-/* 有序列表项里点「编号标题」：修复前命令返回成功却毫无变化 */
+/* 有序列表项里点「编号标题」：修复前命令返回成功却毫无变化；
+   ListItemHeading 放宽 schema 后就地升成 H1 并留在列表里，
+   蓝色 1. 由 ::marker 提供，标题本身不再重复显示第二套前缀。 */
 await page.evaluate(() => {
   const ed = window.ed
   ed.commands.setContent('<h1>第一章</h1><ol><li><p>列表项一</p></li><li><p>列表项二</p></li></ol>')
@@ -126,10 +128,15 @@ await page.evaluate(() => {
 })
 await sleep(150)
 const promoted = await page.evaluate(() => {
-  const h = [...document.querySelectorAll('.ProseMirror h2')].find((el) => el.textContent.includes('列表项一'))
-  return { tag: h?.tagName || '', num: h?.getAttribute('data-number') || '', html: window.ed.getHTML() }
+  const h = [...document.querySelectorAll('.ProseMirror li > h1')].find((el) => el.textContent.includes('列表项一'))
+  return {
+    tag: h?.tagName || '',
+    inList: !!h?.closest('li'),
+    numbered: h?.getAttribute('data-numbered') || '',
+    html: window.ed.getHTML(),
+  }
 })
-check('列表项点「编号标题」真的生效（不再静默失效）', promoted.tag === 'H2' && !!promoted.num, JSON.stringify(promoted))
+check('列表项点「编号标题」就地升为 H1 且保留列表', promoted.tag === 'H1' && promoted.inList && promoted.numbered === '1', JSON.stringify(promoted))
 
 /* ---------- 4) 颜色：先选一次，之后单击 A 一步上色 ---------- */
 async function dragSelect(text, width = 70) {

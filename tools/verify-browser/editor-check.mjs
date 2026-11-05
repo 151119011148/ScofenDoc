@@ -65,7 +65,8 @@ check('编号写进 heading attrs（可随 Yjs 同步）', attrs?.numbered === t
 const html = await page.evaluate(() => window.ed.getHTML())
 check('HTML 输出带 data-numbered（粘贴/导出可还原）', html.includes('data-numbered="1"'))
 
-/* 2b) 普通段落上开编号标题：块仍要是标题，且直接带上序号（斜杠菜单 / 浮动条走这条路） */
+/* 2b) 普通段落上开编号标题：块仍要是标题，且直接带上序号（斜杠菜单 / 浮动条走这条路）。
+   默认级别从 H2 改成 H1：用户要的是 H1 与有序/无序共存。 */
 await page.evaluate(() => {
   const ed = window.ed
   let p = -1
@@ -75,11 +76,11 @@ await page.evaluate(() => {
 })
 await sleep(150)
 const promoted = await page.evaluate(() => {
-  const hs = [...document.querySelectorAll('.ProseMirror h2')]
+  const hs = [...document.querySelectorAll('.ProseMirror h1')]
   const hit = hs.find((h) => h.textContent.includes('正文一段'))
   return hit ? { tag: hit.tagName, num: hit.getAttribute('data-number') } : null
 })
-check('段落直接转「编号标题」', promoted?.tag === 'H2' && !!promoted?.num, JSON.stringify(promoted))
+check('段落直接转「编号标题」（H1）', promoted?.tag === 'H1' && !!promoted?.num, JSON.stringify(promoted))
 
 /* 3) 光标进表格，浮动条出现并显示行列数 */
 await page.evaluate(() => {

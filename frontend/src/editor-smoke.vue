@@ -8,6 +8,7 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import HeadingNumber from './extensions/HeadingNumber'
 import HeadingFold from './extensions/HeadingFold'
+import ListItemHeading from './extensions/ListItemHeading'
 import TableTools from './components/TableTools.vue'
 
 const editor = ref<Editor>()
@@ -16,7 +17,8 @@ let instance: Editor | null = null
 onMounted(() => {
   instance = new Editor({
     extensions: [
-      StarterKit.configure({ history: false }),
+      StarterKit.configure({ history: false, listItem: false }),
+      ListItemHeading,
       HeadingFold,
       HeadingNumber,
       Table.configure({ resizable: false }),

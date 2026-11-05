@@ -25,6 +25,7 @@ import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
 import HeadingNumber from '../extensions/HeadingNumber'
+import ListItemHeading from '../extensions/ListItemHeading'
 import TabIndent from '../extensions/TabIndent'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
@@ -866,7 +867,9 @@ onMounted(() => {
       // 使用 Yjs 协同时必须关闭 Tiptap 自带 history（冲突解决交给 CRDT）
       // codeBlock 交给下面的 DiagramCodeBlock：节点名不变，只换渲染层，
       // 这样粘贴进来的 flowchart / sequenceDiagram 代码块能直接出图
-      StarterKit.configure({ history: false, codeBlock: false }),
+      // listItem 换成允许标题的版本：H1 与有序/无序列表可以同时存在
+      StarterKit.configure({ history: false, codeBlock: false, listItem: false }),
+      ListItemHeading,
       DiagramCodeBlock,
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -1130,7 +1133,7 @@ function onContentClick(e: MouseEvent) {
         <div class="num-dd">
           <button
             :class="['num-main', { active: barState.numbered }]"
-            title="标题前缀：当前标题开关（有序 1 / 1.1 或无序 ● ○ ■）；列表项里会把该项转为独立标题"
+            title="标题前缀：当前标题开关（有序 1 / 1.1 或无序 ● ○ ■）；列表项里会就地升为 H1 并留在列表中"
             @mousedown.prevent
             @click="toggleCurrentNumber"
           >№</button>
