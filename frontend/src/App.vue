@@ -160,7 +160,15 @@ function onEditorReady(ed: unknown) {
     const mo = new MutationObserver(() => {
       outlineRefresh.value++
     })
-    mo.observe(dom, { childList: true, subtree: true, characterData: true })
+    // attributes 只盯标题编号/折叠这两个属性：编号开关是纯属性变化，
+    // 不监听 childList 感知不到；全开 attributes 又会被协同光标等高频 class 刷屏
+    mo.observe(dom, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['data-number', 'data-fold', 'data-numbered'],
+    })
   }
 }
 

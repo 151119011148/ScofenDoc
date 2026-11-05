@@ -38,11 +38,17 @@ function collect(): Item[] {
   for (const h of heads) {
     // 跳过折叠后隐藏的标题（其祖先带 fold-hidden）
     if (h.closest('.fold-hidden')) continue
-    const text = (h.textContent || '').replace(/\s+/g, ' ').trim()
+    // 标题里的折叠三角是装饰节点，不该出现在大纲文字里
+    const copy = h.cloneNode(true) as HTMLElement
+    copy.querySelectorAll('.fold-caret').forEach((n) => n.remove())
+    const text = (copy.textContent || '').replace(/\s+/g, ' ').trim()
     if (!text) continue
+    // 开了自动编号的标题，正文里的序号由 CSS 伪元素显示（不在 textContent 里），
+    // 大纲这里补上，保持「1 / 1.1」与正文一致
+    const num = h.getAttribute('data-number') || ''
     list.push({
       level: Number(h.tagName.charAt(1)),
-      text,
+      text: num ? `${num} ${text}` : text,
       el: h,
     })
   }

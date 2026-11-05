@@ -290,6 +290,8 @@ const isUnderline = computed(() => (void tick.value, !!props.editor?.isActive('u
 const isCode = computed(() => (void tick.value, !!props.editor?.isActive('code')))
 const hasLink = computed(() => (void tick.value, !!props.editor?.isActive('link')))
 const hasComment = computed(() => (void tick.value, !!props.editor?.isActive('comment')))
+/** 当前标题是否开了自动编号（标题 + 有序共存） */
+const isNumbered = computed(() => (void tick.value, !!props.editor?.isActive('heading', { numbered: true })))
 const listKind = computed(() => {
   void tick.value
   const e = props.editor
@@ -306,8 +308,8 @@ const colorValue = computed(() => {
 
 /** 各面板大致高度：用来判断上方空间够不够（不够就向下展开） */
 const PANEL_HEIGHT: Record<string, number> = {
-  heading: 250,
-  list: 150,
+  heading: 280,
+  list: 200,
   color: 118,
   link: 70,
   more: 220,
@@ -347,6 +349,13 @@ function setHeading(level: number) {
   if (level === 0) e.chain().focus().setParagraph().run()
   else e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 }).run()
   panel.value = ''
+}
+
+/** 标题自动编号：保留标题层级，同时给它 1 / 1.1 这类有序序号 */
+function toggleHeadingNumber() {
+  props.editor?.chain().focus().toggleHeadingNumber().run()
+  panel.value = ''
+  tick.value++
 }
 
 function setList(kind: 'bullet' | 'ordered' | 'task') {
@@ -808,6 +817,10 @@ defineExpose({ openThread, closeThread })
         <span class="sel-ic" :style="{ fontSize: 15 - lv + 'px' }">H{{ lv }}</span>
         {{ ['一级标题', '二级标题', '三级标题', '四级标题'][lv - 1] }}
       </button>
+      <span class="sel-sep-line" />
+      <button class="sel-item" :class="{ on: isNumbered }" @mousedown="keepSelection" @click="toggleHeadingNumber">
+        <span class="sel-ic">№</span>标题自动编号（1 / 1.1）
+      </button>
     </div>
 
     <!-- 列表 -->
@@ -820,6 +833,10 @@ defineExpose({ openThread, closeThread })
       </button>
       <button class="sel-item" :class="{ on: listKind === 'task' }" @mousedown="keepSelection" @click="setList('task')">
         <span class="sel-ic">☑</span>待办清单
+      </button>
+      <span class="sel-sep-line" />
+      <button class="sel-item" :class="{ on: isNumbered }" @mousedown="keepSelection" @click="toggleHeadingNumber">
+        <span class="sel-ic">№</span>编号标题（保留标题 + 有序）
       </button>
     </div>
 

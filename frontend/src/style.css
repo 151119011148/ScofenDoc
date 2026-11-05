@@ -2678,3 +2678,161 @@ body {
   font-size: 13px;
   line-height: 1.7;
 }
+
+/* ============ 标题自动编号（标题 + 有序共存） ============
+ * 序号由 HeadingNumber 的装饰写进 data-number，不进文档正文：
+ * 复制文字不会带序号，大纲/锚点/折叠照旧工作。
+ */
+.ProseMirror h1[data-number]::before,
+.ProseMirror h2[data-number]::before,
+.ProseMirror h3[data-number]::before,
+.ProseMirror h4[data-number]::before,
+.ProseMirror h5[data-number]::before,
+.ProseMirror h6[data-number]::before {
+  content: attr(data-number);
+  display: inline-block;
+  margin-right: 0.4em;
+  font-size: 0.86em;
+  font-weight: 600;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+/* 格式栏上的「标题编号」按钮 + 全文开关下拉 */
+.num-dd {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.collab .bar .num-dd .num-caret {
+  min-width: 18px;
+  padding: 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+.num-dd-menu {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 350;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 236px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.12);
+}
+.num-dd-menu button {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: #fff;
+  border-radius: 5px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--text);
+}
+.num-dd-menu button:hover { background: #eaf1ff; color: var(--brand); }
+.num-dd-tip {
+  padding: 7px 10px 4px;
+  margin-top: 3px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* ============ 表格操作：浮动条 + 右键菜单 ============ */
+.tbl-bar {
+  position: fixed;
+  z-index: 305;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: calc(100vw - 16px);
+  padding: 4px 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+.tbl-bar button {
+  flex: 0 0 auto;
+  height: 26px;
+  min-width: 34px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tbl-bar button:hover,
+.tbl-bar .tbl-more.on { background: #eaf1ff; color: var(--brand); }
+.tbl-size {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.tbl-sep { flex: 0 0 auto; width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
+
+.tbl-menu {
+  position: fixed;
+  z-index: 315;
+  width: 208px;
+  max-height: min(70vh, 470px);
+  overflow-y: auto;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+.tbl-group {
+  padding: 6px 10px 3px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.tbl-group:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.tbl-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.tbl-item:hover { background: var(--bg); color: var(--brand); }
+.tbl-item.danger { color: var(--danger); }
+.tbl-item.danger:hover { background: #fff1f0; color: var(--danger); }
+.tbl-ic { width: 14px; text-align: center; font-size: 13px; color: var(--text-3); }
+
+.ProseMirror table:hover { border-color: #c9d6f5; }
+
+@media (max-width: 768px) {
+  .tbl-size, .tbl-sep { display: none; }
+  .tbl-bar button { min-width: 32px; padding: 0 5px; font-size: 11px; }
+}

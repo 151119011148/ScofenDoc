@@ -24,8 +24,10 @@ import MermaidBlock from '../extensions/MermaidBlock'
 import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
+import HeadingNumber from '../extensions/HeadingNumber'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
+import TableTools from './TableTools.vue'
 import { getLastColor, setLastColor } from '../colorMemory'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
@@ -130,6 +132,7 @@ const SLASH_GROUPS: SlashGroup[] = [
       { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => c.toggleHeading({ level: 1 }) },
       { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => c.toggleHeading({ level: 2 }) },
       { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => c.toggleHeading({ level: 3 }) },
+      { key: 'hnum', label: '编号标题', hint: '标题 + 有序序号 1 / 1.1', icon: '№', keywords: 'bianhao biaoti heading number youxu 有序 编号', run: (c) => c.toggleHeadingNumber(true) },
       { key: 'bullet', label: '无序列表', hint: '圆点列表', icon: '•', keywords: 'wuxu liebiao list bullet ul', run: (c) => c.toggleBulletList() },
       { key: 'ordered', label: '有序列表', hint: '带编号列表', icon: '1.', keywords: 'youxu liebiao list ordered ol number', run: (c) => c.toggleOrderedList() },
       { key: 'task', label: '待办清单', hint: '可勾选的任务项', icon: '☑', keywords: 'daiban qingdan todo task checkbox', run: (c) => c.toggleTaskList() },
@@ -314,6 +317,62 @@ function scheduleColorMemory() {
       /* 文档正在被远端改动、位置失效时忽略即可 */
     }
   })
+}
+
+/* ---------------- 顶部格式栏状态 ----------------
+ * isActive() 不是响应式的：光标从正文挪进表格，Vue 不会自己重渲染，
+ * 于是「表格操作」按钮组常年不出现。用 transaction 计数驱动一次重算即可。
+ */
+
+const barTick = ref(0)
+const numMenuOpen = ref(false)
+
+const barState = computed(() => {
+  void barTick.value
+  const e = editor.value
+  if (!e || e.isDestroyed) {
+    return {
+      bold: false, italic: false, strike: false, underline: false, code: false,
+      h1: false, h2: false, bullet: false, ordered: false, task: false,
+      quote: false, table: false, numbered: false,
+    }
+  }
+  return {
+    bold: e.isActive('bold'),
+    italic: e.isActive('italic'),
+    strike: e.isActive('strike'),
+    underline: e.isActive('underline'),
+    code: e.isActive('code'),
+    h1: e.isActive('heading', { level: 1 }),
+    h2: e.isActive('heading', { level: 2 }),
+    bullet: e.isActive('bulletList'),
+    ordered: e.isActive('orderedList'),
+    task: e.isActive('taskList'),
+    quote: e.isActive('blockquote'),
+    table: e.isActive('table'),
+    numbered: e.isActive('heading', { numbered: true }),
+  }
+})
+
+function toggleCurrentNumber() {
+  editor.value?.chain().focus().toggleHeadingNumber().run()
+  numMenuOpen.value = false
+}
+
+function setAllNumbered(value: boolean) {
+  editor.value?.chain().focus().setAllHeadingsNumbered(value).run()
+  numMenuOpen.value = false
+}
+
+/** 点格式栏之外收起「全文编号」下拉 */
+function onGlobalDown(e: MouseEvent) {
+  if (!numMenuOpen.value) return
+  const t = e.target as HTMLElement | null
+  if (!t?.closest?.('.num-dd')) numMenuOpen.value = false
+}
+
+function onGlobalKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') numMenuOpen.value = false
 }
 
 /* ---------------- 顶部栏吸顶状态 ---------------- */
@@ -816,6 +875,8 @@ onMounted(() => {
       MermaidBlock,
       PlantUMLBlock,
       HeadingFold,
+      // 标题自动编号：标题块仍属 heading，只是多了 numbered 属性和派生序号
+      HeadingNumber,
       UndoRedoShortcuts,
       Collaboration.configure({ document: ydoc }),
       CollaborationCursor.configure({
@@ -877,7 +938,14 @@ onMounted(() => {
 
   emit('editor-ready', editor.value)
 
+  // 顶部格式栏的按钮状态（含「光标是否在表格里」）跟着每次 transaction 重算
+  editor.value.on('transaction', () => {
+    barTick.value++
+  })
+
   document.addEventListener('scroll', onAnyScroll, true)
+  document.addEventListener('mousedown', onGlobalDown, true)
+  document.addEventListener('keydown', onGlobalKey)
 
   // 顶部格式栏吸顶：正文滚动容器是 .main，贴上边缘时给它加投影
   barScrollHost = (barEl.value?.closest('.main') as HTMLElement | null) ?? null
@@ -900,6 +968,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateBarStuck)
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mousedown', onDocMouseMove)
+  document.removeEventListener('mousedown', onGlobalDown, true)
+  document.removeEventListener('keydown', onGlobalKey)
   window.removeEventListener('mouseout', onWindowMouseOut)
   cancelPlusHide()
   if (plusRecheckTimer) window.clearTimeout(plusRecheckTimer)
@@ -1013,39 +1083,58 @@ function onContentClick(e: MouseEvent) {
       <template v-if="editable">
         <span class="bar-sep" />
 
-        <button :class="{ active: editor?.isActive('bold') }" title="加粗" @click="editor?.chain().focus().toggleBold().run()">
+        <button :class="{ active: barState.bold }" title="加粗" @click="editor?.chain().focus().toggleBold().run()">
           <b>B</b>
         </button>
-        <button :class="{ active: editor?.isActive('italic') }" title="斜体" @click="editor?.chain().focus().toggleItalic().run()">
+        <button :class="{ active: barState.italic }" title="斜体" @click="editor?.chain().focus().toggleItalic().run()">
           <i>I</i>
         </button>
-        <button :class="{ active: editor?.isActive('strike') }" title="删除线" @click="editor?.chain().focus().toggleStrike().run()">
+        <button :class="{ active: barState.strike }" title="删除线" @click="editor?.chain().focus().toggleStrike().run()">
           <s>S</s>
         </button>
-        <button :class="{ active: editor?.isActive('underline') }" title="下划线" @click="editor?.chain().focus().toggleUnderline().run()">
+        <button :class="{ active: barState.underline }" title="下划线" @click="editor?.chain().focus().toggleUnderline().run()">
           <u>U</u>
         </button>
-        <button :class="{ active: editor?.isActive('code') }" title="行内代码" @click="editor?.chain().focus().toggleCode().run()">
+        <button :class="{ active: barState.code }" title="行内代码" @click="editor?.chain().focus().toggleCode().run()">
           &lt;/&gt;
         </button>
 
         <span class="bar-sep" />
 
-        <button :class="{ active: editor?.isActive('heading', { level: 1 }) }" @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
-        <button :class="{ active: editor?.isActive('heading', { level: 2 }) }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
-        <button :class="{ active: editor?.isActive('bulletList') }" title="无序列表" @click="editor?.chain().focus().toggleBulletList().run()">•</button>
-        <button :class="{ active: editor?.isActive('orderedList') }" title="有序列表" @click="editor?.chain().focus().toggleOrderedList().run()">1.</button>
-        <button :class="{ active: editor?.isActive('taskList') }" title="待办清单" @click="editor?.chain().focus().toggleTaskList().run()">☑</button>
-        <button :class="{ active: editor?.isActive('blockquote') }" title="引用" @click="editor?.chain().focus().toggleBlockquote().run()">❝</button>
+        <button :class="{ active: barState.h1 }" @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
+        <button :class="{ active: barState.h2 }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
 
-        <!-- 光标在表格里才出现的表格操作，避免常驻挤占工具栏 -->
-        <template v-if="editor?.isActive('table')">
+        <!-- 标题自动编号：标题 + 有序序号同时生效；▾ 里可一键给全文标题编号 -->
+        <div class="num-dd">
+          <button
+            :class="['num-main', { active: barState.numbered }]"
+            title="标题自动编号：当前标题切换 1 / 1.1 序号"
+            @mousedown.prevent
+            @click="toggleCurrentNumber"
+          >№</button>
+          <button class="num-caret" title="全文标题编号" @mousedown.prevent @click="numMenuOpen = !numMenuOpen">▾</button>
+          <div v-if="numMenuOpen" class="num-dd-menu">
+            <button @mousedown.prevent @click="setAllNumbered(true)">全文开启标题编号</button>
+            <button @mousedown.prevent @click="setAllNumbered(false)">全文关闭标题编号</button>
+            <span class="num-dd-tip">标题与有序编号可同时生效：1 / 1.1 / 1.1.1</span>
+          </div>
+        </div>
+
+        <button :class="{ active: barState.bullet }" title="无序列表" @click="editor?.chain().focus().toggleBulletList().run()">•</button>
+        <button :class="{ active: barState.ordered }" title="有序列表" @click="editor?.chain().focus().toggleOrderedList().run()">1.</button>
+        <button :class="{ active: barState.task }" title="待办清单" @click="editor?.chain().focus().toggleTaskList().run()">☑</button>
+        <button :class="{ active: barState.quote }" title="引用" @click="editor?.chain().focus().toggleBlockquote().run()">❝</button>
+
+        <!-- 光标在表格里才出现的快捷操作；完整行列操作见表格上方的浮动条 / 右键菜单 -->
+        <template v-if="barState.table">
           <span class="bar-sep" />
-          <button title="下方插入一行" @click="editor?.chain().focus().addRowAfter().run()">+行</button>
-          <button title="右侧插入一列" @click="editor?.chain().focus().addColumnAfter().run()">+列</button>
-          <button title="删除当前行" @click="editor?.chain().focus().deleteRow().run()">-行</button>
-          <button title="删除当前列" @click="editor?.chain().focus().deleteColumn().run()">-列</button>
-          <button title="删除整个表格" @click="editor?.chain().focus().deleteTable().run()">删表</button>
+          <button title="在上方插入一行" @mousedown.prevent @click="editor?.chain().focus().addRowBefore().run()">↑行</button>
+          <button title="在下方插入一行" @mousedown.prevent @click="editor?.chain().focus().addRowAfter().run()">↓行</button>
+          <button title="在左侧插入一列" @mousedown.prevent @click="editor?.chain().focus().addColumnBefore().run()">←列</button>
+          <button title="在右侧插入一列" @mousedown.prevent @click="editor?.chain().focus().addColumnAfter().run()">列→</button>
+          <button title="删除当前行" @mousedown.prevent @click="editor?.chain().focus().deleteRow().run()">删行</button>
+          <button title="删除当前列" @mousedown.prevent @click="editor?.chain().focus().deleteColumn().run()">删列</button>
+          <button title="删除整个表格" @mousedown.prevent @click="editor?.chain().focus().deleteTable().run()">删表</button>
         </template>
 
         <span class="bar-sep" />
@@ -1072,6 +1161,9 @@ function onContentClick(e: MouseEvent) {
       :user-name="userName"
       :user-color="userColor"
     />
+
+    <!-- 光标进表格才出现：上方浮动条 + 单元格右键菜单（行列增删改、合并拆分、删表） -->
+    <TableTools v-if="editor" :editor="editor" :editable="editable" />
 
     <!-- 斜杠菜单：position: fixed，坐标直接来自 coordsAtPos -->
     <div
