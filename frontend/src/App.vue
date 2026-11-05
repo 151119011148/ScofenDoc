@@ -283,6 +283,12 @@ async function onNavigate(payload: { spaceId: number; docId: number; anchor: str
     else if (currentSpaceId.value) await loadDocs(currentSpaceId.value, payload.docId)
   }
 
+  // 链接上的 space 标错、或干脆没带（有些老文档只写了 ?doc=）：
+  // 按 docId 反查真实空间再切一次，别静默停在当前空间的根文档
+  if (payload.docId > 0 && !docs.value.some((d) => d.id === payload.docId)) {
+    await switchToDocSpace(payload.docId)
+  }
+
   // selectDoc 会清掉锚点（用户手动选文档时不该带着旧锚点），所以放在它之后设置
   pendingAnchor.value = anchor
   syncUrl()
@@ -469,6 +475,39 @@ async function loadDocs(spaceId: number, preferDocId?: number | null) {
   syncUrl()
   // 搜索结果 / 主页最近文档也带派生编号，树结构变了要一起刷新
   void refreshHits()
+}
+
+/**
+ * 分享链接里可能只带 doc id，或带的 space 并不是这篇文档真正的空间
+ * （链接被转发、或自己先切到别的空间再粘链接）。
+ * 这时按 doc id 反查它所属空间：在自己的空间列表里就跟着切过去；
+ * 查不到（已删除 / 无权访问）就返回 null，交给上层走原有回落，
+ * 不要因为一条坏链接把人甩到别的空间去。
+ */
+async function resolveDocSpace(docId: number): Promise<number | null> {
+  try {
+    const d = await api.getDoc(docId)
+    return workspaces.value.some((w) => w.id === d.workspaceId) ? d.workspaceId : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 当前空间里没有这篇文档（链接只带了 doc id，或 space 参数是错的）时，
+ * 反查它真正的空间并切过去，返回是否真的切了。
+ * 切空间要连带清掉协同 token 与撤销栈 —— 它们都绑定在上一个空间的文档上。
+ */
+async function switchToDocSpace(docId: number): Promise<boolean> {
+  const spaceId = await resolveDocSpace(docId)
+  if (!spaceId || spaceId === currentSpaceId.value) return false
+  currentSpaceId.value = spaceId
+  currentDocId.value = null
+  collabToken.value = ''
+  collabKeyOfToken.value = ''
+  clearUndo()
+  await loadDocs(spaceId, docId)
+  return true
 }
 
 /**
@@ -927,7 +966,16 @@ async function boot() {
     // 校验本地 token 是否还有效，同时拿到最新用户信息（含 admin 标识）
     session.value = { ...session.value, user: await api.me() }
     await loadWorkspaces()
+    const urlDocId = Number(new URLSearchParams(location.search).get('doc'))
     if (currentSpaceId.value) await loadDocs(currentSpaceId.value)
+    // 分享链接里的文档不在当前空间：反查它真正的空间，切过去再加载一次。
+    // 否则 loadDocs 会静默回落到根文档，看着像"链接失效了"
+    if (wantsDoc && urlDocId && !docs.value.some((d) => d.id === urlDocId)) {
+      await switchToDocSpace(urlDocId)
+      if (!docs.value.some((d) => d.id === urlDocId)) {
+        error.value = '这篇文档不存在，或你已不在它所属的空间'
+      }
+    }
     if (!wantsDoc) {
       syncUrl()
       loadRecent()
