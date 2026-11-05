@@ -30,6 +30,7 @@ import TabIndent from '../extensions/TabIndent'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
 import TableTools from './TableTools.vue'
+import ImageLightbox from './ImageLightbox.vue'
 import { getLastColor, setLastColor } from '../colorMemory'
 import { setLastHeading } from '../headingMemory'
 import * as Y from 'yjs'
@@ -63,6 +64,9 @@ const props = withDefaults(
 const editor = ref<Editor>()
 const toolbarRef = ref<InstanceType<typeof SelectionToolbar> | null>(null)
 let provider: HocuspocusProvider | null = null
+
+/** 当前放大查看的正文配图；关掉即置空，组件自己 Teleport 到 body */
+const previewImage = ref<{ src: string; title: string } | null>(null)
 
 /** 顶部格式栏：吸顶后加个投影，让「已经贴上去了」有视觉反馈 */
 const barEl = ref<HTMLElement | null>(null)
@@ -1058,6 +1062,22 @@ function onAnyScroll(e: Event) {
 function onContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement | null
 
+  // 正文配图 → 全屏预览。必须放在链接处理前面：存档 HTML 里不少图片是
+  // 被 <a href="原图"> 包着的，不先拦住就会当成外链直接跳走。
+  // 只读态同样要能放大，所以不判断 editable。
+  const img = target?.closest?.('img') as HTMLImageElement | null
+  if (img && img.closest('.ProseMirror')) {
+    const src = img.currentSrc || img.getAttribute('src') || ''
+    if (src) {
+      e.preventDefault()
+      previewImage.value = {
+        src,
+        title: img.getAttribute('alt') || img.getAttribute('title') || '图片预览',
+      }
+      return
+    }
+  }
+
   // 点批注高亮 → 打开这条评论（正在拖选文字时不弹，避免选到一半被打断）
   const cmt = target?.closest?.('mark[data-comment-id]') as HTMLElement | null
   if (cmt && window.getSelection()?.isCollapsed) {
@@ -1213,6 +1233,14 @@ function onContentClick(e: MouseEvent) {
     </div>
 
     <EditorContent :editor="editor" class="content" @click="onContentClick" />
+
+    <!-- 单击正文配图放大：全屏预览层，Teleport 到 body，不影响编辑器布局 -->
+    <ImageLightbox
+      v-if="previewImage"
+      :src="previewImage.src"
+      :title="previewImage.title"
+      @close="previewImage = null"
+    />
 
     <!-- 选中文字后的浮动格式条（标题/列表/加粗/删除线/斜体/下划线/链接/代码/颜色/评论） -->
     <SelectionToolbar

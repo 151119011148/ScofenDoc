@@ -23,6 +23,7 @@ import {
   type Workspace,
 } from './api'
 import { clearUndo, pushUndo, redoOnce, undoOnce, undoState } from './undo'
+import { stickyTopGap } from './stickyGap'
 
 /* ---------- 会话 ---------- */
 const session = ref<Session | null>(loadSession())
@@ -234,7 +235,9 @@ function alignAnchor(want: string, rounds = 4) {
   if (!scroller || !dom) return
   const node = findAnchorNode(dom, want)
   if (node) {
-    const delta = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24
+    // 落点要避开吸顶格式栏：和 scrollToAnchor 用同一个基准
+    const gap = stickyTopGap(scroller)
+    const delta = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top - gap
     if (Math.abs(delta) > 40) scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + delta), behavior: 'auto' })
   }
   if (rounds > 1) setTimeout(() => alignAnchor(want, rounds - 1), 700)
@@ -249,7 +252,7 @@ function scrollToAnchor(anchor: string, tries = 0) {
   if (scroller && dom) {
     const hit = findAnchorNode(dom, want)
     if (hit) {
-      const top = scroller.scrollTop + hit.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24
+      const top = scroller.scrollTop + hit.getBoundingClientRect().top - scroller.getBoundingClientRect().top - stickyTopGap(scroller)
       scroller.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
       markAnchor(want)
       alignAnchor(want)
@@ -957,9 +960,13 @@ function logout() {
 /* ---------- 启动 ---------- */
 async function boot() {
   if (!session.value) return
+  const bootParams = new URLSearchParams(location.search)
   // 先按 URL 定视图，再加载数据：loadDocs 里的 syncUrl 会看当前 view 决定是否保留 doc 参数，
   // 顺序反了会把 ?doc= 冲掉，分享链接就退回主页了
-  const wantsDoc = !!new URLSearchParams(location.search).get('doc')
+  const wantsDoc = !!bootParams.get('doc')
+  // 锚点同样要提前存下来：loadDocs → selectDoc → syncUrl 会重写地址栏，
+  // 等到末尾再读 location.search 时 &h= 已经被清掉，带锚点的链接就再也不会定位
+  const bootAnchor = bootParams.get('h') || ''
   view.value = wantsDoc ? 'doc' : 'home'
   try {
     loading.value = true
@@ -981,9 +988,10 @@ async function boot() {
       loadRecent()
     } else {
       // 分享链接里带了锚点：等编辑器把协同正文拉回来再定位（scrollToAnchor 内部会重试）
-      const anchor = new URLSearchParams(location.search).get('h') || ''
+      const anchor = bootAnchor || pendingAnchor.value || ''
       if (anchor) {
         pendingAnchor.value = anchor
+        syncUrl()
         scrollToAnchor(anchor)
       }
     }

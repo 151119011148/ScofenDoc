@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
+import { stickyTopGap } from '../stickyGap'
 
 /**
  * 当前文档的章节大纲：扫描正文编辑器里的 H1–H3，生成可点击跳转的目录。
@@ -76,17 +77,14 @@ function offsetOf(el: HTMLElement): number {
 }
 
 /**
- * 跳转落点上方要留出的高度。
+ * 跳转落点上方要留出的高度 = 吸顶格式栏实测高度 + 呼吸位。
  *
- * 桌面就是一条呼吸留白（12px）；手机正文顶部有吸顶的编辑器工具栏，
- * 若只留 12px，标题第一行会被工具栏压住，所以由 CSS 变量 --jump-gap 给出更大值。
- * 数值只维护在 style.css 一处，这里只负责读。
+ * 桌面端格式栏 sticky 在 .main 顶部，宽屏一行、窄屏 flex-wrap 成两行，
+ * 高度会变；以前固定 12px，标题跳上去后正好被压在工具栏下面。
+ * 具体计算见 stickyGap.ts（站内 ?h= 锚点跳转共用同一套）。
  */
 function jumpGap(): number {
-  const scroller = props.scroller
-  if (!scroller) return 12
-  const v = parseFloat(getComputedStyle(scroller).getPropertyValue('--jump-gap'))
-  return Number.isFinite(v) ? v : 12
+  return stickyTopGap(props.scroller)
 }
 
 const empty = computed(() => items.value.length === 0)
@@ -309,7 +307,9 @@ function spy() {
   spyTimer = window.requestAnimationFrame(() => {
     spyTimer = undefined
     if (!props.scroller) return
-    const y = props.scroller.scrollTop + 80
+    // 判定线与跳转落点保持一致：都以吸顶栏下沿为基准，
+    // 否则点完大纲那一瞬会高亮到上一个标题
+    const y = props.scroller.scrollTop + stickyTopGap(props.scroller) + 4
     let cur = -1
     // 实时读位置：正文里的图/表渲染完成后高度会变，用刷新时的快照会高亮错位
     items.value.forEach((it, i) => {

@@ -549,10 +549,18 @@ body {
 }
 .ProseMirror pre code { background: none; padding: 0; color: inherit; }
 .ProseMirror ul, .ProseMirror ol { padding-left: 24px; }
-/* 有序 / 无序列表符号都用品牌蓝：与文档树章节号、编号标题的 1 / 1.1 同一支颜色。
-   只作用于 ::marker，列表项里的正文颜色不变；嵌套列表同样生效。 */
-.ProseMirror ul > li::marker,
-.ProseMirror ol > li::marker {
+/* 无序列表的圆点形状按层级固定下来：导入的存档 HTML 偶尔自带
+   list-style:none，不重新声明就只剩一段没有圆点的缩进文本。
+   任务列表用自己的复选框，必须排除，否则会多出一个圆点。 */
+.ProseMirror ul:not([data-type='taskList']) { list-style-type: disc; }
+.ProseMirror ul:not([data-type='taskList']) ul:not([data-type='taskList']) { list-style-type: circle; }
+.ProseMirror ul:not([data-type='taskList']) ul:not([data-type='taskList']) ul:not([data-type='taskList']) {
+  list-style-type: square;
+}
+/* 有序数字 / 无序圆点都用品牌蓝：与文档树章节号、编号标题的 1 / 1.1 同一支颜色。
+   只作用于 ::marker，列表项里的正文颜色不变；用后代 li 覆盖嵌套列表，
+   以及「列表项里放 H1–H6 标题」时由 li 提供的 marker。 */
+.ProseMirror :is(ul, ol):not([data-type='taskList']) li::marker {
   color: var(--brand);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -565,14 +573,18 @@ body {
 }
 .ProseMirror hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
 
-/* 正文配图：存档文章一张图常占满宽度，别让它撑破版心 */
+/* 正文配图：存档文章一张图常占满宽度，别让它撑破版心。
+   单击会打开全屏预览（见 ImageLightbox），用 zoom-in 明示可点。 */
 .ProseMirror img {
   max-width: 100%;
   height: auto;
   border-radius: 6px;
   margin: 18px auto;
   display: block;
+  cursor: zoom-in;
+  transition: box-shadow 0.16s ease;
 }
+.ProseMirror img:hover { box-shadow: 0 2px 14px rgba(31, 35, 41, 0.16); }
 .ProseMirror img.ProseMirror-selectednode {
   outline: 2px solid #3370ff;
   outline-offset: 2px;
@@ -1961,6 +1973,32 @@ body {
   pointer-events: none;
 }
 
+/* ============ 正文配图放大预览（沿用图表灯箱外壳） ============ */
+.image-lightbox .dlb-stage { display: flex; align-items: center; justify-content: center; }
+.ilb-img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  background: #fff;
+  user-select: none;
+  -webkit-user-drag: none;
+  cursor: grab;
+}
+.ilb-img:active { cursor: grabbing; }
+.ilb-msg {
+  color: #c7cbd1;
+  font-size: 14px;
+  line-height: 1.9;
+  text-align: center;
+  padding: 24px;
+}
+.ilb-msg b { display: block; color: #e8eaed; font-size: 16px; margin-bottom: 6px; }
+
 @media (max-width: 900px) {
   .sidebar { width: 220px; flex-basis: 220px; }
   .main { --main-top: 16px; padding: 16px 12px 32px; }
@@ -2893,8 +2931,10 @@ body {
 .ProseMirror h5[data-number] { padding-left: 40px; }
 .ProseMirror h6[data-number] { padding-left: 50px; }
 
-/* 无序符号是几何形状，比数字略大、右侧留白多一点才不挤 */
+/* 无序符号是几何形状，比数字略大、右侧留白多一点才不挤；
+   颜色跟有序数字一样统一品牌蓝（● ○ ■ □ ◆ ◇ 六层都算） */
 .ProseMirror :is(h1, h2, h3, h4, h5, h6)[data-number-kind='unordered']::before {
+  color: var(--brand);
   font-size: 1em;
   margin-right: 0.5em;
   letter-spacing: 0;
