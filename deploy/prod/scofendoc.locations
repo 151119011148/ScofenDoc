@@ -96,3 +96,16 @@ location = /lightdoc {
 location /lightdoc/ {
     rewrite ^/lightdoc/(.*)$ /scofendoc/$1 permanent;
 }
+
+# ----------------------------------------------------------------------------
+# 大小写兼容：/scofenDoc/ → /scofendoc/
+# 产品名写作 scofenDoc，手输地址时容易带大写 D；nginx 的 location 大小写敏感，
+# 不兜这一下就会 404。只做页面级重定向，WebSocket 端点仍走小写（客户端硬编码）。
+# ----------------------------------------------------------------------------
+location = /scofenDoc {
+    return 301 /scofendoc/;
+}
+
+location /scofenDoc/ {
+    rewrite ^/scofenDoc/(.*)$ /scofendoc/$1 permanent;
+}
