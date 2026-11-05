@@ -46,7 +46,8 @@ page.on('response', (r) => {
   if (r.status() >= 400 && !r.url().includes('favicon')) errors.push(`${r.status()} ${r.url().slice(0, 120)}`)
 })
 
-await page.goto(`${BASE}?space=2`, { waitUntil: 'domcontentloaded' })
+/* 落地页是主页，只有带 ?doc= 才进编辑器；这里直接给一篇三层文档 */
+await page.goto(`${BASE}?space=2&doc=22`, { waitUntil: 'domcontentloaded' })
 await page.evaluate((t) => {
   localStorage.setItem('scofendoc.token', t)
   localStorage.setItem('scofendoc.user', JSON.stringify({
@@ -56,12 +57,7 @@ await page.evaluate((t) => {
 await page.reload({ waitUntil: 'domcontentloaded' })
 await page.waitForSelector('.tree-row .tree-no', { timeout: 30000 })
 
-/* 打开一篇三层文档，确保协同正文渲染出来 */
-await page.evaluate(() => {
-  const row = [...document.querySelectorAll('.tree-row')]
-    .find((r) => r.querySelector('.tree-no')?.textContent.trim() === '1.1.1')
-  row?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-})
+/* 直接等这篇文档的协同正文渲染出来（不再点树里固定的编号——章节号会随树结构变） */
 await page.waitForSelector('.ProseMirror p', { timeout: 30000 })
 await sleep(1800)
 
