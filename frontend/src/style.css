@@ -210,11 +210,11 @@ body {
   white-space: nowrap;
 }
 
+/* 行内只留窄屏的「⋯」，桌面端操作走右键菜单（常驻删除图标太扎眼） */
 .tree-row .actions {
   display: none;
   gap: 2px;
 }
-.tree-row:hover .actions { display: flex; }
 .tree-row .actions button {
   border: none;
   background: none;
@@ -226,6 +226,72 @@ body {
   line-height: 1;
 }
 .tree-row .actions button:hover { background: #fff; color: var(--brand); }
+.tree-row .actions button.more { font-size: 15px; padding: 0 4px 3px; }
+.tree-row.menu-open { background: #eef2fb; }
+
+/* ---------- 右键菜单 ---------- */
+.ctx-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 399;
+}
+.ctx-menu {
+  position: fixed;
+  z-index: 400;
+  min-width: 172px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 20, 30, 0.14), 0 2px 6px rgba(15, 20, 30, 0.06);
+  font-size: 13px;
+  color: var(--text);
+  animation: ctx-in 0.1s ease-out;
+}
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.ctx-title {
+  padding: 4px 9px 6px;
+  max-width: 220px;
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+.ctx-item:hover { background: #f2f3f5; }
+.ctx-item .k {
+  width: 14px;
+  flex: 0 0 14px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.ctx-sep {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--line);
+}
+.ctx-item.danger { color: var(--danger); }
+.ctx-item.danger:hover { background: #fef0f0; }
+.ctx-item.danger .k { opacity: 0.85; }
 
 .rename-input {
   flex: 1;

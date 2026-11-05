@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Doc } from '../api'
 
 const props = defineProps<{
@@ -340,14 +340,100 @@ function resetDrag() {
   dropZone.value = null
   rootHover.value = false
 }
+
+/* ---------------- 右键菜单 ---------------- */
+
+type MenuState = { doc: Doc; batch: Doc[] | null }
+
+const menu = ref<MenuState | null>(null)
+const menuPos = ref({ x: 0, y: 0 })
+const menuEl = ref<HTMLElement | null>(null)
+
+const MENU_PAD = 8
+/** 打开时刻，用于忽略打开瞬间由焦点/布局变化引发的滚动 */
+let menuOpenedAt = 0
+
+function showMenu(doc: Doc, x: number, y: number) {
+  if (props.readonly || props.disabled || editingId.value !== null) return
+  // 右键的行在多选内 → 菜单作用于整批；否则清掉遗留多选，只针对这一篇
+  const batch =
+    selectedIds.value.has(doc.id) && selectedIds.value.size > 1
+      ? rows.value.filter((r) => selectedIds.value.has(r.doc.id)).map((r) => r.doc)
+      : null
+  if (!batch) clearSelection()
+  menu.value = { doc, batch }
+  menuPos.value = { x, y }
+  menuOpenedAt = Date.now()
+  // 贴边时翻转，避免菜单被视口裁掉
+  nextTick(() => {
+    const el = menuEl.value
+    if (!el) return
+    let { x: mx, y: my } = menuPos.value
+    const { width, height } = el.getBoundingClientRect()
+    if (mx + width + MENU_PAD > window.innerWidth) mx = Math.max(MENU_PAD, mx - width)
+    if (my + height + MENU_PAD > window.innerHeight) my = Math.max(MENU_PAD, my - height)
+    menuPos.value = { x: mx, y: my }
+  })
+}
+
+function onRowContextMenu(e: MouseEvent, doc: Doc) {
+  // 只读空间保留浏览器原生菜单，方便复制文字
+  if (props.readonly || props.disabled || editingId.value !== null) return
+  e.preventDefault()
+  e.stopPropagation()
+  showMenu(doc, e.clientX, e.clientY)
+}
+
+/** 窄屏没有右键：行内「⋯」按钮唤出同一个菜单 */
+function onMoreClick(e: MouseEvent, doc: Doc) {
+  e.stopPropagation()
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  showMenu(doc, rect.right - 6, rect.bottom + 2)
+}
+
+function closeMenu() {
+  menu.value = null
+}
+
+function onMenuPick(action: 'child' | 'rename' | 'remove') {
+  const m = menu.value
+  if (!m) return
+  closeMenu()
+  if (action === 'child') return emit('create-child', m.doc)
+  if (action === 'rename') return startRename(m.doc)
+  if (m.batch) return emit('remove-many', m.batch)
+  emit('remove', m.doc)
+}
+
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && menu.value) closeMenu()
+}
+
+function onGlobalScroll() {
+  // 滚动后锚点已失效，直接收起；刚打开的 150ms 内不判，避免误关
+  if (menu.value && Date.now() - menuOpenedAt > 150) closeMenu()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown)
+  window.addEventListener('scroll', onGlobalScroll, true)
+  window.addEventListener('resize', onGlobalScroll)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onGlobalKeydown)
+  window.removeEventListener('scroll', onGlobalScroll, true)
+  window.removeEventListener('resize', onGlobalScroll)
+})
+
 </script>
 
 <template>
   <div class="tree" @dragend="resetDrag">
     <!-- 多选工具栏：有选中项时显示 -->
     <div v-if="selectedIds.size > 0 && !readonly" class="tree-batch-bar">
-      <span class="batch-count">已选 {{ selectedIds.size }} 篇 · 可直接拖拽整批移动</span>
-      <button class="batch-btn" title="批量删除" @click="removeSelected">🗑 删除</button>
+      <span class="batch-count">已选 {{ selectedIds.size }} 篇 · 拖动整批移动</span>
+      <button class="batch-btn" title="删除所选文档" @click="removeSelected">删除所选</button>
       <button class="batch-btn" title="取消选择" @click="clearSelection">取消</button>
     </div>
 
@@ -359,6 +445,7 @@ function resetDrag() {
         {
           active: row.doc.id === currentId,
           selected: selectedIds.has(row.doc.id),
+          'menu-open': menu?.doc.id === row.doc.id,
           dragging: dragIds.includes(row.doc.id),
           'drop-before': dropId === row.doc.id && dropZone === 'before',
           'drop-after': dropId === row.doc.id && dropZone === 'after',
@@ -373,6 +460,7 @@ function resetDrag() {
       @drop="onDrop($event, row.doc)"
       @click="onRowClick($event, row.doc)"
       @dblclick="!readonly && startRename(row.doc)"
+      @contextmenu="onRowContextMenu($event, row.doc)"
     >
       <span
         v-if="row.hasChildren"
@@ -396,10 +484,11 @@ function resetDrag() {
       />
       <span v-else class="title" :title="row.doc.title">{{ row.doc.title }}</span>
 
+      <!-- 桌面端操作都收进右键菜单，行内只在窄屏留一个「⋯」 -->
       <span v-if="!readonly" class="actions" @click.stop>
-        <button title="新建子文档" @click="emit('create-child', row.doc)">＋</button>
-        <button title="重命名" @click="startRename(row.doc)">✎</button>
-        <button title="删除" @click="emit('remove', row.doc)">🗑</button>
+        <button class="more" title="更多操作（桌面右键同效）" @click="onMoreClick($event, row.doc)">
+          ⋯
+        </button>
       </span>
     </div>
 
@@ -416,4 +505,32 @@ function resetDrag() {
       松手移到根目录
     </div>
   </div>
+
+  <!-- 传送到 body：侧栏是滚动容器（移动端还是 transform 抽屉），fixed 会错位 -->
+  <Teleport to="body">
+    <div class="ctx-layer">
+      <div v-if="menu" class="ctx-mask" @pointerdown="closeMenu" @contextmenu.prevent="closeMenu" />
+      <div
+        v-if="menu"
+        ref="menuEl"
+        class="ctx-menu"
+        :style="{ left: menuPos.x + 'px', top: menuPos.y + 'px' }"
+        @contextmenu.prevent
+      >
+        <div class="ctx-title" :title="menu.doc.title">
+          {{ menu.batch ? `已选 ${menu.batch.length} 篇` : menu.doc.title }}
+        </div>
+        <button class="ctx-item" @click="onMenuPick('child')">
+          <span class="k">＋</span>新建子文档
+        </button>
+        <button class="ctx-item" @click="onMenuPick('rename')">
+          <span class="k">✎</span>重命名
+        </button>
+        <div class="ctx-sep" />
+        <button class="ctx-item danger" @click="onMenuPick('remove')">
+          <span class="k">🗑</span>{{ menu.batch ? `删除所选 ${menu.batch.length} 篇` : '删除' }}
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>

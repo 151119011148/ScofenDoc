@@ -1003,7 +1003,7 @@ boot()
             @move="moveDocs"
           />
           <div class="tree-tip">
-            <template v-if="canWrite">拖动可调整层级与顺序 · Ctrl+Z 撤销</template>
+            <template v-if="canWrite">拖动调整层级 · 右键文档可新建/重命名/删除 · Ctrl+Z 撤销</template>
             <template v-else>你在此空间只有查看权限</template>
           </div>
         </template>
