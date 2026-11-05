@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 import type * as Y from 'yjs'
+import { getLastColor, setLastColor } from '../colorMemory'
 
 /**
  * 选中文字后的浮动格式条（对标飞书/Notion 的 bubble toolbar）。
@@ -82,6 +83,9 @@ const COLOR_SWATCHES = [
   { name: '洋红', value: '#eb2f96' },
   { name: '灰', value: '#8f959e' },
 ]
+
+/** 上次用过的颜色：色板上加个角标，方便一眼看出「现在续的是哪个色」 */
+const recentColor = ref(getLastColor())
 
 /** 工具栏/面板内按下鼠标不能抢走正文选区，否则点一下就丢选 */
 function keepSelection(e: MouseEvent) {
@@ -322,6 +326,7 @@ const panelUp = computed(() => {
 function togglePanel(p: typeof panel.value) {
   const next = panel.value === p ? '' : p
   panel.value = next
+  if (next === 'color') recentColor.value = getLastColor()
   if (next === 'link') {
     const href = (props.editor?.getAttributes('link').href as string) || ''
     linkUrl.value = href
@@ -358,6 +363,9 @@ function applyColor(value: string) {
   if (!e) return
   if (!value) e.chain().focus().unsetColor().run()
   else e.chain().focus().setColor(value).run()
+  // 记住这次的选择：紧接着敲的字自动用同一个颜色，不用再点一次色板
+  setLastColor(value)
+  recentColor.value = value
   panel.value = ''
   tick.value++
 }
@@ -392,6 +400,9 @@ function clearFormat() {
     .unsetColor()
     .unsetLink()
     .run()
+  // 清格式连记忆一起清，否则后面每段都会被上一次的颜色续上
+  setLastColor('')
+  recentColor.value = ''
   panel.value = ''
   tick.value++
 }
@@ -818,9 +829,13 @@ defineExpose({ openThread, closeThread })
         v-for="c in COLOR_SWATCHES"
         :key="c.name"
         class="swatch"
-        :title="c.name"
+        :title="c.value && c.value === recentColor ? `${c.name}（上次使用，继续输入会自动沿用）` : c.name"
         :style="{ background: c.value || '#ffffff' }"
-        :class="{ on: (colorValue || '') === c.value, none: !c.value }"
+        :class="{
+          on: (colorValue || '') === c.value,
+          none: !c.value,
+          recent: !!c.value && c.value === recentColor,
+        }"
         @mousedown="keepSelection"
         @click="applyColor(c.value)"
       />

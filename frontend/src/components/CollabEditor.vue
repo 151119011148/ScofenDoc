@@ -4,6 +4,8 @@ import { Editor, EditorContent } from '@tiptap/vue-3'
 import type { ChainedCommands } from '@tiptap/core'
 import { Extension } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
+import type { EditorState } from '@tiptap/pm/state'
+import type { Mark, Node as PMNode } from '@tiptap/pm/model'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -24,6 +26,7 @@ import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
+import { getLastColor, setLastColor } from '../colorMemory'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { COLLAB_URL } from '../config'
@@ -55,6 +58,11 @@ const props = withDefaults(
 const editor = ref<Editor>()
 const toolbarRef = ref<InstanceType<typeof SelectionToolbar> | null>(null)
 let provider: HocuspocusProvider | null = null
+
+/** 顶部格式栏：吸顶后加个投影，让「已经贴上去了」有视觉反馈 */
+const barEl = ref<HTMLElement | null>(null)
+const barStuck = ref(false)
+let barScrollHost: HTMLElement | null = null
 
 // 在 setup 里创建，选中文工具栏要拿它挂评论 Map（换文档时组件整体重建，实例天然隔离）
 const ydoc = new Y.Doc()
@@ -202,6 +210,121 @@ const activeChildren = computed(() => {
   if (!submenuOf.value) return []
   return ALL_ITEMS.find((i) => i.key === submenuOf.value)?.children ?? []
 })
+
+/* ---------------- 文字颜色记忆 ---------------- */
+
+/** 从一组 marks 里取出文字颜色（TextStyle 的 color），没有颜色返回空串 */
+function colorOfMarks(marks: readonly Mark[]): string {
+  for (const m of marks) {
+    if (m.type.name === 'textStyle') return (m.attrs.color as string) || ''
+  }
+  return ''
+}
+
+/** 取一个块（或文本节点）里最后一个文本节点的 marks */
+function lastTextMarks(node: PMNode | null | undefined): readonly Mark[] {
+  if (!node) return []
+  if (node.isText) return node.marks
+  let marks: readonly Mark[] = []
+  node.descendants((child) => {
+    if (child.isText) marks = child.marks
+    return true
+  })
+  return marks
+}
+
+/**
+ * 光标前紧挨着的文字是什么颜色。
+ *
+ * 回车换段是最常见的情形：新段落是空的，段落内部找不到任何文字，
+ * 这时要退回上一块的末尾去看——「上一段是红的，这一段接着写还想要红」就靠这一步。
+ */
+function colorBeforeCaret(state: EditorState, pos: number): string {
+  const $pos = state.doc.resolve(pos)
+
+  const inline = $pos.nodeBefore
+  if (inline?.isText) return colorOfMarks(inline.marks)
+
+  // 段首 / 空段：看上一块
+  let depth = $pos.depth
+  while (depth > 0) {
+    const before = $pos.before(depth)
+    if (before > 0) {
+      const prev = state.doc.resolve(before).nodeBefore
+      if (!prev) return ''
+      // 上一块是代码块、图片、分割线之类，没有「文字颜色」可继承
+      if (!prev.isTextblock) return ''
+      return colorOfMarks(lastTextMarks(prev))
+    }
+    depth--
+  }
+  return ''
+}
+
+/**
+ * 让新输入的文字延续「记忆色」。
+ *
+ * 触发条件刻意收得很紧：光标处本身没颜色时，只有当光标紧挨着的文字正好是记忆色，
+ * 才把它塞进 storedMarks。这样红色段落后面的续写自动是红色，而正文其他位置
+ * 不会莫名其妙被上一次的颜色污染。
+ */
+function applyColorMemory() {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed || !ed.isEditable) return
+
+  const { state, view } = ed
+  const sel = state.selection
+  if (!sel.empty) return
+
+  const remembered = getLastColor()
+  const current = colorOfMarks((state.storedMarks ?? sel.$from.marks()) as readonly Mark[])
+
+  // 光标已经落在有色文字里：把颜色记为记忆，后续输入由 ProseMirror 自然延续
+  if (current) {
+    if (current !== remembered) setLastColor(current)
+    return
+  }
+
+  if (!remembered) return
+  if (colorBeforeCaret(state, sel.from) !== remembered) return
+
+  const textStyle = state.schema.marks.textStyle
+  if (!textStyle) return
+
+  const base = (state.storedMarks ?? (sel.$from.marks() as readonly Mark[])).filter(
+    (m) => m.type.name !== 'textStyle',
+  )
+  view.dispatch(state.tr.setStoredMarks([...base, textStyle.create({ color: remembered })]))
+}
+
+let colorMemoryQueued = false
+
+/**
+ * selectionUpdate 本身就在一次 dispatch 里，直接再 dispatch 会打架，
+ * 挪到本轮微任务之后执行（仍在下一个按键事件之前，不会漏字）。
+ */
+function scheduleColorMemory() {
+  if (colorMemoryQueued) return
+  colorMemoryQueued = true
+  queueMicrotask(() => {
+    colorMemoryQueued = false
+    try {
+      applyColorMemory()
+    } catch {
+      /* 文档正在被远端改动、位置失效时忽略即可 */
+    }
+  })
+}
+
+/* ---------------- 顶部栏吸顶状态 ---------------- */
+
+function updateBarStuck() {
+  const el = barEl.value
+  if (!el) return
+  const host = barScrollHost ?? (barScrollHost = el.closest('.main') as HTMLElement | null)
+  const hostTop = host ? host.getBoundingClientRect().top : 0
+  barStuck.value = el.getBoundingClientRect().top <= hostTop + 1
+}
 
 /** 光标是否处在「段首输入 /xxx」的状态；是则更新菜单位置 */
 function syncSlash(revealPlus = false) {
@@ -744,14 +867,24 @@ onMounted(() => {
       },
     },
     onUpdate: () => syncSlash(false),
-    // 光标搬家（点击 / 方向键 / Tab）→ 把 ＋ 送到新段落
-    onSelectionUpdate: () => syncSlash(true),
+    // 光标搬家（点击 / 方向键 / Tab）→ 把 ＋ 送到新段落；顺带把文字颜色记忆接上
+    onSelectionUpdate: () => {
+      syncSlash(true)
+      scheduleColorMemory()
+    },
     onBlur: closeSlash,
   })
 
   emit('editor-ready', editor.value)
 
   document.addEventListener('scroll', onAnyScroll, true)
+
+  // 顶部格式栏吸顶：正文滚动容器是 .main，贴上边缘时给它加投影
+  barScrollHost = (barEl.value?.closest('.main') as HTMLElement | null) ?? null
+  barScrollHost?.addEventListener('scroll', updateBarStuck, { passive: true })
+  window.addEventListener('resize', updateBarStuck)
+  updateBarStuck()
+
   // ＋ 按钮的显隐跟着鼠标走（飞书式），用文档级监听，因为按钮本体在编辑器 DOM 之外
   document.addEventListener('mousemove', onDocMouseMove, { passive: true })
   document.addEventListener('mousedown', onDocMouseMove, { passive: true })
@@ -763,6 +896,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('scroll', onAnyScroll, true)
+  barScrollHost?.removeEventListener('scroll', updateBarStuck)
+  window.removeEventListener('resize', updateBarStuck)
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mousedown', onDocMouseMove)
   window.removeEventListener('mouseout', onWindowMouseOut)
@@ -865,7 +1000,7 @@ function onContentClick(e: MouseEvent) {
 
 <template>
   <div class="collab">
-    <div class="bar">
+    <div ref="barEl" :class="['bar', { stuck: barStuck }]">
       <span :class="['dot', connected ? 'on' : 'off']" />
       <span class="status">
         <template v-if="authError">{{ authError }}</template>
