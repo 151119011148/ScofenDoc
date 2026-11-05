@@ -21,7 +21,13 @@ onMounted(() => {
       ListItemHeading,
       HeadingFold,
       HeadingNumber,
-      Table.configure({ resizable: false }),
+      // 与生产一致：列宽可拖、块手柄可选中整表
+      Table.configure({
+        resizable: true,
+        lastColumnResizable: true,
+        allowTableNodeSelection: true,
+        handleWidth: 6,
+      }),
       TableRow,
       TableHeader,
       TableCell,

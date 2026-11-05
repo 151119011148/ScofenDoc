@@ -901,8 +901,14 @@ onMounted(() => {
       DiagramCodeBlock,
       TaskList,
       TaskItem.configure({ nested: true }),
-      // 表格：履历、方案这类文档大量用表格承载对照关系，没有表格节点就只能退化成纯文本
-      Table.configure({ resizable: false, lastColumnResizable: false }),
+      // 表格：履历、方案这类文档大量用表格承载对照关系，没有表格节点就只能退化成纯文本。
+      // resizable 打开列宽拖拽（飞书同款），allowTableNodeSelection 让块手柄可以选中整张表
+      Table.configure({
+        resizable: true,
+        lastColumnResizable: true,
+        allowTableNodeSelection: true,
+        handleWidth: 6,
+      }),
       TableRow,
       TableHeader,
       TableCell,

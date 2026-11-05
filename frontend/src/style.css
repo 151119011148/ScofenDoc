@@ -724,54 +724,106 @@ body {
   text-decoration: line-through;
 }
 
-/* 表格：履历这类文档里表格是主载体，必须能横向滚动、单元格可换行 */
+/* ============ 表格（样式对齐飞书） ============
+   飞书表格：细灰边框、浅灰表头、无斑马纹、整块被选中时淡蓝底 + 蓝框，
+   列宽可拖（table-layout: fixed 是拖拽写 colwidth 后能立刻生效的前提）。 */
 .ProseMirror .tableWrapper {
+  position: relative;
   overflow-x: auto;
   margin: 16px 0;
 }
 .ProseMirror table {
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
   width: 100%;
   font-size: 14px;
-  overflow: hidden;
+  background: #fff;
 }
 .ProseMirror table td,
 .ProseMirror table th {
-  border: 1px solid var(--line);
-  padding: 7px 10px;
+  border: 1px solid #e5e6eb;
+  padding: 8px 10px;
   vertical-align: top;
   position: relative;
   min-width: 60px;
+  word-break: break-word;
 }
 .ProseMirror table th {
-  background: #f5f7fa;
-  font-weight: 600;
+  background: #f2f3f5;
+  font-weight: 500;
   text-align: left;
+  color: var(--text);
 }
-.ProseMirror table tr:nth-child(even) td {
+/* 鼠标所在行给一层几乎看不见的底色，长表格里不丢行 */
+.ProseMirror table tr:hover > td {
   background: #fafbfc;
 }
 .ProseMirror table p {
   margin: 0;
 }
-/* 选区落在表格里时给出整格高亮，否则看不出当前在改哪一格 */
+/* 选区落在表格里：整格淡蓝，和飞书的选区色一致 */
 .ProseMirror table .selectedCell::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(51, 112, 255, 0.12);
+  background: rgba(51, 112, 255, 0.1);
   pointer-events: none;
 }
-.ProseMirror table .column-resize-handle {
+/* 整张表被块手柄选中：单元格一起染淡蓝，外圈一道蓝框。
+   prosemirror-tables 的 nodeDOM 是 .tableWrapper，选中类落在 wrapper 上，
+   所以两处都写，兼容以后换成普通 table 渲染的情况。 */
+.ProseMirror .tableWrapper.ProseMirror-selectednode > table,
+.ProseMirror table.ProseMirror-selectednode {
+  outline: 2px solid rgba(51, 112, 255, 0.55);
+  outline-offset: -1px;
+}
+.ProseMirror .tableWrapper.ProseMirror-selectednode > table > tbody > tr > td,
+.ProseMirror .tableWrapper.ProseMirror-selectednode > table > tbody > tr > th,
+.ProseMirror .tableWrapper.ProseMirror-selectednode > table > tr > td,
+.ProseMirror .tableWrapper.ProseMirror-selectednode > table > tr > th,
+.ProseMirror table.ProseMirror-selectednode > tbody > tr > td,
+.ProseMirror table.ProseMirror-selectednode > tbody > tr > th,
+.ProseMirror table.ProseMirror-selectednode > tr > td,
+.ProseMirror table.ProseMirror-selectednode > tr > th {
+  background-color: rgba(51, 112, 255, 0.07);
+}
+/* 拖列宽：整列可拖的区域透明，视觉上只在顶部露一个蓝点 + 一条细线 */
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: transparent;
+  pointer-events: none;
+  z-index: 3;
+}
+.ProseMirror .column-resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--brand);
+}
+.ProseMirror .column-resize-handle::after {
+  content: '';
   position: absolute;
   right: -2px;
-  top: 0;
-  bottom: -2px;
-  width: 4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: var(--brand);
-  pointer-events: none;
+  box-shadow: 0 0 0 2px #fff;
 }
+body.resize-cursor,
+body.resize-cursor * {
+  cursor: col-resize !important;
+}
+/* 只读文档不该能拖列宽 */
+.ProseMirror[contenteditable='false'] .column-resize-handle { display: none; }
 
 /* ============ 斜杠菜单 ============ */
 .slash-menu {
@@ -2997,90 +3049,133 @@ body {
   color: var(--text-3);
 }
 
-/* ============ 表格操作：浮动条 + 右键菜单 ============ */
-.tbl-bar {
+/* ============ 表格块手柄 + 块菜单（飞书式） ============ */
+.tbl-handle {
   position: fixed;
   z-index: 305;
   display: flex;
-  align-items: center;
-  gap: 3px;
-  max-width: calc(100vw - 16px);
-  padding: 4px 6px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  /* 手柄要能被鼠标追上，中间空隙不能算「离开表格」 */
+  padding-right: 6px;
 }
-.tbl-bar button {
-  flex: 0 0 auto;
-  height: 26px;
-  min-width: 34px;
-  padding: 0 7px;
+.tbl-grip-row {
+  display: flex;
+  gap: 1px;
+  padding: 1px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(31, 35, 41, 0.1);
+}
+.tbl-hbtn,
+.tbl-hadd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: none;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-2);
-  font-size: 12px;
-  white-space: nowrap;
+  color: #8f959e;
   cursor: pointer;
 }
-.tbl-bar button:hover,
-.tbl-bar .tbl-more.on { background: #eaf1ff; color: var(--brand); }
-.tbl-size {
-  flex: 0 0 auto;
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--text-3);
-  white-space: nowrap;
+.tbl-hbtn svg,
+.tbl-hadd svg {
+  width: 15px;
+  height: 15px;
+  display: block;
 }
-.tbl-sep { flex: 0 0 auto; width: 1px; height: 16px; margin: 0 3px; background: var(--line); }
+.tbl-hbtn:hover,
+.tbl-hadd:hover { background: #f2f3f5; color: var(--brand); }
+.tbl-hbtn.on { background: #eaf1ff; color: var(--brand); }
+.tbl-hdots { color: #b7bcc4; }
+.tbl-hadd {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(31, 35, 41, 0.1);
+}
 
 .tbl-menu {
   position: fixed;
   z-index: 315;
-  width: 208px;
-  max-height: min(70vh, 470px);
+  width: 224px;
+  max-height: min(76vh, 520px);
   overflow-y: auto;
   padding: 6px;
   background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  border: 1px solid #e8e9eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 34px rgba(31, 35, 41, 0.16);
 }
-.tbl-group {
-  padding: 6px 10px 3px;
+.tbl-menu-head {
+  padding: 4px 10px 6px;
   font-size: 11px;
   color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
-.tbl-group:not(:first-child) {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
+.tbl-div {
+  height: 1px;
+  margin: 5px 8px;
+  background: #eef0f2;
 }
 .tbl-item {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  height: 30px;
+  height: 32px;
   padding: 0 10px;
   border: none;
-  border-radius: 5px;
-  background: #fff;
+  border-radius: 6px;
+  background: transparent;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
-.tbl-item:hover { background: var(--bg); color: var(--brand); }
+.tbl-item:hover { background: #f2f3f5; }
 .tbl-item.danger { color: var(--danger); }
-.tbl-item.danger:hover { background: #fff1f0; color: var(--danger); }
-.tbl-ic { width: 14px; text-align: center; font-size: 13px; color: var(--text-3); }
-
-.ProseMirror table:hover { border-color: #c9d6f5; }
-
-@media (max-width: 768px) {
-  .tbl-size, .tbl-sep { display: none; }
-  .tbl-bar button { min-width: 32px; padding: 0 5px; font-size: 11px; }
+.tbl-item.danger:hover { background: #fff1f0; }
+.tbl-svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #646a73;
 }
+.tbl-item.danger .tbl-svg { color: var(--danger); }
+.tbl-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 开关：和飞书一致，开是品牌蓝，关是浅灰轨道 */
+.tbl-sw {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  padding: 2px;
+  border-radius: 999px;
+  background: #d8dbe0;
+  transition: background 0.16s ease;
+}
+.tbl-sw i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.16s ease;
+}
+.tbl-sw.on { background: var(--brand); }
+.tbl-sw.on i { transform: translateX(12px); }
