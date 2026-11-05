@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import CollabEditor from './components/CollabEditor.vue'
 import DocTree from './components/DocTree.vue'
 import OutlinePanel from './components/OutlinePanel.vue'
@@ -11,6 +11,7 @@ import AdminUsersModal from './components/AdminUsersModal.vue'
 import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import CreateSpaceModal from './components/CreateSpaceModal.vue'
 import MembersModal from './components/MembersModal.vue'
+import type { Editor } from '@tiptap/core'
 import {
   api,
   clearSession,
@@ -149,13 +150,13 @@ function resetSidebarWidth() {
 
 /* 大纲面板：需要拿到正文编辑器实例与滚动容器（.main），标题变化时重扫 */
 const mainScroller = ref<HTMLElement | null>(null)
-const outlineEditor = ref<{ view?: { dom?: HTMLElement } } | null>(null)
+const outlineEditor = shallowRef<Editor | null>(null)
 const outlineRefresh = ref(0)
 
 function onEditorReady(ed: unknown) {
-  outlineEditor.value = ed as { view?: { dom?: HTMLElement } } | null
+  outlineEditor.value = (ed as unknown as Editor) ?? null
   // 正文是 Yjs 协同、Tiptap 渲染，Vue 无法感知其标题变化；挂一个轻量 observer
-  const dom = (ed as { view?: { dom?: HTMLElement } } | null)?.view?.dom
+  const dom = (ed as Editor | null)?.view?.dom
   if (dom) {
     const mo = new MutationObserver(() => {
       outlineRefresh.value++

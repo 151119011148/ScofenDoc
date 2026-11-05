@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import type { Editor } from '@tiptap/core'
 
 /**
  * 当前文档的章节大纲：扫描正文编辑器里的 H1–H3，生成可点击跳转的目录。
  * 自带滚动高亮（当前章节高亮并保持在可视区）。独立于左侧的「文档树」，
  * 解决长文档（如 Netty）内部快速定位。
+ *
+ * 除了跳转，每条标题还能就地「提升 / 降低层级」：改的是正文里 heading 节点的
+ * level 属性，不是大纲自己的副本，所以章节号、折叠、协同都会跟着重算。
  *
  * 标题位置由调用方（App.vue）通过 editor + refresh 触发重扫，
  * 因为正文是 Yjs 协同、由 Tiptap 渲染，Vue 无法直接响应其 DOM 变化。
@@ -16,10 +20,15 @@ interface Item {
   el: HTMLElement
 }
 
+/** 大纲只列 H1–H3，层级调整也限制在这个区间，免得调完条目直接从目录里消失 */
+const MIN_LEVEL = 1
+const MAX_LEVEL = 3
+
 const props = defineProps<{
   /** 正文滚动容器（.main），用于计算标题相对位置与滚动高亮 */
   scroller?: HTMLElement | null
-  editor?: { view?: { dom?: HTMLElement } } | null
+  /** 正文编辑器实例：既要读 DOM，也要能改 heading 节点的 level */
+  editor?: Editor | null
   /** 触发重扫的信号（每 +1 扫描一次标题） */
   refresh?: number
 }>()
@@ -78,6 +87,53 @@ function jumpGap(): number {
 
 const empty = computed(() => items.value.length === 0)
 
+/**
+ * 只读空间不给层级按钮：改了也没意义，还会误导「已生效」。
+ *
+ * isEditable 本身不是响应式的，所以单独用 ref 跟一下：
+ * Tiptap 的 setEditable 默认会 emit('update')，那里同步即可。
+ */
+const editable = ref(true)
+function onEditorUpdate() {
+  const now = !!props.editor?.isEditable
+  if (now !== editable.value) editable.value = now
+}
+const canEdit = computed(() => editable.value && !!props.editor)
+
+/**
+ * 提升（delta=-1）/ 降低（delta=+1）某个标题的层级。
+ *
+ * 改的是正文 heading 节点的 level 属性，走 ProseMirror 事务：
+ * 于是 Yjs 协同、Ctrl+Z、章节号（HeadingNumber 装饰）、折叠全部自动跟着走，
+ * 大纲只是在事务落地后重扫一遍 DOM。位置每次用 posAtDOM 现算，
+ * 不依赖扫描快照，避免正文异步渲染后位置漂移。
+ *
+ * 只动这一个标题，不连带它下面的小标题：这里的使用场景是把导入文档里
+ * 错乱的层级一条条摆正，连带下移会把原本对的也弄乱。
+ */
+function shiftLevel(item: Item, delta: number) {
+  const ed = props.editor
+  const view = ed?.view
+  if (!ed || !view || !ed.isEditable) return
+  const next = item.level + delta
+  if (next < MIN_LEVEL || next > MAX_LEVEL) return
+
+  let pos: number
+  try {
+    // posAtDOM(el, 0) 落在标题内容起点，减 1 才是节点自身的位置
+    pos = view.posAtDOM(item.el, 0) - 1
+  } catch {
+    return
+  }
+  const node = view.state.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'heading') return
+  if (Number(node.attrs.level) === next) return
+
+  view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: next }))
+  // 标签从 h2 变 h3，缩进要立刻跟上；不等 MutationObserver 那一拍
+  window.requestAnimationFrame(() => refresh())
+}
+
 function refresh() {
   items.value = collect()
 }
@@ -125,12 +181,18 @@ function spy() {
 }
 
 watch(
-  () => props.refresh,
-  () => refresh(),
+  () => props.editor,
+  (ed, prev) => {
+    prev?.off?.('update', onEditorUpdate)
+    ed?.on?.('update', onEditorUpdate)
+    editable.value = !!ed?.isEditable
+    refresh()
+  },
+  { immediate: true },
 )
 
 watch(
-  () => props.editor,
+  () => props.refresh,
   () => refresh(),
 )
 
@@ -156,6 +218,7 @@ watch(
 
 onBeforeUnmount(() => {
   props.scroller?.removeEventListener('scroll', onScroll)
+  props.editor?.off?.('update', onEditorUpdate)
   if (spyTimer) cancelAnimationFrame(spyTimer)
 })
 </script>
@@ -171,7 +234,28 @@ onBeforeUnmount(() => {
         :class="['outline-item', `lvl-${item.level}`, { on: i === activeId }]"
         @click="jump(item, i)"
       >
-        {{ item.text }}
+        <span class="outline-text">{{ item.text }}</span>
+        <!-- 悬停才出现：提升 / 降低层级，边界层级置灰 -->
+        <span v-if="canEdit" class="outline-acts" @click.stop>
+          <button
+            class="outline-act"
+            type="button"
+            :disabled="item.level <= MIN_LEVEL"
+            :title="item.level <= MIN_LEVEL ? '已经是最高层级' : `提升为 H${item.level - 1}`"
+            :aria-label="`提升「${item.text}」层级`"
+            @mousedown.stop
+            @click.stop="shiftLevel(item, -1)"
+          >↑</button>
+          <button
+            class="outline-act"
+            type="button"
+            :disabled="item.level >= MAX_LEVEL"
+            :title="item.level >= MAX_LEVEL ? '已经是最低层级' : `降低为 H${item.level + 1}`"
+            :aria-label="`降低「${item.text}」层级`"
+            @mousedown.stop
+            @click.stop="shiftLevel(item, 1)"
+          >↓</button>
+        </span>
       </li>
     </ul>
   </div>

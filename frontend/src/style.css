@@ -1429,15 +1429,56 @@ body {
   overflow-y: auto;
 }
 .outline-item {
-  padding: 5px 14px 5px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px 16px;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-2);
   cursor: pointer;
   border-left: 2px solid transparent;
+}
+.outline-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 层级调整按钮：平时不占视线，悬停/聚焦该条才浮出 */
+.outline-acts {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+.outline-item:hover .outline-acts,
+.outline-item:focus-within .outline-acts { display: flex; }
+.outline-act {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.outline-act:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: #f2f6ff;
+}
+.outline-act:disabled { opacity: 0.35; cursor: default; }
+/* 平板等无悬停设备：直接常驻，否则点不到 */
+@media (hover: none) {
+  .outline-acts { display: flex; }
 }
 .outline-item:hover { background: var(--bg); color: var(--text); }
 .outline-item.on {
@@ -2473,11 +2514,15 @@ body {
   .outline-list { padding: 4px 0 12px; }
   /* 手机上没有 hover，条目要按手指尺寸给高度；长标题换行而不是省略 */
   .outline-item {
-    padding: 9px 16px;
+    padding: 9px 12px 9px 16px;
     font-size: 14px;
     line-height: 1.45;
-    white-space: normal;
+    gap: 8px;
   }
+  .outline-text { white-space: normal; }
+  /* 触屏没有悬停，层级按钮常驻，按手指尺寸放大 */
+  .outline-acts { display: flex; }
+  .outline-act { width: 26px; height: 26px; font-size: 13px; border-radius: 6px; }
   .outline-item.lvl-1 { padding-left: 16px; }
   .outline-item.lvl-2 { padding-left: 30px; }
   .outline-item.lvl-3 { padding-left: 44px; }
