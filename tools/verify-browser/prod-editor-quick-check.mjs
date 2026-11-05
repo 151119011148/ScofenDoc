@@ -71,7 +71,7 @@ const base = await page.evaluate(() => ({
   entryJS: [...document.querySelectorAll('script[src]')].map((s) => s.getAttribute('src')).join(','),
 }))
 check('线上正文已加载', base.paragraphs > 0, `可用段落 ${base.paragraphs}`)
-check('顶部 № 入口标明「标题 + 有序编号」', base.numTitle.includes('标题 + 有序编号'), base.numTitle)
+check('顶部 № 入口标明「标题前缀」', base.numTitle.includes('标题前缀'), base.numTitle)
 check('已加载本次构建产物', /\/scofendoc\/assets\/index-/.test(base.entryJS), base.entryJS.slice(0, 90))
 
 /* 有序列表序号颜色：造一个离屏 .ProseMirror ol 量 ::marker，不动文档数据 */
@@ -88,6 +88,26 @@ const marker = await page.evaluate(() => {
 })
 check('有序列表序号为品牌蓝', marker.color === BLUE, JSON.stringify(marker))
 check('列表项正文颜色未变', marker.text !== BLUE, marker.text)
+
+/* 标题前缀：有序数字与无序符号都该是品牌蓝（离屏 DOM，不动文档数据） */
+const prefix = await page.evaluate(() => {
+  const box = document.createElement('div')
+  box.className = 'ProseMirror'
+  box.style.cssText = 'position:absolute;left:-9999px;top:0'
+  box.innerHTML =
+    '<h2 data-number="1.1." data-number-kind="ordered">a</h2>' +
+    '<h6 data-number="◇" data-number-kind="unordered">b</h6>'
+  document.body.appendChild(box)
+  const out = {
+    ordered: getComputedStyle(box.querySelector('h2'), '::before').color,
+    unordered: getComputedStyle(box.querySelector('h6'), '::before').color,
+    indent6: getComputedStyle(box.querySelector('h6')).paddingLeft,
+  }
+  box.remove()
+  return out
+})
+check('有序前缀与无序符号都是品牌蓝', prefix.ordered === BLUE && prefix.unordered === BLUE, JSON.stringify(prefix))
+check('六级标题有层级缩进', parseFloat(prefix.indent6) >= 50, prefix.indent6)
 
 /* 拖选唤起浮动工具条，检查颜色按钮的拆分结构（不点击任何改色命令） */
 const box = await page.evaluate(() => {
@@ -138,6 +158,28 @@ const palette = await page.evaluate(() => ({
   title: document.querySelector('.sel-colors-title')?.textContent.trim() || '',
 }))
 check('色板为「字体颜色」8 色 + 恢复默认', palette.swatches === 8 && palette.reset && palette.title === '字体颜色', JSON.stringify(palette))
+/* 选区标题面板：六级入口 + 有序 / 无序两种前缀 */
+await page.click('.sel-bar button[title="标题"]')
+await page.waitForSelector('.sel-panel', { timeout: 5000 })
+const hPanel = await page.evaluate(() => document.querySelector('.sel-panel')?.textContent || '')
+check(
+  '标题面板开放 H1–H6 六级',
+  ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].every((k) => hPanel.includes(k)),
+  hPanel.replace(/\s+/g, ' ').slice(0, 110),
+)
+check('标题面板有有序 / 无序两种前缀', hPanel.includes('标题有序编号') && hPanel.includes('标题无序符号'))
+
+/* 格式栏 № 下拉：全文与单篇都能切两种样式 */
+await page.click('.num-caret')
+await page.waitForSelector('.num-dd-menu', { timeout: 5000 })
+const numMenu = await page.evaluate(() => document.querySelector('.num-dd-menu')?.textContent || '')
+check(
+  '№ 下拉含全文有序 / 无序 / 关闭',
+  numMenu.includes('全文设为有序编号') && numMenu.includes('全文设为无序符号') && numMenu.includes('全文关闭前缀'),
+)
+check('№ 下拉含单篇有序 / 无序样式', numMenu.includes('有序编号 1 / 1.1') && numMenu.includes('无序符号 ● ○ ■'))
+await page.click('.num-caret')
+
 await page.keyboard.press('Escape')
 
 check('无 JS 运行时报错 / 资源 4xx', errors.length === 0, errors.slice(0, 3).join(' | '))

@@ -12,6 +12,7 @@ import TextStyle from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
 import * as Y from 'yjs'
 import HeadingNumber from './extensions/HeadingNumber'
+import HeadingFold from './extensions/HeadingFold'
 import TabIndent from './extensions/TabIndent'
 import SelectionToolbar from './components/SelectionToolbar.vue'
 
@@ -27,6 +28,7 @@ onMounted(() => {
       TextStyle,
       Color,
       HeadingNumber,
+      HeadingFold,
       TabIndent,
     ],
     content: `

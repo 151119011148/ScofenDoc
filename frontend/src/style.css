@@ -521,6 +521,11 @@ body {
 .ProseMirror h1 { font-size: 26px; }
 .ProseMirror h2 { font-size: 21px; }
 .ProseMirror h3 { font-size: 17px; }
+/* H4–H6：浏览器默认字号会一路缩到比正文还小，显式定一档，
+   六级标题都能用，层级靠字号 + 蓝色前缀拉开 */
+.ProseMirror h4 { font-size: 16px; font-weight: 600; }
+.ProseMirror h5 { font-size: 15.5px; font-weight: 600; }
+.ProseMirror h6 { font-size: 15px; font-weight: 600; }
 .ProseMirror blockquote {
   border-left: 3px solid var(--brand);
   background: #eaf1ff;
@@ -653,7 +658,8 @@ body {
 .plantuml-block .plantuml-error pre { background: #fff1f0; color: var(--danger); }
 
 /* ============ 标题折叠 ============ */
-.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 { position: relative; }
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3,
+.ProseMirror h4, .ProseMirror h5, .ProseMirror h6 { position: relative; }
 .fold-caret {
   display: inline-block;
   width: 18px;
@@ -668,7 +674,10 @@ body {
 }
 .ProseMirror h1:hover .fold-caret,
 .ProseMirror h2:hover .fold-caret,
-.ProseMirror h3:hover .fold-caret { opacity: 1; }
+.ProseMirror h3:hover .fold-caret,
+.ProseMirror h4:hover .fold-caret,
+.ProseMirror h5:hover .fold-caret,
+.ProseMirror h6:hover .fold-caret { opacity: 1; }
 .fold-caret:hover { color: var(--brand); }
 .fold-hidden { display: none; }
 
@@ -2542,6 +2551,15 @@ body {
   .ProseMirror h1 { font-size: 22px; }
   .ProseMirror h2 { font-size: 19px; }
   .ProseMirror h3 { font-size: 16.5px; }
+  .ProseMirror h4 { font-size: 16px; }
+  .ProseMirror h5 { font-size: 15.5px; }
+  .ProseMirror h6 { font-size: 15px; }
+  /* 窄屏把层级缩进收一半，别让 H6 挤掉正文宽度 */
+  .ProseMirror h2[data-number] { padding-left: 6px; }
+  .ProseMirror h3[data-number] { padding-left: 12px; }
+  .ProseMirror h4[data-number] { padding-left: 18px; }
+  .ProseMirror h5[data-number] { padding-left: 24px; }
+  .ProseMirror h6[data-number] { padding-left: 30px; }
   .ProseMirror blockquote { padding: 8px 12px; }
   .ProseMirror pre {
     padding: 12px;
@@ -2724,9 +2742,10 @@ body {
   line-height: 1.7;
 }
 
-/* ============ 标题自动编号（标题 + 有序共存） ============
- * 序号由 HeadingNumber 的装饰写进 data-number，不进文档正文：
- * 复制文字不会带序号，大纲/锚点/折叠照旧工作。
+/* ============ 标题前缀（有序数字 / 无序符号） ============
+ * 前缀由 HeadingNumber 的装饰写进 data-number，不进文档正文：
+ * 复制文字不会带前缀，大纲/锚点/折叠照旧工作。
+ * 有序 1 / 1.1 / 1.1.1 与无序 ● ○ ■ □ ◆ ◇ 走同一套样式，统一品牌蓝。
  */
 .ProseMirror h1[data-number]::before,
 .ProseMirror h2[data-number]::before,
@@ -2743,6 +2762,22 @@ body {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.2px;
   user-select: none;
+}
+
+/* 六层深度：带前缀的标题按层级轻轻内缩，长文档里层级一眼可辨。
+   无前缀的普通标题不受影响，已有正文布局不动。 */
+.ProseMirror h2[data-number] { padding-left: 10px; }
+.ProseMirror h3[data-number] { padding-left: 20px; }
+.ProseMirror h4[data-number] { padding-left: 30px; }
+.ProseMirror h5[data-number] { padding-left: 40px; }
+.ProseMirror h6[data-number] { padding-left: 50px; }
+
+/* 无序符号是几何形状，比数字略大、右侧留白多一点才不挤 */
+.ProseMirror :is(h1, h2, h3, h4, h5, h6)[data-number-kind='unordered']::before {
+  font-size: 1em;
+  margin-right: 0.5em;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 /* 格式栏上的「标题编号」按钮 + 全文开关下拉 */
@@ -2785,6 +2820,13 @@ body {
   color: var(--text);
 }
 .num-dd-menu button:hover { background: #eaf1ff; color: var(--brand); }
+.num-dd-menu button.on { background: #eaf1ff; color: var(--brand); font-weight: 600; }
+.num-dd-group {
+  padding: 8px 10px 3px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.num-dd-sep { height: 1px; margin: 5px 2px; background: var(--line); }
 .num-dd-tip {
   padding: 7px 10px 4px;
   margin-top: 3px;

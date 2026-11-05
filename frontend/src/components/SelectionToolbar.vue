@@ -290,10 +290,17 @@ const headingLabel = computed(() => {
   void tick.value
   const e = props.editor
   if (!e) return 'T'
-  for (const level of [1, 2, 3, 4] as const) {
+  for (const level of [1, 2, 3, 4, 5, 6] as const) {
     if (e.isActive('heading', { level })) return `H${level}`
   }
   return 'T'
+})
+/** 当前标题的前缀样式：'' 表示没开编号 */
+const headingNumberStyle = computed(() => {
+  void tick.value
+  const e = props.editor
+  if (!e || !e.isActive('heading', { numbered: true })) return ''
+  return (e.getAttributes('heading').numberStyle as string) || 'ordered'
 })
 const isBold = computed(() => (void tick.value, !!props.editor?.isActive('bold')))
 const isItalic = computed(() => (void tick.value, !!props.editor?.isActive('italic')))
@@ -302,8 +309,6 @@ const isUnderline = computed(() => (void tick.value, !!props.editor?.isActive('u
 const isCode = computed(() => (void tick.value, !!props.editor?.isActive('code')))
 const hasLink = computed(() => (void tick.value, !!props.editor?.isActive('link')))
 const hasComment = computed(() => (void tick.value, !!props.editor?.isActive('comment')))
-/** 当前标题是否开了自动编号（标题 + 有序共存） */
-const isNumbered = computed(() => (void tick.value, !!props.editor?.isActive('heading', { numbered: true })))
 const listKind = computed(() => {
   void tick.value
   const e = props.editor
@@ -320,8 +325,8 @@ const colorValue = computed(() => {
 
 /** 各面板大致高度：用来判断上方空间够不够（不够就向下展开） */
 const PANEL_HEIGHT: Record<string, number> = {
-  heading: 280,
-  list: 200,
+  heading: 360,
+  list: 240,
   color: 150,
   link: 70,
   more: 220,
@@ -358,13 +363,22 @@ function setHeading(level: number) {
   const e = props.editor
   if (!e) return
   if (level === 0) e.chain().focus().setParagraph().run()
-  else e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 }).run()
+  else e.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run()
   panel.value = ''
 }
 
-/** 标题自动编号：保留标题层级，同时给它 1 / 1.1 这类有序序号 */
-function toggleHeadingNumber() {
-  props.editor?.chain().focus().toggleHeadingNumber().run()
+/**
+ * 切换标题前缀样式：有序数字 / 无序符号。
+ * 再点一次当前样式就是关掉前缀，和飞书「点亮的项再点即取消」一致。
+ */
+function setHeadingNumberStyle(style: 'ordered' | 'unordered') {
+  const e = props.editor
+  if (!e) return
+  if (headingNumberStyle.value === style) {
+    e.chain().focus().toggleHeadingNumber(false).run()
+  } else {
+    e.chain().focus().toggleHeadingNumber(true, style).run()
+  }
   panel.value = ''
   tick.value++
 }
@@ -843,19 +857,32 @@ defineExpose({ openThread, closeThread })
         <span class="sel-ic">¶</span>正文
       </button>
       <button
-        v-for="lv in [1, 2, 3, 4]"
+        v-for="lv in [1, 2, 3, 4, 5, 6]"
         :key="lv"
         class="sel-item"
         :class="{ on: headingLabel === `H${lv}` }"
         @mousedown="keepSelection"
         @click="setHeading(lv)"
       >
-        <span class="sel-ic" :style="{ fontSize: 15 - lv + 'px' }">H{{ lv }}</span>
-        {{ ['一级标题', '二级标题', '三级标题', '四级标题'][lv - 1] }}
+        <span class="sel-ic" :style="{ fontSize: 17 - lv + 'px' }">H{{ lv }}</span>
+        {{ ['一级标题', '二级标题', '三级标题', '四级标题', '五级标题', '六级标题'][lv - 1] }}
       </button>
       <span class="sel-sep-line" />
-      <button class="sel-item" :class="{ on: isNumbered }" @mousedown="keepSelection" @click="toggleHeadingNumber">
-        <span class="sel-ic">№</span>标题自动编号（1 / 1.1）
+      <button
+        class="sel-item"
+        :class="{ on: headingNumberStyle === 'ordered' }"
+        @mousedown="keepSelection"
+        @click="setHeadingNumberStyle('ordered')"
+      >
+        <span class="sel-ic">№</span>标题有序编号（1 / 1.1 / 1.1.1）
+      </button>
+      <button
+        class="sel-item"
+        :class="{ on: headingNumberStyle === 'unordered' }"
+        @mousedown="keepSelection"
+        @click="setHeadingNumberStyle('unordered')"
+      >
+        <span class="sel-ic">●</span>标题无序符号（● ○ ■ □ ◆ ◇）
       </button>
     </div>
 
@@ -871,8 +898,21 @@ defineExpose({ openThread, closeThread })
         <span class="sel-ic">☑</span>待办清单
       </button>
       <span class="sel-sep-line" />
-      <button class="sel-item" :class="{ on: isNumbered }" @mousedown="keepSelection" @click="toggleHeadingNumber">
+      <button
+        class="sel-item"
+        :class="{ on: headingNumberStyle === 'ordered' }"
+        @mousedown="keepSelection"
+        @click="setHeadingNumberStyle('ordered')"
+      >
         <span class="sel-ic">№</span>标题 + 有序编号（1 / 1.1）
+      </button>
+      <button
+        class="sel-item"
+        :class="{ on: headingNumberStyle === 'unordered' }"
+        @mousedown="keepSelection"
+        @click="setHeadingNumberStyle('unordered')"
+      >
+        <span class="sel-ic">●</span>标题 + 无序符号（● ○ ■）
       </button>
     </div>
 

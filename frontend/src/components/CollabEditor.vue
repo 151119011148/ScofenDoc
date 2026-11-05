@@ -133,7 +133,11 @@ const SLASH_GROUPS: SlashGroup[] = [
       { key: 'h1', label: '一级标题', hint: '章节大标题', icon: 'H1', keywords: 'h1 yiji biaoti title', run: (c) => c.toggleHeading({ level: 1 }) },
       { key: 'h2', label: '二级标题', hint: '小节标题', icon: 'H2', keywords: 'h2 erji biaoti title', run: (c) => c.toggleHeading({ level: 2 }) },
       { key: 'h3', label: '三级标题', hint: '更小的标题', icon: 'H3', keywords: 'h3 sanji biaoti title', run: (c) => c.toggleHeading({ level: 3 }) },
-      { key: 'hnum', label: '编号标题', hint: '标题 + 有序序号 1 / 1.1', icon: '№', keywords: 'bianhao biaoti heading number youxu 有序 编号', run: (c) => c.toggleHeadingNumber(true) },
+      { key: 'h4', label: '四级标题', hint: '四级小节', icon: 'H4', keywords: 'h4 siji biaoti title', run: (c) => c.toggleHeading({ level: 4 }) },
+      { key: 'h5', label: '五级标题', hint: '五级小节', icon: 'H5', keywords: 'h5 wuji biaoti title', run: (c) => c.toggleHeading({ level: 5 }) },
+      { key: 'h6', label: '六级标题', hint: '最深一级', icon: 'H6', keywords: 'h6 liuji biaoti title', run: (c) => c.toggleHeading({ level: 6 }) },
+      { key: 'hnum', label: '有序标题', hint: '标题 + 有序序号 1 / 1.1', icon: '№', keywords: 'youxu biaoti bianhao heading number 有序 编号', run: (c) => c.toggleHeadingNumber(true, 'ordered') },
+      { key: 'hbullet', label: '无序标题', hint: '标题 + 层级符号 ● ○ ■', icon: '●', keywords: 'wuxu biaoti heading bullet unordered 无序 符号', run: (c) => c.toggleHeadingNumber(true, 'unordered') },
       { key: 'bullet', label: '无序列表', hint: '圆点列表', icon: '•', keywords: 'wuxu liebiao list bullet ul', run: (c) => c.toggleBulletList() },
       { key: 'ordered', label: '有序列表', hint: '带编号列表', icon: '1.', keywords: 'youxu liebiao list ordered ol number', run: (c) => c.toggleOrderedList() },
       { key: 'task', label: '待办清单', hint: '可勾选的任务项', icon: '☑', keywords: 'daiban qingdan todo task checkbox', run: (c) => c.toggleTaskList() },
@@ -335,7 +339,7 @@ const barState = computed(() => {
     return {
       bold: false, italic: false, strike: false, underline: false, code: false,
       h1: false, h2: false, bullet: false, ordered: false, task: false,
-      quote: false, table: false, numbered: false,
+      quote: false, table: false, numbered: false, numberStyle: '',
     }
   }
   return {
@@ -352,6 +356,9 @@ const barState = computed(() => {
     quote: e.isActive('blockquote'),
     table: e.isActive('table'),
     numbered: e.isActive('heading', { numbered: true }),
+    numberStyle: e.isActive('heading')
+      ? ((e.getAttributes('heading').numberStyle as string) || 'ordered')
+      : '',
   }
 })
 
@@ -360,8 +367,20 @@ function toggleCurrentNumber() {
   numMenuOpen.value = false
 }
 
-function setAllNumbered(value: boolean) {
-  editor.value?.chain().focus().setAllHeadingsNumbered(value).run()
+/** 当前标题切到有序 / 无序；再点同一样式即关闭前缀 */
+function setCurrentNumberStyle(style: 'ordered' | 'unordered') {
+  const e = editor.value
+  if (!e) return
+  const active =
+    e.isActive('heading', { numbered: true }) &&
+    ((e.getAttributes('heading').numberStyle as string) || 'ordered') === style
+  if (active) e.chain().focus().toggleHeadingNumber(false).run()
+  else e.chain().focus().toggleHeadingNumber(true, style).run()
+  numMenuOpen.value = false
+}
+
+function setAllNumbered(value: boolean, style?: 'ordered' | 'unordered') {
+  editor.value?.chain().focus().setAllHeadingsNumbered(value, style).run()
   numMenuOpen.value = false
 }
 
@@ -1107,19 +1126,33 @@ function onContentClick(e: MouseEvent) {
         <button :class="{ active: barState.h1 }" @click="editor?.chain().focus().toggleHeading({ level: 1 }).run()">H1</button>
         <button :class="{ active: barState.h2 }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
 
-        <!-- 标题自动编号：标题 + 有序序号同时生效；▾ 里可一键给全文标题编号 -->
+        <!-- 标题前缀：有序 1 / 1.1 与无序 ● ○ ■ 两种样式，▾ 里可全文切换 -->
         <div class="num-dd">
           <button
             :class="['num-main', { active: barState.numbered }]"
-            title="标题 + 有序编号：当前标题切换 1 / 1.1；在列表项里会把该项转为独立编号标题"
+            title="标题前缀：当前标题开关（有序 1 / 1.1 或无序 ● ○ ■）；列表项里会把该项转为独立标题"
             @mousedown.prevent
             @click="toggleCurrentNumber"
           >№</button>
-          <button class="num-caret" title="全文标题编号" @mousedown.prevent @click="numMenuOpen = !numMenuOpen">▾</button>
+          <button class="num-caret" title="标题前缀样式" @mousedown.prevent @click="numMenuOpen = !numMenuOpen">▾</button>
           <div v-if="numMenuOpen" class="num-dd-menu">
-            <button @mousedown.prevent @click="setAllNumbered(true)">全文开启标题编号</button>
-            <button @mousedown.prevent @click="setAllNumbered(false)">全文关闭标题编号</button>
-            <span class="num-dd-tip">标题与有序编号可同时生效：1 / 1.1 / 1.1.1</span>
+            <span class="num-dd-group">当前标题</span>
+            <button
+              :class="{ on: barState.numbered && barState.numberStyle === 'ordered' }"
+              @mousedown.prevent
+              @click="setCurrentNumberStyle('ordered')"
+            >有序编号 1 / 1.1</button>
+            <button
+              :class="{ on: barState.numbered && barState.numberStyle === 'unordered' }"
+              @mousedown.prevent
+              @click="setCurrentNumberStyle('unordered')"
+            >无序符号 ● ○ ■</button>
+            <span class="num-dd-sep" />
+            <span class="num-dd-group">全文标题</span>
+            <button @mousedown.prevent @click="setAllNumbered(true, 'ordered')">全文设为有序编号</button>
+            <button @mousedown.prevent @click="setAllNumbered(true, 'unordered')">全文设为无序符号</button>
+            <button @mousedown.prevent @click="setAllNumbered(false)">全文关闭前缀</button>
+            <span class="num-dd-tip">H1–H6 共 6 级；数字与符号统一蓝色</span>
           </div>
         </div>
 
