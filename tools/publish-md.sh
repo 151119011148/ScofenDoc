@@ -153,6 +153,18 @@ if [ "$RESTART" = "1" ] && [ "${NO_RESTART:-0}" != "1" ]; then
     echo "协同服务未起来，请查 journalctl -u scofendoc-collab" >&2; exit 1; }
 fi
 
+# 通知协同服务刷新正文检索索引。
+# 走 RESTART=1 时服务重启本来就会全量重建，这里是幂等的（按 mtime 跳过未变文件）；
+# 关键是 NO_RESTART=1 / RESTART=0 的旁路：服务没重启、写入钩子也没被触发，
+# 不主动刷一次就会「正文发上去了但搜不到」。接口只绑回环，失败不影响发布主流程。
+ssh -o BatchMode=yes "$HOST" 'bash -s' <<'EOS' >/dev/null 2>&1 || true
+SECRET=$(grep '^JWT_SECRET=' /opt/scofendoc/collab/collab.env 2>/dev/null | cut -d= -f2-)
+[ -n "$SECRET" ] || exit 0
+TOKEN=$(printf '%s' "${SECRET}:search" | sha256sum | cut -d' ' -f1)
+curl -sf --max-time 10 -X POST -H "X-Internal-Token: $TOKEN" \
+  http://127.0.0.1:1235/internal/reindex >/dev/null || true
+EOS
+
 echo "==> 4/4 回读校验（确认线上文件可解析且结构完整）"
 scp -q "$HOST:$DATA_DIR/$COLLAB_KEY.bin" "$TMP_BIN"
 node "$PROJECT_ROOT/tools/md-to-collab/read-ydoc.mjs" "$TMP_BIN"

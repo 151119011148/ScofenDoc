@@ -10,6 +10,7 @@ import HeadingFold from './extensions/HeadingFold'
 import ListItemHeading from './extensions/ListItemHeading'
 import TableTools from './components/TableTools.vue'
 import { CellDragSelect } from './extensions/CellDragSelect'
+import { ParagraphStyle } from './extensions/ParagraphStyle'
 
 const editor = ref<Editor>()
 let instance: Editor | null = null
@@ -32,6 +33,9 @@ onMounted(() => {
       TableHeader,
       TableCell,
       CellDragSelect,
+      // 与生产编辑器保持同一套段落属性，否则带对齐/行高/字号的文档在此页
+      // 会因 schema 缺属性被丢掉
+      ParagraphStyle,
     ],
     content: `
       <h1>第一章</h1><h2>小节 A</h2><h2>小节 B</h2><h3>细项</h3><p>正文一段</p>

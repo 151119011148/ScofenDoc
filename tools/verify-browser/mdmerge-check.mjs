@@ -25,7 +25,8 @@ const token = jwt.sign(
 
 const BASE = 'http://47.117.110.143/scofendoc/'
 const DOCS = [
-  { title: 'Java 基础 - JDK8-11-25新特性', heads: 31, imgs: 0, codes: 1, tables: 2, minChars: 6000 },
+  // JDK 篇补全 18–25 每版特性 + 五个升级坑 + 面试四问后共 44 个标题（原期望 31 已过时）
+  { title: 'Java 基础 - JDK8-11-25新特性', heads: 44, imgs: 0, codes: 1, tables: 2, minChars: 6000 },
   { title: '关键字: synchronized详解', heads: 76, imgs: 23, codes: 37, tables: 2, minChars: 20000 },
   { title: 'MySQL - 索引(B+树)', heads: 46, imgs: 32, codes: 34, tables: 16, minChars: 20000 },
 ]

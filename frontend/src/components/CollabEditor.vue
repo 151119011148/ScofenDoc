@@ -26,6 +26,13 @@ import HeadingFold from '../extensions/HeadingFold'
 import HeadingNumber from '../extensions/HeadingNumber'
 import ListItemHeading from '../extensions/ListItemHeading'
 import TabIndent from '../extensions/TabIndent'
+import {
+  ParagraphStyle,
+  ALIGN_OPTIONS,
+  LINE_HEIGHT_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  type ParagraphStyleAttrs,
+} from '../extensions/ParagraphStyle'
 import { CellDragSelect } from '../extensions/CellDragSelect'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
@@ -354,10 +361,13 @@ const barState = computed(() => {
     return {
       bold: false, italic: false, strike: false, underline: false, code: false,
       h1: false, h2: false, bullet: false, ordered: false, task: false,
-      quote: false, table: false, numbered: false, numberStyle: '',
+      quote: false, table: false, numbered: false, numberStyle: '', align: '',
     }
   }
   return {
+    // 顶部栏只显示当前块的对齐方式；跨多行混合时的精确状态在浮动条的段落面板里
+    align: (e.getAttributes('paragraph').textAlign as string)
+      || (e.getAttributes('heading').textAlign as string) || '',
     bold: e.isActive('bold'),
     italic: e.isActive('italic'),
     strike: e.isActive('strike'),
@@ -376,6 +386,44 @@ const barState = computed(() => {
       : '',
   }
 })
+
+/**
+ * 顶部栏只留一个「¶」下拉，不摆一排按钮：.bar 是 flex-wrap，多出来的按钮
+ * 会把整条格式栏撑成两行，正好压住正文顶部的表格表头（实测回归）。
+ * 下拉里的能力与浮动条的段落面板共用同一套命令，跨多行选区一次改完。
+ */
+const paraMenuOpen = ref(false)
+
+function applyBarParagraphStyle(patch: ParagraphStyleAttrs) {
+  editor.value?.chain().focus().setParagraphStyle(patch).run()
+  paraMenuOpen.value = false
+  barTick.value++
+}
+
+function resetBarParagraph() {
+  editor.value?.chain().focus().unsetParagraphStyle().run()
+  paraMenuOpen.value = false
+  barTick.value++
+}
+
+/** 顶部栏清除格式：mark 与段落属性一起清，选中几行就清几行 */
+function clearBarFormat() {
+  editor.value
+    ?.chain()
+    .focus()
+    .unsetBold()
+    .unsetItalic()
+    .unsetStrike()
+    .unsetUnderline()
+    .unsetCode()
+    .unsetColor()
+    .unsetLink()
+    .unsetParagraphStyle()
+    .run()
+  setLastColor('')
+  paraMenuOpen.value = false
+  barTick.value++
+}
 
 /**
  * 顶部格式栏设标题：顺手记住级别，选中工具条的标题主键随后就能一键复用。
@@ -924,6 +972,9 @@ onMounted(() => {
       Underline,
       TextStyle,
       Color,
+      // 段落级排版（对齐 / 行高 / 字号）：给 paragraph / heading 挂属性，
+      // 命令会遍历选区内所有 textblock，跨多行选区一次统一生效
+      ParagraphStyle,
       // 批注锚点：正文只留 id，评论正文在 ydoc 的 comments Map 里
       CommentMark,
       // 图片：存档文章导入、以及正文里贴图都需要。inline:false 让它独占一段，
@@ -1215,6 +1266,49 @@ function onContentClick(e: MouseEvent) {
         <button :class="{ active: barState.ordered }" title="有序列表" @click="editor?.chain().focus().toggleOrderedList().run()">1.</button>
         <button :class="{ active: barState.task }" title="待办清单" @click="editor?.chain().focus().toggleTaskList().run()">☑</button>
         <button :class="{ active: barState.quote }" title="引用" @click="editor?.chain().focus().toggleBlockquote().run()">❝</button>
+
+        <!-- 段落排版：收进一个下拉，避免把顶部栏撑成两行遮挡正文表格 -->
+        <span class="bar-sep" />
+        <div class="num-dd para-dd">
+          <button
+            class="num-main"
+            :class="{ active: !!barState.align }"
+            title="段落排版：对齐 / 行高 / 字号（对选中多行一次生效）"
+            @mousedown.prevent
+            @click="paraMenuOpen = !paraMenuOpen"
+          >¶</button>
+          <button class="num-caret" title="展开段落排版" @mousedown.prevent @click="paraMenuOpen = !paraMenuOpen">▾</button>
+          <div v-if="paraMenuOpen" class="num-dd-menu para-dd-menu">
+            <span class="num-dd-group">对齐</span>
+            <button
+              v-for="o in ALIGN_OPTIONS"
+              :key="o.value"
+              :class="{ on: barState.align === o.value }"
+              @mousedown.prevent
+              @click="applyBarParagraphStyle({ textAlign: o.value })"
+            >{{ o.icon }} {{ o.label }}</button>
+            <span class="num-dd-sep" />
+            <span class="num-dd-group">行高</span>
+            <button
+              v-for="o in LINE_HEIGHT_OPTIONS"
+              :key="o.value"
+              @mousedown.prevent
+              @click="applyBarParagraphStyle({ lineHeight: o.value })"
+            >{{ o.label }} · {{ o.value }}</button>
+            <span class="num-dd-sep" />
+            <span class="num-dd-group">字号</span>
+            <button
+              v-for="o in FONT_SIZE_OPTIONS"
+              :key="o.value"
+              @mousedown.prevent
+              @click="applyBarParagraphStyle({ fontSize: o.value })"
+            >{{ o.label }} · {{ o.value }}px</button>
+            <span class="num-dd-sep" />
+            <button @mousedown.prevent @click="resetBarParagraph">↺ 恢复默认排版</button>
+            <button @mousedown.prevent @click="clearBarFormat">⌫ 清除选中内容的格式</button>
+            <span class="num-dd-tip">对选中多行一次性生效；选中文字后也可以用浮动工具条里的段落面板。正文输入 / 可插入区块</span>
+          </div>
+        </div>
 
         <!-- 光标在表格里才出现的快捷操作；完整行列操作见表格上方的浮动条 / 右键菜单 -->
         <template v-if="barState.table">

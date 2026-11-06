@@ -81,7 +81,7 @@ const shownSpaces = computed(() => (shownKind.value === 'KB' ? kbSpaces.value : 
       <input
         ref="searchEl"
         :value="props.search"
-        placeholder="搜索文档"
+        placeholder="搜索标题 / 正文"
         @input="emit('search', ($event.target as HTMLInputElement).value)"
         @keyup.esc="emit('search', '')"
       />

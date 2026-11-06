@@ -48,17 +48,20 @@ public class DocumentService {
     private final DocRepository docRepo;
     private final MembershipService membership;
     private final JwtService jwtService;
+    private final CollabSearchClient collabSearch;
 
     public DocumentService(WorkspaceRepository workspaceRepo,
                            WorkspaceMemberRepository memberRepo,
                            DocRepository docRepo,
                            MembershipService membership,
-                           JwtService jwtService) {
+                           JwtService jwtService,
+                           CollabSearchClient collabSearch) {
         this.workspaceRepo = workspaceRepo;
         this.memberRepo = memberRepo;
         this.docRepo = docRepo;
         this.membership = membership;
         this.jwtService = jwtService;
+        this.collabSearch = collabSearch;
     }
 
     /* ---------------- 空间 ---------------- */
@@ -114,11 +117,15 @@ public class DocumentService {
     }
 
     /**
-     * 跨空间搜索文档标题 / 章节号。q 为空时退化成"最近更新"，主页直接复用这个接口。
+     * 跨空间搜索：标题 / 派生章节号 / 正文。q 为空时退化成"最近更新"，主页复用。
      *
      * 只搜索「我加入的空间」，权限判定和列表一致，不会因为搜索绕过成员表。
-     * 正文是 Yjs 二进制，没有全文索引，所以这里只匹配标题；纯数字查询额外匹配
-     * 派生章节号（搜 1.1 会命中该章及其子文档），补上清理手写编号后的按号检索。
+     * 正文检索委托给协同服务（它能解析 Yjs .bin）：这里只把当前用户可见、且未软删的
+     * collabKey 传过去，协同服务只在这些 key 里搜，越权与软删风险在入口就被挡住。
+     * 协同服务不可用时 client 返回空 Map，自动降级成原来的标题搜索，不会 500。
+     *
+     * 排序：标题命中 > 章节号命中 > 正文命中次数，最后按更新时间兜底。
+     * 纯数字查询额外匹配派生章节号（搜 1.1 会命中该章及其子文档）。
      */
     public List<DocHitDto> searchDocs(String q, int limit, Long userId) {
         List<Long> ids = memberRepo.findByUserId(userId).stream()
@@ -137,23 +144,49 @@ public class DocumentService {
         // 搜索本来就查了全部可见文档：直接用这批数据算编号，不用为每个结果再查一次树
         List<Doc> all = docRepo.findByWorkspaceIdInAndDeletedFalseOrderByUpdatedAtDesc(ids);
         Map<Long, String> numbers = DocNumbers.of(all);
-
-        // 标题里手写的章节号清理掉之后，纯数字查询就直接匹配派生编号：
-        // 搜「1.1」仍能找到该章节及其子文档，不会因为编号不落库而搜不到。
         boolean chapterQuery = kw.matches("\\d+(\\.\\d+)*");
 
-        return all.stream()
-                .filter(d -> {
-                    if (kw.isEmpty()) return true;
-                    if (d.getTitle() != null && d.getTitle().toLowerCase().contains(kw)) return true;
-                    if (!chapterQuery) return false;
-                    String n = numbers.get(d.getId());
-                    return n != null && (n.equals(kw) || n.startsWith(kw + "."));
-                })
+        // 正文命中：只在有关键词时查；「最近更新」(q='') 不应触发全文扫描
+        Map<String, CollabSearchClient.Hit> bodyHits = Map.of();
+        if (!kw.isEmpty()) {
+            List<String> keys = all.stream()
+                    .map(Doc::getCollabKey)
+                    .filter(Objects::nonNull)
+                    .toList();
+            bodyHits = collabSearch.search(kw, keys, Math.max(cap * 4, 100));
+        }
+        final Map<String, CollabSearchClient.Hit> hits = bodyHits;
+
+        record Scored(Doc doc, String snippet, int score) {
+        }
+        List<Scored> scored = new ArrayList<>();
+        for (Doc d : all) {
+            if (kw.isEmpty()) {
+                scored.add(new Scored(d, null, 0));
+                continue;
+            }
+            String title = d.getTitle() == null ? "" : d.getTitle().toLowerCase();
+            boolean titleHit = title.contains(kw);
+            String n = numbers.get(d.getId());
+            boolean chapterHit = chapterQuery && n != null && (n.equals(kw) || n.startsWith(kw + "."));
+            CollabSearchClient.Hit body = hits.get(d.getCollabKey());
+            if (!titleHit && !chapterHit && body == null) continue;
+
+            int score = titleHit ? 1000 : (chapterHit ? 600 : 0);
+            if (body != null) score += Math.min(body.hits(), 50) * 10;
+            scored.add(new Scored(d, body == null ? null : body.snippet(), score));
+        }
+
+        scored.sort(Comparator.comparingInt(Scored::score).reversed()
+                .thenComparing(Comparator.comparing((Scored s) -> s.doc().getUpdatedAt()).reversed()));
+
+        return scored.stream()
                 .limit(cap)
-                .map(d -> new DocHitDto(
-                        d.getId(), d.getTitle(), numbers.get(d.getId()), d.getWorkspaceId(),
-                        nameOf.getOrDefault(d.getWorkspaceId(), ""), d.getParentId(), d.getUpdatedAt()))
+                .map(s -> new DocHitDto(
+                        s.doc().getId(), s.doc().getTitle(), numbers.get(s.doc().getId()),
+                        s.doc().getWorkspaceId(),
+                        nameOf.getOrDefault(s.doc().getWorkspaceId(), ""),
+                        s.doc().getParentId(), s.doc().getUpdatedAt(), s.snippet()))
                 .toList();
     }
 

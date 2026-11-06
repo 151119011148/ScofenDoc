@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
+import { TextSelection } from '@tiptap/pm/state'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import type * as Y from 'yjs'
 import { getLastColor, setLastColor } from '../colorMemory'
 import { getLastHeading, headingName, headingShort, setLastHeading } from '../headingMemory'
+import {
+  ALIGN_OPTIONS,
+  FONT_SIZE_OPTIONS,
+  LINE_HEIGHT_OPTIONS,
+  type ParagraphStyleAttrs,
+} from '../extensions/ParagraphStyle'
 
 /**
  * 选中文字后的浮动格式条（对标飞书/Notion 的 bubble toolbar）。
@@ -66,7 +74,7 @@ const barW = ref(340)
 const barH = ref(40)
 
 /** 当前展开的下拉/输入面板 */
-const panel = ref<'' | 'heading' | 'list' | 'color' | 'link' | 'more' | 'comment'>('')
+const panel = ref<'' | 'heading' | 'list' | 'color' | 'link' | 'more' | 'comment' | 'paragraph'>('')
 
 const linkUrl = ref('')
 const linkInput = ref<HTMLInputElement | null>(null)
@@ -172,7 +180,33 @@ function resetPointer() {
 function selectionRect(): { left: number; top: number; bottom: number; width: number; height: number } | null {
   const sel = window.getSelection()
   if (sel && sel.rangeCount && !sel.isCollapsed) {
-    const r = sel.getRangeAt(0).getBoundingClientRect()
+    const range = sel.getRangeAt(0)
+    const rects = [...range.getClientRects()].filter((r) => r.width > 0 || r.height > 0)
+    // 跨多行时 getBoundingClientRect() 是所有行的联合包围盒，工具条会被顶到选区
+    // 最上方、离真正收尾的光标很远 —— 这正是「选中多行后工具条像没弹」的原因。
+    // 改成锚在光标所在行：无论从上往下选还是从下往上选，都跟着鼠标那一头。
+    if (rects.length > 1) {
+      try {
+        const caret = document.createRange()
+        caret.setStart(sel.focusNode!, sel.focusOffset)
+        caret.collapse(true)
+        const r = caret.getBoundingClientRect()
+        if (r.left || r.top) {
+          return {
+            left: r.left,
+            top: r.top,
+            bottom: r.bottom || r.top + 16,
+            width: 1,
+            height: Math.max(r.bottom - r.top, 16),
+          }
+        }
+      } catch {
+        // focusNode 是元素节点、offset 越界时退回最后一行
+      }
+      const last = rects[rects.length - 1]
+      return { left: last.left, top: last.top, bottom: last.bottom, width: last.width, height: last.height }
+    }
+    const r = range.getBoundingClientRect()
     if (r.width || r.height) {
       return { left: r.left, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
     }
@@ -210,6 +244,10 @@ function updatePosition() {
   if (pointerDown) return hideBar()
   // 评论弹层打开时，工具条让位，不跟着重新计算
   if (threadId.value) return
+  // 只服务文字选区。CellSelection（跨表格单元格）与 NodeSelection（整图/整表）
+  // 不是 TextSelection 的子类，一起挡掉：否则文字浮条会盖住 TableTools 的
+  // 单元格操作条，而且这里的加粗/上色按钮对它们点了也没有意义。
+  if (!(e.state.selection instanceof TextSelection)) return hideBar()
   if (e.state.selection.empty && !panel.value) return hideBar()
 
   // 焦点已经落到面板输入框里，DOM 选区不在正文，别乱动
@@ -348,6 +386,75 @@ const colorValue = computed(() => {
   return (props.editor?.getAttributes('textStyle').color as string) || ''
 })
 
+/**
+ * 选区里某个 mark 是否「一部分有、一部分没有」。
+ *
+ * Tiptap 的 isActive 要求选区 100% 被该 mark 覆盖才返回 true，所以跨段落
+ * 「一段加粗、一段没加粗」时 B 按钮是全灭的；而 toggleBold 看到 isActive=false
+ * 会走 setMark，把整段选区全部加粗 —— 界面状态与点击结果对不上。
+ * 这里单独算出混合态，给按钮一个第三种视觉状态并在 title 里说明点击结果。
+ */
+function markMixed(name: string): boolean {
+  const e = props.editor
+  if (!e || e.isDestroyed) return false
+  const sel = e.state.selection
+  if (sel.empty || !(sel instanceof TextSelection)) return false
+  let has = false
+  let missing = false
+  e.state.doc.nodesBetween(sel.from, sel.to, (node) => {
+    if (!node.isText || !node.text?.length) return
+    if (node.marks.some((m) => m.type.name === name)) has = true
+    else missing = true
+  })
+  return has && missing
+}
+const mixedBold = computed(() => (void tick.value, markMixed('bold')))
+const mixedItalic = computed(() => (void tick.value, markMixed('italic')))
+const mixedStrike = computed(() => (void tick.value, markMixed('strike')))
+const mixedUnderline = computed(() => (void tick.value, markMixed('underline')))
+
+/**
+ * 选区内所有段落的排版属性值。值不一致时该键返回 '' 并置 mixed，
+ * 避免把第一段的对齐方式错当成整片选区的状态。
+ */
+const paraState = computed(() => {
+  void tick.value
+  const state = { textAlign: '', lineHeight: '', fontSize: '', mixed: false, blocks: 0 }
+  const e = props.editor
+  if (!e || e.isDestroyed) return state
+  const sel = e.state.selection
+  const blocks: PMNode[] = []
+  e.state.doc.nodesBetween(sel.from, sel.to, (node) => {
+    if (node.isTextblock) blocks.push(node)
+  })
+  if (!blocks.length) {
+    for (let d = sel.$from.depth; d > 0; d--) {
+      const n = sel.$from.node(d)
+      if (n.isTextblock) {
+        blocks.push(n)
+        break
+      }
+    }
+  }
+  if (!blocks.length) return state
+  const read = (k: string) => {
+    const vals = blocks.map((b) => (b.attrs[k] as string | null) ?? '')
+    const first = vals[0]
+    const mixed = vals.some((v) => v !== first)
+    return { value: mixed ? '' : first, mixed }
+  }
+  const a = read('textAlign')
+  const l = read('lineHeight')
+  const f = read('fontSize')
+  return {
+    textAlign: a.value,
+    lineHeight: l.value,
+    fontSize: f.value,
+    mixed: a.mixed || l.mixed || f.mixed,
+    blocks: blocks.length,
+  }
+})
+
 /** 各面板大致高度：用来判断上方空间够不够（不够就向下展开） */
 const PANEL_HEIGHT: Record<string, number> = {
   heading: 360,
@@ -356,6 +463,7 @@ const PANEL_HEIGHT: Record<string, number> = {
   link: 70,
   more: 220,
   comment: 232,
+  paragraph: 300,
 }
 
 /** 工具条在选区上方时面板向上展开，别把刚选中的字盖住 */
@@ -490,9 +598,26 @@ function clearFormat() {
     .unsetCode()
     .unsetColor()
     .unsetLink()
+    // 段落级排版（对齐/行高/字号）也一并清掉，否则「清除格式」之后
+    // 选中的几行看起来还是被调过，和按钮名字对不上
+    .unsetParagraphStyle()
     .run()
   // 清格式连记忆一起清，否则后面每段都会被上一次的颜色续上
   setLastColor('')
+  panel.value = ''
+  tick.value++
+}
+
+/** 对选区内所有段落一次性设置排版属性（跨多行、跨列表/引用/表格单元格都生效） */
+function applyParagraphStyle(patch: ParagraphStyleAttrs) {
+  props.editor?.chain().focus().setParagraphStyle(patch).run()
+  panel.value = ''
+  tick.value++
+}
+
+/** 恢复正文默认排版 */
+function resetParagraphStyle() {
+  props.editor?.chain().focus().unsetParagraphStyle().run()
   panel.value = ''
   tick.value++
 }
@@ -851,18 +976,29 @@ defineExpose({ openThread, closeThread })
         <span class="chev">▾</span>
       </button>
 
+      <button
+        class="wide"
+        :class="{ on: panel === 'paragraph' || paraState.mixed || !!(paraState.textAlign || paraState.lineHeight || paraState.fontSize) }"
+        :title="`段落排版：对齐 / 行高 / 字号（选中 ${paraState.blocks} 个段落，一次统一生效）`"
+        @mousedown="keepSelection"
+        @click="togglePanel('paragraph')"
+      >
+        <span class="para-ico">¶</span>
+        <span class="chev">▾</span>
+      </button>
+
       <span class="sel-sep" />
 
-      <button :class="{ on: isBold }" title="加粗 ⌘B" @mousedown="keepSelection" @click="editor?.chain().focus().toggleBold().run()">
+      <button :class="{ on: isBold, mixed: mixedBold }" :title="mixedBold ? '部分文字已加粗，点击统一加粗' : '加粗 ⌘B'" @mousedown="keepSelection" @click="editor?.chain().focus().toggleBold().run()">
         <b>B</b>
       </button>
-      <button :class="{ on: isStrike }" title="删除线" @mousedown="keepSelection" @click="editor?.chain().focus().toggleStrike().run()">
+      <button :class="{ on: isStrike, mixed: mixedStrike }" :title="mixedStrike ? '部分文字有删除线，点击统一加上' : '删除线'" @mousedown="keepSelection" @click="editor?.chain().focus().toggleStrike().run()">
         <span class="ic-strike">S</span>
       </button>
-      <button :class="{ on: isItalic }" title="斜体 ⌘I" @mousedown="keepSelection" @click="editor?.chain().focus().toggleItalic().run()">
+      <button :class="{ on: isItalic, mixed: mixedItalic }" :title="mixedItalic ? '部分文字是斜体，点击统一设为斜体' : '斜体 ⌘I'" @mousedown="keepSelection" @click="editor?.chain().focus().toggleItalic().run()">
         <i>I</i>
       </button>
-      <button :class="{ on: isUnderline }" title="下划线 ⌘U" @mousedown="keepSelection" @click="editor?.chain().focus().toggleUnderline().run()">
+      <button :class="{ on: isUnderline, mixed: mixedUnderline }" :title="mixedUnderline ? '部分文字有下划线，点击统一加上' : '下划线 ⌘U'" @mousedown="keepSelection" @click="editor?.chain().focus().toggleUnderline().run()">
         <u>U</u>
       </button>
       <button :class="{ on: hasLink || panel === 'link' }" title="链接" @mousedown="keepSelection" @click="togglePanel('link')">
@@ -906,6 +1042,57 @@ defineExpose({ openThread, closeThread })
           <path d="M4 4h16v12H9l-5 4z" />
         </svg>
       </button>
+    </div>
+
+    <!-- 段落排版：对齐 / 行高 / 字号，一次作用于选区内的所有段落 -->
+    <div v-if="panel === 'paragraph'" class="sel-panel sel-para">
+      <div class="sel-sect">
+        对齐
+        <span v-if="paraState.mixed" class="sel-mixed-tip">选区内不一致，点击即统一</span>
+      </div>
+      <div class="sel-grid">
+        <button
+          v-for="o in ALIGN_OPTIONS"
+          :key="o.value"
+          class="sel-chip"
+          :class="{ on: paraState.textAlign === o.value }"
+          @mousedown="keepSelection"
+          @click="applyParagraphStyle({ textAlign: o.value })"
+        >
+          <span class="sel-ic">{{ o.icon }}</span>{{ o.label }}
+        </button>
+      </div>
+      <div class="sel-sect">行高</div>
+      <div class="sel-grid">
+        <button
+          v-for="o in LINE_HEIGHT_OPTIONS"
+          :key="o.value"
+          class="sel-chip"
+          :class="{ on: paraState.lineHeight === o.value }"
+          @mousedown="keepSelection"
+          @click="applyParagraphStyle({ lineHeight: o.value })"
+        >
+          {{ o.label }} <small>{{ o.value }}</small>
+        </button>
+      </div>
+      <div class="sel-sect">字号</div>
+      <div class="sel-grid">
+        <button
+          v-for="o in FONT_SIZE_OPTIONS"
+          :key="o.value"
+          class="sel-chip"
+          :class="{ on: paraState.fontSize === o.value }"
+          @mousedown="keepSelection"
+          @click="applyParagraphStyle({ fontSize: o.value })"
+        >
+          {{ o.label }} <small>{{ o.value }}</small>
+        </button>
+      </div>
+      <span class="sel-sep-line" />
+      <button class="sel-item" @mousedown="keepSelection" @click="resetParagraphStyle">
+        <span class="sel-ic">↺</span>恢复默认排版
+      </button>
+      <div class="sel-hint">对选中的 {{ paraState.blocks }} 个段落统一生效</div>
     </div>
 
     <!-- 标题 -->

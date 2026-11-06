@@ -137,7 +137,9 @@ out.boldApplied = await page.$$eval('.ProseMirror strong', (els) => els.map((e) 
 // 5) 字体颜色：选中未加粗的「甲段落」
 await selectText('甲段落')
 await page.waitForSelector('.sel-bar', { timeout: 4000 })
-await page.click('.sel-bar button[title="字体颜色"]')
+// 颜色主键改成「单击套用上次颜色」后 title 是动态的，首次才打开色板；
+// 验收要点 ▾ 才一定能展开色板，不依赖有没有记忆色
+await page.click('.color-dd .color-caret')
 await page.waitForSelector('.sel-panel.sel-colors', { timeout: 3000 })
 await page.screenshot({ path: 'bubble-2-color.png', clip: { x: 0, y: Math.max(0, out.barRect.top - 160), width: 900, height: 460 } })
 await page.evaluate(() => {

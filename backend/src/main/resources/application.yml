@@ -53,6 +53,10 @@ scofendoc:
     ttl-seconds: ${JWT_TTL_SECONDS:604800}
     # 协同 token 有效期：2 小时（前端每次切文档重新申请）
     collab-ttl-seconds: ${JWT_COLLAB_TTL_SECONDS:7200}
+  # 正文全文检索由协同服务提供（它能解析 Yjs .bin）。只绑回环、不走 Nginx。
+  # 协同服务不可用时搜索自动降级为标题匹配，不影响主流程。
+  collab:
+    search-url: ${COLLAB_SEARCH_URL:http://127.0.0.1:1235/internal/search}
 
 # 说明：本地无 MySQL 时，可临时改用 H2 以便直接启动后端（仅 Demo）：
 # spring:

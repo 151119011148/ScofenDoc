@@ -36,6 +36,8 @@ export interface DocHit {
   workspaceName: string
   parentId: number | null
   updatedAt: string
+  /** 正文命中的上下文片段；标题命中或「最近更新」时为空 */
+  snippet?: string | null
 }
 
 export interface User {

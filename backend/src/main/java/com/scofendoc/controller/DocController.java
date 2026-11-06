@@ -49,7 +49,8 @@ public class DocController {
     }
 
     /**
-     * 跨空间搜索文档标题；q 为空即"最近更新"（主页用）。
+     * 跨空间搜索标题 + 章节号 + 正文；q 为空即"最近更新"（主页用）。
+     * 正文命中会在结果里带 snippet（上下文片段），供前端高亮展示。
      * limit 默认 20，服务端封顶 50。
      */
     @GetMapping("/docs/search")

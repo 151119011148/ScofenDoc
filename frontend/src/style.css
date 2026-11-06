@@ -508,13 +508,11 @@ body {
   margin: 0 2px;
 }
 
+/* 「输入 / 插入区块」是装饰性提示，但 .bar 是 flex-wrap：宽度稍紧时它会独自
+   换到第二行，把格式栏从 45px 撑到 75px，正好压住正文顶部的表格表头。
+   手机端本来就隐藏了它，桌面也一并隐藏；提示写进 ¶ 下拉的 tip 里。 */
 .collab .bar .slash-tip {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text-3);
-  border: 1px dashed var(--line);
-  border-radius: 4px;
-  padding: 2px 6px;
+  display: none;
 }
 
 .collab .bar button {
@@ -543,7 +541,11 @@ body {
   font-size: 15.5px;
   min-height: 400px;
 }
+/* 跨多行选区给一层更轻的蓝色，浏览器默认的深蓝会把几行文字整片盖住 */
+.ProseMirror ::selection { background: rgba(51, 112, 255, 0.18); }
 .ProseMirror > * + * { margin-top: 12px; }
+/* 段落级排版（text-align / line-height / font-size）由 ParagraphStyle 写行内 style，
+   优先级高于这里的默认值，存量文档没有这些属性时自然回落到 1.8 / 15.5px。 */
 .ProseMirror h1 { font-size: 26px; }
 .ProseMirror h2 { font-size: 21px; }
 .ProseMirror h3 { font-size: 17px; }
@@ -1009,6 +1011,13 @@ body.resize-cursor * {
 .sel-bar button.wide { padding: 0 4px 0 6px; }
 .sel-bar button:hover { background: rgba(31, 35, 41, 0.06); }
 .sel-bar button.on { background: #eaf1ff; color: var(--brand); }
+/* 跨多行混合格式：isActive 全灭不代表没有格式，用半亮 + 虚线给出第三种状态 */
+.sel-bar button.mixed {
+  background: #f0f4ff;
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px rgba(51, 112, 255, 0.45);
+}
+.sel-bar .para-ico { font-size: 15px; font-weight: 600; }
 .sel-bar button b { font-size: 15px; }
 .sel-bar button i { font-family: Georgia, "Times New Roman", serif; font-size: 15px; }
 .sel-bar button u { text-underline-offset: 2px; font-size: 14px; }
@@ -1076,6 +1085,44 @@ body.resize-cursor * {
 }
 .sel-item:hover { background: #f2f3f5; }
 .sel-item.on { color: var(--brand); background: #eaf1ff; }
+
+/* 段落排版面板：对齐 / 行高 / 字号，一次作用于选区里的所有段落 */
+.sel-para { width: 236px; }
+.sel-sect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 4px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.sel-mixed-tip { font-size: 10px; color: #e8912d; }
+.sel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 0 4px 4px;
+}
+.sel-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.sel-chip:hover { background: #f2f3f5; }
+.sel-chip.on { background: #eaf1ff; color: var(--brand); }
+.sel-chip small { color: var(--text-3); font-size: 10px; }
+.sel-chip.on small { color: var(--brand); }
+.sel-chip .sel-ic { font-size: 13px; width: 14px; }
+.sel-hint { padding: 4px 8px 2px; font-size: 10px; color: var(--text-3); }
 .sel-ic {
   display: inline-flex;
   align-items: center;
@@ -2551,11 +2598,31 @@ body.resize-cursor * {
 }
 .hit-meta { font-size: 11px; color: var(--text-3); }
 .hit-time { flex: 0 0 auto; font-size: 11px; color: var(--text-3); }
-.hit-title mark {
+.hit-title mark,
+.hit-snippet mark {
   background: #fff1b8;
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+}
+/* 正文命中摘要：两行封顶，关键词高亮，避免长文把结果列表撑散 */
+.hit-snippet {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.hit-src {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #eef3ff;
+  color: #3370ff;
+  font-size: 10px;
 }
 
 /* ============ 搜索结果 ============ */
@@ -3175,6 +3242,8 @@ body.resize-cursor * {
   color: var(--text-3);
 }
 .num-dd-sep { height: 1px; margin: 5px 2px; background: var(--line); }
+/* 段落排版下拉项较多（4 对齐 + 4 行高 + 4 字号 + 2 操作），封顶可滚动，别顶出视口 */
+.para-dd-menu { max-height: 420px; overflow-y: auto; }
 .num-dd-tip {
   padding: 7px 10px 4px;
   margin-top: 3px;

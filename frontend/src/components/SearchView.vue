@@ -32,6 +32,6 @@ const emit = defineEmits<{
     <DocHitList v-else-if="props.hits.length" :hits="props.hits" :keyword="props.keyword" @open="emit('open', $event)" />
     <div v-else class="home-empty">没有匹配的文档，换个关键词试试</div>
 
-    <p class="search-tip">只搜索文档标题（正文是协同编辑的二进制态，暂未建全文索引）</p>
+    <p class="search-tip">同时搜索文档标题与正文内容；正文命中会显示关键词所在的上下文片段</p>
   </div>
 </template>
