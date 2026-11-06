@@ -19,10 +19,13 @@ import { stickyTopGap } from '../stickyGap'
  * 2) 整组原子：子树里只要有一条会越过 H1/H6 边界，就整组拦下并说明原因。
  *    逐条 clamp 会把层级压平（H2、H3 一起降 → H3、H3），比不动更糟。
  * 3) 可撤销：所有改动走单个 ProseMirror 事务（Yjs 里也是一个 update），
- *    面板自带「撤销 / 重做」，焦点在大纲里时 Ctrl/⌘+Z 也能直接用。
+ *    Ctrl/⌘+Z 直接可用，不额外占一个按钮条。
  *
  * 支持多选批量调整：Cmd/Ctrl 点击加减选、Shift 点击选范围，选中后顶部浮出批量条，
  * 选中集合按「子树并集」计算，父子同时选中不会把子级降两级。
+ *
+ * 折叠（对齐飞书）：有子级的条目前面留一个三角位，悬停才出现；点一下折起，
+ * 折起后三角常驻（提示这里藏着内容）。折叠只影响大纲本身，不动正文。
  *
  * 标题位置由调用方（App.vue）通过 editor + refresh 触发重扫，
  * 因为正文是 Yjs 协同、由 Tiptap 渲染，Vue 无法直接响应其 DOM 变化。
@@ -75,11 +78,22 @@ function scanHeads(): Head[] {
   return els.map((el) => ({ el, level: Number(el.tagName.charAt(1)) }))
 }
 
-/** 标题纯文本：折叠三角是装饰节点、自动编号是伪元素，两者都不该进文字 */
+/** 标题纯文本：自动编号是伪元素，取 textContent 不会带上，这里只做空白归一化 */
 function textOf(el: HTMLElement): string {
-  const copy = el.cloneNode(true) as HTMLElement
-  copy.querySelectorAll('.fold-caret').forEach((n) => n.remove())
-  return (copy.textContent || '').replace(/\s+/g, ' ').trim()
+  return (el.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * 折叠状态：存的是「被折叠的标题元素」本身。
+ *
+ * 用元素而不是索引/文字：索引会随标题增删漂移，文字可能重复（大量「21」这种标题）。
+ * 元素身份能扛住正文里增删别的标题、也能扛住只改文字。
+ * 改层级时 h2→h3 会被 ProseMirror 换成新元素，那次由 applyPlan 里按序号搬回来。
+ */
+const folded = ref<Set<HTMLElement>>(new Set())
+
+function isFolded(el: HTMLElement): boolean {
+  return folded.value.has(el)
 }
 
 function buildItems(all: Head[]): { list: Item[]; limit: number } {
@@ -88,11 +102,16 @@ function buildItems(all: Head[]): { list: Item[]; limit: number } {
   // 显示到「文档真正用到的最深层级」：三级文档不长个子，四级文档也不会把 H4 藏起来
   const limit = Math.min(MAX_LEVEL, deepest)
   const list: Item[] = []
+  // 祖先链：进到某个标题时，比它浅的那些才是它的祖先，折叠状态沿链传递
+  const chain: { level: number; folded: boolean }[] = []
   for (let i = 0; i < all.length; i++) {
     const h = all[i]
+    while (chain.length && chain[chain.length - 1].level >= h.level) chain.pop()
+    const hidden = chain.some((c) => c.folded)
+    chain.push({ level: h.level, folded: isFolded(h.el) })
     if (h.level > limit) continue
-    // 跳过折叠后隐藏的标题（其祖先带 fold-hidden）
-    if (h.el.closest('.fold-hidden')) continue
+    // 祖先被折叠：这条不进大纲（但仍要进 chain，它的子级同样隐藏）
+    if (hidden) continue
     const raw = textOf(h.el)
     if (!raw) continue
     // 子树 = 紧随其后、每一条都比它深的标题，遇到同级或更浅即止
@@ -157,51 +176,33 @@ const editable = ref(true)
 function onEditorUpdate() {
   const now = !!props.editor?.isEditable
   if (now !== editable.value) editable.value = now
-  syncHistory()
 }
 const canEdit = computed(() => editable.value && !!props.editor)
 
-/* ---------------- 撤销 / 重做 ---------------- */
+/* ---------------- 撤销 / 重做（只留快捷键，不占按钮条） ---------------- */
 
 /**
- * 撤销栈是 Yjs 的 UndoManager（StarterKit 的 history 已关掉），
- * editor.can().undo() 会看它的栈里还有没有东西可用。
+ * 撤销栈是 Yjs 的 UndoManager（StarterKit 的 history 已关掉）。
  *
- * 面板单独给按钮的原因：点了大纲里的 ↑↓ 之后焦点在按钮上，
- * 键盘的 Ctrl+Z 根本到不了正文编辑器，用户会以为「撤不了」。
+ * 不在面板上放「撤销 / 重做」按钮：编辑区的 Ctrl/⌘+Z 本来就能用。
+ * 但点完大纲里的 ↑↓ / 三角后焦点在按钮上，键盘事件到不了正文编辑器，
+ * 所以下面 onKeydown 在大纲内部接管一次，转发给编辑器的 undo/redo。
  */
-const undoable = ref(false)
-const redoable = ref(false)
-
-function syncHistory() {
-  const ed = props.editor
-  try {
-    undoable.value = !!ed && ed.isEditable && !!ed.can().undo()
-    redoable.value = !!ed && ed.isEditable && !!ed.can().redo()
-  } catch {
-    undoable.value = false
-    redoable.value = false
-  }
-}
-
 function undo() {
-  if (!canEdit.value || !undoable.value) return
+  if (!canEdit.value) return
   props.editor?.commands.undo()
   afterHistory()
 }
 
 function redo() {
-  if (!canEdit.value || !redoable.value) return
+  if (!canEdit.value) return
   props.editor?.commands.redo()
   afterHistory()
 }
 
 function afterHistory() {
   // 撤销回退的是正文节点，大纲要等 DOM 落地后再扫一遍
-  window.requestAnimationFrame(() => {
-    refresh()
-    syncHistory()
-  })
+  window.requestAnimationFrame(() => refresh())
 }
 
 /**
@@ -296,6 +297,14 @@ function applyPlan(steps: Step[]): number {
   const view = ed?.view
   if (!ed || !view || !ed.isEditable) return 0
 
+  // 改层级会把 h2 换成 h3（DOM 元素重建），折叠状态记在元素上会跟着丢。
+  // 节点顺序不会被层级改动打乱，所以先记下「折叠项在标题序列里的序号」，改完再搬回去。
+  const before = scanHeads()
+  const foldedAt: number[] = []
+  before.forEach((h, i) => {
+    if (isFolded(h.el)) foldedAt.push(i)
+  })
+
   const tr = view.state.tr
   let done = 0
   for (const s of steps) {
@@ -314,6 +323,13 @@ function applyPlan(steps: Step[]): number {
   }
   if (!done) return 0
   view.dispatch(tr)
+
+  if (foldedAt.length) {
+    const after = scanHeads()
+    folded.value = new Set(
+      foldedAt.map((i) => after[i]?.el).filter((el): el is HTMLElement => !!el),
+    )
+  }
   return done
 }
 
@@ -332,10 +348,7 @@ function shiftLevel(item: Item, delta: number) {
   const extra = steps.length - 1
   flash(extra > 0 ? `已${verb}「${item.raw}」及 ${extra} 条子级` : `已${verb}「${item.raw}」`)
   // 标签从 h2 变 h3，缩进要立刻跟上；不等 MutationObserver 那一拍
-  window.requestAnimationFrame(() => {
-    refresh()
-    syncHistory()
-  })
+  window.requestAnimationFrame(() => refresh())
 }
 
 /* ---------------- 多选：批量调整层级 ---------------- */
@@ -454,18 +467,55 @@ function shiftSelected(delta: number) {
   const verb = delta < 0 ? '提升' : '降低'
   const extra = steps.length - done
   flash(`已${verb} ${done} 条${extra > 0 ? `（另 ${extra} 条已在该层级）` : ''}`)
-  window.requestAnimationFrame(() => {
-    refresh()
-    syncHistory()
-  })
+  window.requestAnimationFrame(() => refresh())
 }
 
 function refresh() {
   const all = scanHeads()
+  // 正文里被删掉/重建的标题，对应的折叠记录一并清掉，免得 Set 越攒越大
+  if (folded.value.size) {
+    const alive = new Set(all.map((h) => h.el))
+    let stale = false
+    for (const el of folded.value) {
+      if (!alive.has(el)) {
+        stale = true
+        break
+      }
+    }
+    if (stale) {
+      const next = new Set<HTMLElement>()
+      for (const el of folded.value) if (alive.has(el)) next.add(el)
+      folded.value = next
+    }
+  }
   const { list } = buildItems(all)
   // 正文标题增删会让索引错位，旧选择可能指向别的标题，直接作废
   if (list.length !== items.value.length) clearSelection()
   items.value = list
+}
+
+/**
+ * 折叠 / 展开某一条。
+ *
+ * 只影响大纲列表，不动正文——和飞书一致：目录里收起一节，是为了让长文档的
+ * 结构一眼看清，不是要把正文段落也藏起来。
+ */
+function toggleFold(item: Item) {
+  const next = new Set(folded.value)
+  const wasFolded = next.has(item.el)
+  if (wasFolded) next.delete(item.el)
+  else next.add(item.el)
+  folded.value = next
+  // 选中集合存的是列表索引，折叠后整体错位，继续用会改错标题
+  clearSelection()
+  const keep = activeId.value === null ? null : items.value[activeId.value]?.el ?? null
+  refresh()
+  // 折起来后高亮不能停在看不见的子级上，退回到被折叠的这一条
+  const nowVisible = activeId.value === null ? null : items.value[activeId.value]?.el ?? null
+  if (keep && keep !== nowVisible) {
+    const i = items.value.findIndex((it) => it.el === item.el)
+    if (i >= 0) activeId.value = i
+  }
 }
 
 let spyTimer: number | undefined
@@ -505,7 +555,6 @@ watch(
     ed?.on?.('update', onEditorUpdate)
     editable.value = !!ed?.isEditable
     refresh()
-    syncHistory()
   },
   { immediate: true },
 )
@@ -570,24 +619,6 @@ onBeforeUnmount(() => {
 <template>
   <!-- 只负责列表本身：外框、标题、拖拽宽度都由 App 的中间栏控制 -->
   <div class="outline-body">
-    <!-- 层级调整可撤销：焦点在大纲里时 Ctrl/⌘+Z 也能用，不必先点回正文 -->
-    <div v-if="canEdit" class="outline-tools">
-      <button
-        class="ot-btn"
-        type="button"
-        :disabled="!undoable"
-        :title="undoable ? '撤销上一步（Ctrl/⌘+Z）' : '没有可撤销的操作'"
-        @click="undo"
-      >↶ 撤销</button>
-      <button
-        class="ot-btn"
-        type="button"
-        :disabled="!redoable"
-        :title="redoable ? '重做（Ctrl/⌘+Shift+Z）' : '没有可重做的操作'"
-        @click="redo"
-      >↷ 重做</button>
-    </div>
-
     <!-- 多选批量条：Cmd/Ctrl 加选、Shift 选范围后出现；整组升降，保持组内相对关系 -->
     <div v-if="canEdit && selCount > 0" class="outline-batch">
       <span class="ob-count">{{ hint || `已选 ${selCount} 条` }}</span>
@@ -616,11 +647,23 @@ onBeforeUnmount(() => {
       <li
         v-for="(item, i) in items"
         :key="i"
-        :class="['outline-item', `lvl-${item.level}`, { on: i === activeId, sel: selected.has(i) }]"
+        :class="['outline-item', `lvl-${item.level}`, { on: i === activeId, sel: selected.has(i), folded: isFolded(item.el) }]"
         :title="canEdit ? '点击跳转；Ctrl/⌘ 点击多选，Shift 选连续范围' : ''"
         @mousedown="onItemMouseDown"
         @click="onItemClick(item, i, $event)"
       >
+        <!-- 折叠三角：有子级才占位；悬停出现、折起后常驻（同飞书） -->
+        <button
+          v-if="item.kids > 0"
+          class="outline-caret"
+          :class="{ open: !isFolded(item.el) }"
+          type="button"
+          :title="isFolded(item.el) ? `展开「${item.raw}」下的 ${item.kids} 条` : `折叠「${item.raw}」下的 ${item.kids} 条`"
+          :aria-label="isFolded(item.el) ? `展开「${item.raw}」` : `折叠「${item.raw}」`"
+          :aria-expanded="!isFolded(item.el)"
+          @mousedown.stop.prevent
+          @click.stop="toggleFold(item)"
+        ></button>
         <span class="outline-text">{{ item.text }}</span>
         <!-- 悬停才出现：提升 / 降低层级，边界层级置灰 -->
         <span v-if="canEdit" class="outline-acts" @click.stop>

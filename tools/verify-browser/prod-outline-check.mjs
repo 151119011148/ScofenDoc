@@ -3,8 +3,8 @@
  *
  *   node prod-outline-check.mjs <JWT_SECRET> [baseUrl]
  *
- * 覆盖：新前端已上线（大纲工具条存在）、大纲层级缩进、撤销按钮初始不可用、
- *       条目数与正文标题数一致、页面无 JS 报错。不点击任何会改正文的按钮。
+ * 覆盖：新前端已上线（撤销按钮已移除、折叠三角存在）、大纲层级缩进、
+ *       折叠/展开可用且不改正文、条目数与正文标题数一致、页面无 JS 报错。
  */
 import puppeteer from 'puppeteer-core'
 import jwt from 'jsonwebtoken'
@@ -57,24 +57,56 @@ await sleep(1200)
 
 const st = await page.evaluate(() => {
   const items = [...document.querySelectorAll('.outline-item')]
-  const tools = [...document.querySelectorAll('.ot-btn')]
   return {
-    tools: tools.map((b) => ({ text: b.textContent.trim(), disabled: b.disabled, title: b.title })),
+    tools: document.querySelectorAll('.ot-btn').length,
     itemCount: items.length,
     levels: items.map((li) => (li.className.match(/lvl-\d/) || [''])[0]),
     texts: items.slice(0, 3).map((li) => li.querySelector('.outline-text')?.textContent?.trim() || ''),
     acts: document.querySelectorAll('.outline-act').length,
+    carets: document.querySelectorAll('.outline-caret').length,
     headCount: document.querySelectorAll('.ProseMirror h1,.ProseMirror h2,.ProseMirror h3,.ProseMirror h4,.ProseMirror h5,.ProseMirror h6').length,
     hint: document.querySelectorAll('.outline-toast').length,
   }
 })
 
-check('新前端已上线：大纲出现「撤销 / 重做」', st.tools.length === 2 && /撤销/.test(st.tools[0].text) && /重做/.test(st.tools[1].text), st.tools.map((t) => t.text).join(' | '))
-check('刚打开文档时两步都不可用', st.tools[0]?.disabled === true && st.tools[1]?.disabled === true)
+check('新前端已上线：撤销 / 重做按钮已移除（只留快捷键）', st.tools === 0, String(st.tools))
 check('大纲条目已渲染且缩进分级正确', st.itemCount > 3 && st.levels.every((c) => /^lvl-[1-6]$/.test(c)), `${st.itemCount} ${st.levels.slice(0, 6).join('/')}`)
 check('每条都有层级按钮', st.acts === st.itemCount * 2, `${st.acts}/${st.itemCount}`)
+check('带子级的条目有折叠三角', st.carets > 0 && st.carets < st.itemCount, `${st.carets}/${st.itemCount}`)
 check('大纲条目不超出正文标题数', st.itemCount <= st.headCount, `${st.itemCount}/${st.headCount}`)
 check('没有残留的操作提示', st.hint === 0)
+
+// 折叠只改目录、不动正文：展开/收起后正文标题数必须一致
+const foldBefore = await page.evaluate(() => {
+  const li = [...document.querySelectorAll('.outline-item')].find((x) => x.querySelector('.outline-caret'))
+  if (!li) return null
+  const before = {
+    items: document.querySelectorAll('.outline-item').length,
+    heads: document.querySelectorAll('.ProseMirror h1,.ProseMirror h2,.ProseMirror h3,.ProseMirror h4,.ProseMirror h5,.ProseMirror h6').length,
+  }
+  li.querySelector('.outline-caret').click()
+  return before
+})
+await sleep(400)
+const foldAfter = await page.evaluate(() => ({
+  items: document.querySelectorAll('.outline-item').length,
+  heads: document.querySelectorAll('.ProseMirror h1,.ProseMirror h2,.ProseMirror h3,.ProseMirror h4,.ProseMirror h5,.ProseMirror h6').length,
+  folded: document.querySelectorAll('.outline-item.folded').length,
+  caretAlways: [...document.querySelectorAll('.outline-item.folded > .outline-caret')].every((c) => Number(getComputedStyle(c).opacity) === 1),
+}))
+check('点三角能折叠：条目变少、正文不变', !!foldBefore && foldAfter.items < foldBefore.items && foldAfter.heads === foldBefore.heads, `${foldBefore?.items}→${foldAfter.items} 正文 ${foldBefore?.heads}/${foldAfter.heads}`)
+check('折叠后三角常驻显示', foldAfter.folded === 1 && foldAfter.caretAlways, `${foldAfter.folded} ${foldAfter.caretAlways}`)
+
+// 展开还原，不给下次访问留下折叠态
+await page.evaluate(() => {
+  document.querySelector('.outline-item.folded > .outline-caret')?.click()
+})
+await sleep(400)
+const restored = await page.evaluate(() => ({
+  items: document.querySelectorAll('.outline-item').length,
+  folded: document.querySelectorAll('.outline-item.folded').length,
+}))
+check('再点一次展开、回到原条目数', !!foldBefore && restored.items === foldBefore.items && restored.folded === 0, `${restored.items}/${foldBefore?.items}`)
 check('无 JS 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 
 await page.screenshot({ path: '/tmp/prod-outline.png' })

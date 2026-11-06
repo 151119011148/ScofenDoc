@@ -45,8 +45,9 @@ const state = () =>
       selCount: document.querySelectorAll('.outline-item.sel').length,
       countText: document.querySelector('.ob-count')?.textContent?.trim() || '',
       toast: document.querySelector('.outline-toast')?.textContent?.trim() || '',
-      undoable: !document.querySelectorAll('.ot-btn')[0]?.disabled,
-      redoable: !document.querySelectorAll('.ot-btn')[1]?.disabled,
+      // 面板上不再放「撤销 / 重做」按钮，直接问编辑器的撤销栈
+      undoable: window.ed.can().undo(),
+      redoable: window.ed.can().redo(),
     }
   })
 
@@ -76,8 +77,9 @@ const clickItem = async (n, mods = {}) => {
   await sleep(160)
 }
 
+/** 撤销（0）/ 重做（1）：没有按钮了，直接走编辑器命令 */
 const clickTool = async (idx) => {
-  await page.evaluate((i) => document.querySelectorAll('.ot-btn')[i].click(), idx)
+  await page.evaluate((i) => (i === 0 ? window.ed.commands.undo() : window.ed.commands.redo()), idx)
   await sleep(280)
 }
 
@@ -109,7 +111,8 @@ st = await state()
 check('重做后回到级联后的层级', st.levels === 'h1,h1,h2,h2,h2,h3,h2', st.levels)
 
 // 4) 键盘撤销（焦点在大纲里，Ctrl+Z 要能撤回层级调整）
-await page.evaluate(() => document.querySelectorAll('.ot-btn')[0].focus())
+//    点完 ↑↓ / 折叠三角后焦点落在按钮上，键盘事件到不了正文编辑器，面板内部接管一次
+await page.evaluate(() => document.querySelector('.outline-item .outline-caret').focus())
 await page.keyboard.down('Control')
 await page.keyboard.press('z')
 await page.keyboard.up('Control')
@@ -156,7 +159,7 @@ for (let i = 0; i < 6; i++) {
   await sleep(120)
 }
 st = await state()
-check('撤到底后「撤销」置灰且正文还在', st.undoable === false && st.texts.length >= 7, `${st.undoable} ${st.texts.length}`)
+check('撤到底后撤销栈为空且正文还在', st.undoable === false && st.texts.length >= 7, `${st.undoable} ${st.texts.length}`)
 
 // 10) 连点两次降级互不吞并：一次撤销只退一步（Yjs 会把 500ms 内的改动并成一步，
 //     大纲每次改完都主动封口，所以这里 120ms 的连点也应该是两个撤销步）
