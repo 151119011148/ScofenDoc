@@ -116,20 +116,20 @@ await clickBatch(0)
 st = await state()
 check('整组提升：H2,H3 → H1,H2', st.levels[1] === 'h1' && st.levels[2] === 'h2', st.levels.slice(0, 4).join(','))
 check('提升后选中态保留（可继续调）', st.selCount === 2, `selCount=${st.selCount}`)
-check('批量条反馈已调整条数', /已调整\s*2\s*条/.test(st.countText), st.countText)
+check('批量条反馈已调整条数', /已提升\s*2\s*条/.test(st.countText), st.countText)
 
 // 6) 一次撤销回退整组（关键：批量合并成单个事务）
 await undo()
 st = await state()
 check('一次 Ctrl+Z 回退整组（不是逐条退）', st.levels[1] === 'h2' && st.levels[2] === 'h3', st.levels.slice(0, 4).join(','))
 
-// 7) 全选后的边界：含 H1 不能提升、含 H3 不能降低
+// 7) 全选后的边界：含 H1 不能提升；最深才 H4，所以还能继续降低
 await clickBatch(2)
 st = await state()
-check('全选选中全部 5 条', st.selCount === 5, `selCount=${st.selCount}`)
+check('全选选中全部 6 条（含 H4）', st.selCount === 6, `selCount=${st.selCount}`)
 check('含 H1 时「提升」置灰', st.raiseDisabled === true, st.raiseTitle)
-check('含 H3 时「降低」置灰', st.lowerDisabled === true, st.lowerTitle)
-check('置灰原因写进 title', /H1/.test(st.raiseTitle) && /H3/.test(st.lowerTitle), `${st.raiseTitle} | ${st.lowerTitle}`)
+check('置灰原因写进 title', /H1/.test(st.raiseTitle), st.raiseTitle)
+check('最深才 H4，整组仍可降低（上限是 H6）', st.lowerDisabled === false, st.lowerTitle)
 
 // 8) 混合层级整组降低：H1 + H2 → H2 + H3
 await clickBatch(3) // 清空
@@ -142,6 +142,7 @@ check('含 H1 时仍可降低', st.lowerDisabled === false)
 await clickBatch(1)
 st = await state()
 check('整组降低：H1,H2 → H2,H3', st.levels[0] === 'h2' && st.levels[3] === 'h3', st.levels.join(','))
+check('降低时子级跟着降（细节 b1 → H4）', st.levels[4] === 'h4', st.levels.join(','))
 await undo()
 st = await state()
 check('降低后可整组撤销', st.levels[0] === 'h1' && st.levels[3] === 'h2', st.levels.join(','))

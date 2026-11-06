@@ -1497,6 +1497,52 @@ body.resize-cursor * {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* 轻提示要贴在本面板底部，不能飘到整页 */
+  position: relative;
+}
+/* 撤销 / 重做：常驻在列表上方，点了层级调整一眼就知道能退 */
+.outline-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 4px;
+}
+.ot-btn {
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ot-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: #f7faff;
+}
+.ot-btn:disabled { opacity: 0.4; cursor: default; }
+/* 单条操作的反馈：没有多选时没有批量条，用一条贴底轻提示 */
+.outline-toast {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(31, 35, 41, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+  animation: outline-toast-in 0.16s ease-out;
+}
+@keyframes outline-toast-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 .outline-empty {
   padding: 14px;
@@ -1629,6 +1675,9 @@ body.resize-cursor * {
 .outline-item.lvl-1 { font-weight: 600; }
 .outline-item.lvl-2 { padding-left: 28px; }
 .outline-item.lvl-3 { padding-left: 40px; }
+.outline-item.lvl-4 { padding-left: 52px; }
+.outline-item.lvl-5 { padding-left: 64px; }
+.outline-item.lvl-6 { padding-left: 76px; }
 
 /* ============ 轻提示 ============ */
 .toast {
@@ -2692,6 +2741,11 @@ body.resize-cursor * {
   .outline-item.lvl-1 { padding-left: 16px; }
   .outline-item.lvl-2 { padding-left: 30px; }
   .outline-item.lvl-3 { padding-left: 44px; }
+  .outline-item.lvl-4 { padding-left: 58px; }
+  .outline-item.lvl-5 { padding-left: 72px; }
+  .outline-item.lvl-6 { padding-left: 86px; }
+  .outline-tools { padding: 8px 12px 4px; }
+  .ot-btn { height: 28px; font-size: 13px; }
   .outline-item:active { background: #eef0f3; }
 
   /* ---------- 正文 ---------- */

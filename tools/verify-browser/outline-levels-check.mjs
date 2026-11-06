@@ -63,9 +63,9 @@ const clickAct = async (n, which) => {
   await sleep(180)
 }
 
-// 1) 初始：大纲只列 H1–H3（h4 不进大纲）
+// 1) 初始：大纲列到文档实际用到的最深层级（这篇有 H4，所以列 6 条）
 let st = await outlineState()
-check('大纲列 5 条（H4 不计入）', st.items.length === 5, `实际 ${st.items.length}`)
+check('大纲列 6 条（含 H4，不再被截断在 H3）', st.items.length === 6, `实际 ${st.items.length}`)
 check(
   '大纲层级缩进正确',
   /lvl-1/.test(st.items[0].cls) && /lvl-2/.test(st.items[1].cls) && /lvl-3/.test(st.items[2].cls),
@@ -90,7 +90,7 @@ await clickAct(2, 'down')
 st = await outlineState()
 check('降低层级后正文标题变 h3', st.blocks[2] === 'h3', st.blocks.slice(0, 5).join(','))
 check('大纲条目缩进同步变 lvl-3', /lvl-3/.test(st.items[1].cls), st.items[1].cls)
-check('条目顺序与文字不变', st.items[1].text.includes('小节 A') && st.items.length === 5, st.items[1].text)
+check('条目顺序与文字不变', st.items[1].text.includes('小节 A') && st.items.length === 6, st.items[1].text)
 
 // 4) 提升层级：再 ↑ 两次 → h1，且 H1 的 ↑ 置灰
 await clickAct(2, 'up')
@@ -108,29 +108,42 @@ check('H1 的「提升」按钮置灰', topDisabled)
 /** 按标题文字查正文里的层级（比按下标更稳，段落会插在中间） */
 const levelOf = (text) =>
   page.evaluate((t) => {
-    const h = [...document.querySelectorAll('.ProseMirror h1,.ProseMirror h2,.ProseMirror h3,.ProseMirror h4')].find(
+    const h = [...document.querySelectorAll('.ProseMirror h1,.ProseMirror h2,.ProseMirror h3,.ProseMirror h4,.ProseMirror h5,.ProseMirror h6')].find(
       (n) => n.textContent.includes(t),
     )
     return h ? h.tagName.toLowerCase() : null
   }, text)
 
-// 5) 边界：H3 不能再往下
+// 4b) 级联：小节 A 连升两次时，其下的「细节 a1」跟着一起升到 H2
+check('级联：子级跟着父级一起提升', (await levelOf('细节 a1')) === 'h2', await levelOf('细节 a1'))
+check('同级 / 别家的子级不受影响', (await levelOf('小节 B')) === 'h2' && (await levelOf('细节 b1')) === 'h3')
+
+// 5) 边界：可以一路降到 H6，之后 ↓ 置灰
 await clickAct(3, 'down')
-check('H3 的「降低」被拦住（仍是 h3）', (await levelOf('细节 a1')) === 'h3', await levelOf('细节 a1'))
+check('H2 可以降到 H3', (await levelOf('细节 a1')) === 'h3', await levelOf('细节 a1'))
+await clickAct(3, 'down')
+check('再降到 H4（不再卡在三级）', (await levelOf('细节 a1')) === 'h4', await levelOf('细节 a1'))
+st = await outlineState()
+check('大纲缩进跟着变 lvl-4', /lvl-4/.test(st.items[2].cls), st.items[2].cls)
+// 中间隔开一点：ProseMirror 的 history 会把 500ms 内的连续改动并成一步，
+// 这里要验的是「撤销最近一次」，不是撤销的分组策略（那在协同栈那边单独验）
+await clickAct(3, 'down')
+await sleep(700)
+await clickAct(3, 'down')
+check('可以一路降到 H6', (await levelOf('细节 a1')) === 'h6', await levelOf('细节 a1'))
 const bottomDisabled = await page.evaluate(() => {
   const li = document.querySelectorAll('.outline-item')[2]
   return li.querySelectorAll('.outline-act')[1].disabled === true
 })
-check('H3 的「降低」按钮置灰', bottomDisabled)
+check('H6 的「降低」按钮置灰', bottomDisabled)
 
-// 6) 撤销：Ctrl/Cmd+Z 能回退层级变更
+// 6) 撤销：Ctrl/Cmd+Z 能回退层级变更（退一级，不是退全部）
 await page.click('.ProseMirror')
 await page.keyboard.down('Meta')
 await page.keyboard.press('z')
 await page.keyboard.up('Meta')
 await sleep(220)
-st = await outlineState()
-check('Ctrl+Z 撤销层级变更', st.blocks[2] === 'h2', st.blocks.slice(0, 4).join(','))
+check('Ctrl+Z 撤销最后一次层级变更', (await levelOf('细节 a1')) === 'h5', await levelOf('细节 a1'))
 
 // 7) 编号标题：改层级后章节号跟着重排
 await page.evaluate(() => window.ed.chain().setAllHeadingsNumbered(true).run())
