@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import CollabEditor from './components/CollabEditor.vue'
 import DocTree from './components/DocTree.vue'
 import OutlinePanel from './components/OutlinePanel.vue'
@@ -329,6 +329,17 @@ function syncViewport(e?: MediaQueryListEvent) {
 
 /** 手机上没有「折叠成窄条」这回事，永远是完整抽屉 */
 const railCollapsed = computed(() => sidebarCollapsed.value && !isMobile.value)
+
+/**
+ * 文档树：手机抽屉拉开、或侧栏从窄条展开时，让它重新把当前文档指出来。
+ * 树一直在 DOM 里（抽屉是靠 transform 藏起来的），滚过的位置会保留，
+ * 不主动定位的话拉开来可能正好停在不相关的一段。
+ */
+const docTreeEl = ref<{ reveal: (id?: number | null) => void } | null>(null)
+watch([navOpen, railCollapsed], ([open, collapsed]) => {
+  if (!open && collapsed) return
+  nextTick(() => docTreeEl.value?.reveal())
+})
 
 /** 手机顶栏标题：优先当前文档（带章节号），其次空间名 */
 const mobileTitle = computed(() => {
@@ -1098,6 +1109,7 @@ boot()
             </button>
           </div>
           <DocTree
+            ref="docTreeEl"
             :docs="docs"
             :current-id="currentDocId"
             :disabled="moving"

@@ -68,12 +68,13 @@ const state = () =>
 
 // 1) 初始：6 行（父节点默认全展开），只有带子级的三行有真三角
 let st = await state()
-check('冒烟页渲染 6 行（父节点默认展开）', st.count === 6, `${st.count} 行`)
+// 冒烟数据：第一章(1) + 小节 A 及其两个细节(2,3,4) + 小节 B(5) + 34 行长列表 + 第二章(41)
+check('冒烟页渲染 40 行（父节点默认展开）', st.count === 40, `${st.count} 行`)
 // 第一章 / 小节 A 有子文档；小节 B、两个细节、第二章 是叶子
 check(
   '带子级的行才有真三角（其余是同宽占位）',
   st.carets.filter((c) => c && !c.placeholder).length === 2 &&
-    st.carets.filter((c) => c && c.placeholder).length === 4,
+    st.carets.filter((c) => c && c.placeholder).length === 38,
   st.carets.map((c) => (c ? (c.placeholder ? 'ph' : 'caret') : '-')).join(','),
 )
 check(
@@ -127,7 +128,7 @@ await page.evaluate(() => document.querySelectorAll('.tree-row')[0].querySelecto
 await sleep(260)
 await parkMouse()
 st = await state()
-check('再点一次展开：行数复原', st.count === 6 && st.collapsedRows === 0, `${st.count} 行 / collapsed=${st.collapsedRows}`)
+check('再点一次展开：行数复原', st.count === 40 && st.collapsedRows === 0, `${st.count} 行 / collapsed=${st.collapsedRows}`)
 check('展开后三角又只在悬停时出现', st.carets[0].opacity === 0, String(st.carets[0].opacity))
 
 // 6) 点三角不应该改变「当前打开文档」

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * 文档树折叠三角的本地冒烟页（只被 Vite dev 加载，不进生产产物、不连后端）。
- * 验收脚本：tools/verify-browser/tree-caret-check.mjs
+ * 文档树本地冒烟页（只被 Vite dev 加载，不进生产产物、不连后端）。
+ * 验收脚本：tools/verify-browser/tree-caret-check.mjs、tree-reveal-check.mjs
  *
- * 要验的就是「和文章大纲一致」：蓝色三角、悬停才出现、收起后常驻、出现时不挤标题。
+ * 数据造得够长（40 行），才验得出「打开文档时滚到它、并高亮」。
  */
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { Doc } from './api'
 import DocTree from './components/DocTree.vue'
 
@@ -17,23 +17,43 @@ const docs = ref<Doc[]>([
   { ...base, id: 3, parentId: 2, title: '细节 a1', number: '1.1.1', sortOrder: 1 },
   { ...base, id: 4, parentId: 2, title: '细节 a2', number: '1.1.2', sortOrder: 2 },
   { ...base, id: 5, parentId: 1, title: '小节 B', number: '1.2', sortOrder: 2 },
-  { ...base, id: 6, parentId: null, title: '第二章 设计', number: '2', sortOrder: 2 },
+  // 一层长列表：把树撑到需要滚动
+  ...Array.from({ length: 34 }, (_, i) => ({
+    ...base,
+    id: 7 + i,
+    parentId: 1,
+    title: `长列表 ${String(i + 1).padStart(2, '0')}`,
+    number: `1.${i + 3}`,
+    sortOrder: 3 + i,
+  })),
+  { ...base, id: 41, parentId: null, title: '第二章 设计', number: '2', sortOrder: 2 },
 ])
 
 const currentId = ref<number | null>(1)
+const treeRef = ref<InstanceType<typeof DocTree> | null>(null)
 
 function onSelect(d: Doc) {
   currentId.value = d.id
 }
+
+onMounted(() => {
+  // 给验收脚本用：切当前文档 / 模拟列表刷新（不改当前文档）/ 手动定位
+  ;(window as any).__smoke = {
+    setDoc: (id: number | null) => (currentId.value = id),
+    touchDocs: () => (docs.value = [...docs.value]),
+    reveal: () => treeRef.value?.reveal(),
+  }
+})
 </script>
 
 <template>
   <div class="smoke-shell">
     <div class="smoke-side nav-tree">
-      <DocTree :docs="docs" :current-id="currentId" @select="onSelect" />
+      <DocTree ref="treeRef" :docs="docs" :current-id="currentId" @select="onSelect" />
     </div>
     <div class="smoke-main">
-      <p>左侧是真实的 <code>DocTree</code> 组件（假数据）。悬停行看三角、点三角折叠。</p>
+      <p>左侧是真实的 <code>DocTree</code> 组件（40 行假数据，够长所以会滚）。</p>
+      <p>打开文档时应自动滚到它、展开祖先、并高亮。</p>
     </div>
   </div>
 </template>

@@ -341,6 +341,100 @@ function resetDrag() {
   rootHover.value = false
 }
 
+/* ---------------- 定位当前文档 ---------------- */
+
+/**
+ * 打开一篇文档时，树要把它「指出来」：祖先全展开 → 滚到可见 → 高亮。
+ *
+ * 只做一次：同一篇文档在列表刷新（改名、拖动、协同更新）时不再抢滚动，
+ * 否则用户正滚着看别的分支，一保存就被拽回当前文档，很难用。
+ */
+const treeEl = ref<HTMLElement | null>(null)
+/** 上一次已经定位过的文档，用来挡住列表刷新时的重复定位 */
+let revealedId: number | null = null
+/** 刚滚过来的那一行闪一下，视线能跟上（滚动了才闪） */
+const locateId = ref<number | null>(null)
+let locateTimer: number | undefined
+
+function rowOf(id: number): HTMLElement | null {
+  return treeEl.value?.querySelector<HTMLElement>(`[data-doc-id="${id}"]`) ?? null
+}
+
+/** 离元素最近的、真的能滚的祖先（树的滚动容器可能就是 .nav-tree 自己） */
+function innerScroller(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement
+  while (node) {
+    const style = getComputedStyle(node)
+    if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) return node
+    node = node.parentElement
+  }
+  return null
+}
+
+/**
+ * 让行露出来。已经在可视区里就一点都不动（返回 false），
+ * 完全在视野外就居中放，贴着边缘就按最近方向挪一点 —— 都只动树的滚动容器，
+ * 不会把上面的空间列表一起卷走。
+ */
+function revealRow(id: number): boolean {
+  const el = rowOf(id)
+  if (!el) return false
+  const box = innerScroller(el)
+  if (!box) return false
+  const pad = 10
+  const r = el.getBoundingClientRect()
+  const b = box.getBoundingClientRect()
+  if (r.top >= b.top + pad && r.bottom <= b.bottom - pad) return false
+  const far = r.bottom < b.top || r.top > b.bottom
+  const delta = far
+    ? r.top - b.top - (b.height - r.height) / 2
+    : r.top < b.top + pad
+      ? r.top - b.top - pad
+      : r.bottom - b.bottom + pad
+  box.scrollTop += delta
+  return true
+}
+
+function flashRow(id: number) {
+  locateId.value = id
+  window.clearTimeout(locateTimer)
+  locateTimer = window.setTimeout(() => (locateId.value = null), 1200)
+}
+
+/**
+ * 定位到指定文档（默认当前文档）。
+ * 祖先被收起时目标行根本不在 DOM 里，先展开再看。
+ */
+async function reveal(id: number | null = props.currentId) {
+  if (id === null || !byId.value.has(id)) return
+  const chain = ancestorIds(id)
+  if (chain.some((x) => !expanded.value.has(x))) {
+    expanded.value = new Set([...expanded.value, ...chain])
+    await nextTick()
+  }
+  if (revealRow(id)) flashRow(id)
+  revealedId = id
+}
+
+// 切文档（或文档列表刚到齐）时定位一次
+watch(
+  () => [props.currentId, props.docs] as const,
+  () => {
+    const id = props.currentId
+    if (id === null) {
+      revealedId = null
+      return
+    }
+    if (id === revealedId) return
+    // 列表可能晚于「打开文档」到达，没这篇就先不动，等下次
+    if (!byId.value.has(id)) return
+    reveal(id)
+  },
+  { immediate: true, flush: 'post' },
+)
+
+defineExpose({ reveal })
+
 /* ---------------- 右键菜单 ---------------- */
 
 type MenuState = { doc: Doc; batch: Doc[] | null }
@@ -424,12 +518,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
   window.removeEventListener('scroll', onGlobalScroll, true)
   window.removeEventListener('resize', onGlobalScroll)
+  window.clearTimeout(locateTimer)
 })
 
 </script>
 
 <template>
-  <div class="tree" @dragend="resetDrag">
+  <div ref="treeEl" class="tree" @dragend="resetDrag">
     <!-- 多选工具栏：有选中项时显示 -->
     <div v-if="selectedIds.size > 0 && !readonly" class="tree-batch-bar">
       <span class="batch-count">已选 {{ selectedIds.size }} 篇 · 拖动整批移动</span>
@@ -440,11 +535,14 @@ onBeforeUnmount(() => {
     <div
       v-for="row in rows"
       :key="row.doc.id"
+      :data-doc-id="row.doc.id"
       :class="[
         'tree-row',
         {
           active: row.doc.id === currentId,
           selected: selectedIds.has(row.doc.id),
+          // 刚从屏幕外滚过来：闪一下再落回高亮色，视线能跟上
+          locating: row.doc.id === locateId,
           'menu-open': menu?.doc.id === row.doc.id,
           dragging: dragIds.includes(row.doc.id),
           'drop-before': dropId === row.doc.id && dropZone === 'before',

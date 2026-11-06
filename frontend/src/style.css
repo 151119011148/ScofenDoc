@@ -120,8 +120,21 @@ body {
   position: relative;
 }
 .tree-row:hover { background: var(--bg); }
-.tree-row.active { background: #eaf1ff; color: var(--brand); }
+/* 当前打开的文档：底色 + 左侧一道蓝条。只换底色在 380 行的树里不够显眼 */
+.tree-row.active {
+  background: #e4edff;
+  color: var(--brand);
+  box-shadow: inset 2px 0 0 var(--brand);
+}
 .tree-row.selected { background: #dbe7ff; }
+
+/* 从屏幕外滚过来时闪一下，再落回高亮色（只滚动才闪，不滚动不闪） */
+.tree-row.locating { animation: tree-locate 1.2s ease-out; }
+@keyframes tree-locate {
+  0% { background: #c3d8ff; }
+  70% { background: #dbe8ff; }
+  100% { background: #e4edff; }
+}
 
 /* ---- 多选批量工具栏 ---- */
 .tree-batch-bar {
