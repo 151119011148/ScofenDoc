@@ -11,8 +11,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
-import TableHeader from '@tiptap/extension-table-header'
-import TableCell from '@tiptap/extension-table-cell'
+import { StyledTableCell as TableCell, StyledTableHeader as TableHeader } from '../extensions/TableCellStyle'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
 import Underline from '@tiptap/extension-underline'
@@ -27,6 +26,7 @@ import HeadingFold from '../extensions/HeadingFold'
 import HeadingNumber from '../extensions/HeadingNumber'
 import ListItemHeading from '../extensions/ListItemHeading'
 import TabIndent from '../extensions/TabIndent'
+import { CellDragSelect } from '../extensions/CellDragSelect'
 import { CommentMark } from '../extensions/CommentMark'
 import SelectionToolbar from './SelectionToolbar.vue'
 import TableTools from './TableTools.vue'
@@ -942,6 +942,8 @@ onMounted(() => {
       }),
       // 放最后：列表缩进、表格跳格、斜杠菜单确认都优先，只有剩下的普通文本块才轮到「空两格」
       TabIndent,
+      // 跨单元格拖选 → 单元格选区，多选后才有多选操作条
+      CellDragSelect,
     ],
     content: '',
     editable: props.editable,

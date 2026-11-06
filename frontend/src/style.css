@@ -3180,6 +3180,128 @@ body.resize-cursor * {
 .tbl-sw.on { background: var(--brand); }
 .tbl-sw.on i { transform: translateX(12px); }
 
+/* 菜单里的「单元格」段：底色色板 + 对齐 */
+.tbl-sect {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.tbl-sws {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px 8px;
+}
+.tbl-bgsw {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(31, 35, 41, 0.14);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+.tbl-bgsw:hover { transform: scale(1.12); }
+.tbl-bgsw.on {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--brand);
+}
+/* 无填充：白底加一道斜杠，和飞书一致 */
+.tbl-bgsw.none::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 1px;
+  background: #c9cdd4;
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+.tbl-alns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+.tbl-aln {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #646a73;
+  cursor: pointer;
+}
+.tbl-aln:hover { background: #f2f3f5; }
+.tbl-aln.on { background: #e1eaff; color: var(--brand); }
+.tbl-aln svg { width: 16px; height: 16px; }
+
+/* ============ 多选单元格操作条 ============ */
+.tbl-cellbar {
+  position: fixed;
+  z-index: 316;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  background: #fff;
+  border: 1px solid #e8e9eb;
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(31, 35, 41, 0.16);
+}
+.tbl-cbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tbl-cbtn:hover { background: #f2f3f5; }
+.tbl-cbtn.on { background: #e1eaff; color: var(--brand); }
+.tbl-cbtn svg { width: 15px; height: 15px; color: #646a73; }
+.tbl-cbtn.on svg { color: var(--brand); }
+.tbl-cicon { padding: 0 6px; }
+.tbl-cdiv {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: #eef0f2;
+}
+/* 底色按钮上的小色块：一眼看到当前填充 */
+.tbl-bgdot {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid rgba(31, 35, 41, 0.16);
+  background-image: linear-gradient(45deg, #f2f3f5 25%, transparent 25%, transparent 75%, #f2f3f5 75%);
+  background-size: 6px 6px;
+}
+.tbl-bgwrap { position: relative; }
+.tbl-bgpop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 18px);
+  gap: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  border: 1px solid #e8e9eb;
+  border-radius: 9px;
+  box-shadow: 0 8px 26px rgba(31, 35, 41, 0.16);
+}
+
 /* ============ 全文查找替换 ============ */
 
 .find-panel {

@@ -4,12 +4,12 @@ import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
-import TableHeader from '@tiptap/extension-table-header'
-import TableCell from '@tiptap/extension-table-cell'
+import { StyledTableCell as TableCell, StyledTableHeader as TableHeader } from './extensions/TableCellStyle'
 import HeadingNumber from './extensions/HeadingNumber'
 import HeadingFold from './extensions/HeadingFold'
 import ListItemHeading from './extensions/ListItemHeading'
 import TableTools from './components/TableTools.vue'
+import { CellDragSelect } from './extensions/CellDragSelect'
 
 const editor = ref<Editor>()
 let instance: Editor | null = null
@@ -31,6 +31,7 @@ onMounted(() => {
       TableRow,
       TableHeader,
       TableCell,
+      CellDragSelect,
     ],
     content: `
       <h1>第一章</h1><h2>小节 A</h2><h2>小节 B</h2><h3>细项</h3><p>正文一段</p>

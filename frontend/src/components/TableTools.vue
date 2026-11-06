@@ -3,7 +3,9 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ChainedCommands } from '@tiptap/core'
 import type { Editor } from '@tiptap/vue-3'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { CellSelection } from '@tiptap/pm/tables'
 import type { Node as PMNode, ResolvedPos } from '@tiptap/pm/model'
+import { CELL_ALIGNS, CELL_BACKGROUNDS } from '../extensions/TableCellStyle'
 
 /**
  * 飞书式表格操作层。
@@ -67,6 +69,10 @@ const MENU: MenuRow[] = [
   { key: 'delete', label: '删除表格', icon: 'trash', danger: true, sep: true },
 ]
 
+/** 菜单分两段：表格形态，中间插一段「单元格」底色/对齐，再接行列与删除 */
+const MENU_SHAPE = MENU.slice(0, 3)
+const MENU_EDIT = MENU.slice(3)
+
 /** 16×16 线性图标，和飞书一样用细描边，跟着按钮颜色走 */
 const ICONS: Record<string, string[]> = {
   table: ['M2.5 3.5h11v9h-11z', 'M2.5 6.5h11', 'M2.5 9.5h11', 'M6 3.5v9', 'M10 3.5v9'],
@@ -82,6 +88,16 @@ const ICONS: Record<string, string[]> = {
   trash: ['M3 4.5h10', 'M6 4.5V3h4v1.5', 'M4.6 4.5l.6 8h5.6l.6-8', 'M6.8 7v3', 'M9.2 7v3'],
   grip: ['M5 5h1.2v1.2H5z', 'M9.8 5H11v1.2H9.8z', 'M5 9.8h1.2V11H5z', 'M9.8 9.8H11V11H9.8z'],
   plus: ['M8 3.5v9', 'M3.5 8h9'],
+  alignLeft: ['M2.5 3.5h11', 'M2.5 6.5h7', 'M2.5 9.5h11', 'M2.5 12.5h5'],
+  alignCenter: ['M2.5 3.5h11', 'M4.5 6.5h7', 'M2.5 9.5h11', 'M5.5 12.5h5'],
+  alignRight: ['M2.5 3.5h11', 'M6.5 6.5h7', 'M2.5 9.5h11', 'M8.5 12.5h5'],
+}
+
+/** 对齐按钮到图标的映射：数据里存 left/center/right，图标名多一个前缀 */
+const ALIGN_ICON: Record<string, string> = {
+  left: 'alignLeft',
+  center: 'alignCenter',
+  right: 'alignRight',
 }
 
 const handleVisible = ref(false)
@@ -94,6 +110,15 @@ const sizeLabel = ref('')
 
 const handleEl = ref<HTMLElement | null>(null)
 const menuEl = ref<HTMLElement | null>(null)
+
+/* 选中多个单元格时浮出的操作条（飞书：合并 / 底色 / 对齐 / 删除） */
+const cellBarVisible = ref(false)
+const cellBarPos = ref({ left: 0, top: 0 })
+const cellBarEl = ref<HTMLElement | null>(null)
+const bgOpen = ref(false)
+const curBg = ref<string | null>(null)
+const curAlign = ref<string | null>(null)
+const curMerged = ref(false)
 
 /** 鼠标当前停在哪张表上（普通变量：只用于算位置，不需要触发渲染） */
 let hoverEl: HTMLTableElement | null = null
@@ -171,6 +196,126 @@ function currentRef(): TableRef | null {
   return selectionRef()
 }
 
+/* ---------------- 单元格底色 / 对齐 ---------------- */
+
+/** 当前选区所在的单元格节点（多选时取锚点格，单选时取光标所在格） */
+function cursorCellNode(): PMNode | null {
+  const e = props.editor
+  const sel = e?.state.selection
+  if (!e || !sel) return null
+  if (sel instanceof CellSelection) {
+    // $anchorCell 停在单元格内部，node(depth) 是 tableRow，单元格本身是 nodeAfter；
+    // 直接取 node(depth) 会拿到行，底色/对齐的当前值就永远读不到。
+    const after = sel.$anchorCell.nodeAfter
+    if (after && (after.type.name === 'tableCell' || after.type.name === 'tableHeader')) return after
+    try {
+      const node = sel.$anchorCell.node(sel.$anchorCell.depth + 1)
+      if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') return node
+    } catch {
+      /* 深度越界时按「没有单元格」处理，不影响其它操作 */
+    }
+    return null
+  }
+  const { $from } = sel
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d)
+    if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') return node
+  }
+  return null
+}
+
+/** 把当前单元格的底色、对齐、合并状态同步到 UI，供菜单和操作条高亮 */
+function refreshCellState() {
+  const node = cursorCellNode()
+  curBg.value = (node?.attrs.background as string) || null
+  curAlign.value = (node?.attrs.align as string) || null
+  curMerged.value = !!node && (Number(node.attrs.colspan) > 1 || Number(node.attrs.rowspan) > 1)
+}
+
+function updateCellBar() {
+  const e = props.editor
+  const sel = e?.state.selection
+  if (!e || !props.editable || menuOpen.value || !(sel instanceof CellSelection)) {
+    cellBarVisible.value = false
+    bgOpen.value = false
+    return
+  }
+  // prosemirror-tables 会给选区内的格子加 selectedCell，直接量真实 DOM 比推算坐标稳
+  const cells = Array.from(e.view.dom.querySelectorAll<HTMLElement>('td.selectedCell, th.selectedCell'))
+  if (!cells.length) {
+    cellBarVisible.value = false
+    return
+  }
+  const rects = cells.map((c) => c.getBoundingClientRect())
+  const top = Math.min(...rects.map((r) => r.top))
+  const left = Math.min(...rects.map((r) => r.left))
+  const right = Math.max(...rects.map((r) => r.right))
+  const w = cellBarEl.value?.offsetWidth || 300
+  cellBarPos.value = {
+    left: Math.max(8, Math.min(left + (right - left - w) / 2, window.innerWidth - w - 8)),
+    top: Math.max(barBottom() + 6, top - 44),
+  }
+  refreshCellState()
+  cellBarVisible.value = true
+  // 首帧还没量到宽度，下一帧按真实宽度重新居中
+  if (!cellBarEl.value?.offsetWidth) requestAnimationFrame(() => {
+    if (cellBarVisible.value) updateCellBar()
+  })
+}
+
+/** 底色/对齐都走 setCellAttribute：一次覆盖选区里所有格子，且能进撤销栈 */
+function applyCellAttr(name: 'background' | 'align', value: string | null) {
+  const e = props.editor
+  if (!e || e.isDestroyed || !props.editable) return
+  try {
+    e.chain().focus().setCellAttribute(name, value).run()
+  } catch (err) {
+    console.warn(`[table] set cell ${name} failed`, err)
+  }
+  bgOpen.value = false
+  nextTick(() => {
+    updateCellBar()
+    refreshCellState()
+    scheduleHandle()
+  })
+}
+
+function applyCellBg(value: string | null) {
+  applyCellAttr('background', value)
+}
+
+function applyCellAlign(value: string) {
+  applyCellAttr('align', value)
+}
+
+/** 多选状态直接合并/拆分，不经过块菜单（不抢焦点、不收起菜单） */
+function mergeCellsNow() {
+  if (!props.editable) return
+  runChain((c) => c.mergeCells())
+  nextTick(() => {
+    updateCellBar()
+    scheduleHandle()
+  })
+}
+
+function splitCellsNow() {
+  if (!props.editable) return
+  runChain((c) => c.splitCell())
+  nextTick(() => {
+    updateCellBar()
+    scheduleHandle()
+  })
+}
+
+function deleteTableFromBar() {
+  runChain((c) => c.deleteTable())
+  cellBarVisible.value = false
+  bgOpen.value = false
+  menuOpen.value = false
+  menuTable = null
+  nextTick(() => scheduleHandle())
+}
+
 /* ---------------- 手柄位置 ---------------- */
 
 let raf = 0
@@ -189,6 +334,7 @@ function barBottom(): number {
 }
 
 function updateHandle() {
+  updateCellBar()
   const e = props.editor
   if (!e || e.isDestroyed || !props.editable) {
     handleVisible.value = false
@@ -229,6 +375,7 @@ function refreshHeaderState(ref: TableRef) {
     if (row.firstChild?.type.name !== 'tableHeader') colHead = false
   })
   headerCol.value = colHead
+  refreshCellState()
 }
 
 function placeMenu(x: number, y: number) {
@@ -649,7 +796,7 @@ watch(
       <div class="tbl-menu-head">
         <span>{{ sizeLabel }}</span>
       </div>
-      <template v-for="row in MENU" :key="row.key">
+      <template v-for="row in MENU_SHAPE" :key="row.key">
         <div v-if="row.sep" class="tbl-div" />
         <button :class="['tbl-item', { danger: row.danger }]" @click="apply(row)">
           <svg
@@ -672,6 +819,108 @@ watch(
           </span>
         </button>
       </template>
+
+      <!-- 单元格：底色 + 对齐，单选一格时从这里改 -->
+      <div class="tbl-div" />
+      <div class="tbl-sect">单元格</div>
+      <div class="tbl-sws">
+        <button
+          v-for="c in CELL_BACKGROUNDS"
+          :key="c.label"
+          :class="['tbl-bgsw', { on: (curBg || null) === c.value, none: !c.value }]"
+          :style="{ background: c.value || '#fff' }"
+          :title="c.value ? `${c.label}色` : '无填充'"
+          @click="applyCellBg(c.value)"
+        />
+      </div>
+      <div class="tbl-alns">
+        <button
+          v-for="a in CELL_ALIGNS"
+          :key="a.value"
+          :class="['tbl-aln', { on: curAlign === a.value }]"
+          :title="a.label"
+          @click="applyCellAlign(a.value)"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+            <path v-for="d in ICONS[ALIGN_ICON[a.value]]" :key="d" :d="d" />
+          </svg>
+        </button>
+      </div>
+
+      <template v-for="row in MENU_EDIT" :key="row.key">
+        <div v-if="row.sep" class="tbl-div" />
+        <button :class="['tbl-item', { danger: row.danger }]" @click="apply(row)">
+          <svg
+            class="tbl-svg"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path v-for="d in ICONS[row.icon]" :key="d" :d="d" />
+          </svg>
+          <span class="tbl-label">{{ row.label }}</span>
+        </button>
+      </template>
+    </div>
+
+    <!-- 选中多个单元格：贴选区上沿浮出操作条，和飞书一致 -->
+    <div
+      v-if="cellBarVisible"
+      ref="cellBarEl"
+      class="tbl-cellbar"
+      :style="{ left: cellBarPos.left + 'px', top: cellBarPos.top + 'px' }"
+      @mousedown.prevent
+    >
+      <button class="tbl-cbtn" title="合并单元格" @click="mergeCellsNow">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <path v-for="d in ICONS.merge" :key="d" :d="d" />
+        </svg>
+        <span>合并</span>
+      </button>
+      <button v-if="curMerged" class="tbl-cbtn" title="拆分单元格" @click="splitCellsNow">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <path v-for="d in ICONS.split" :key="d" :d="d" />
+        </svg>
+        <span>拆分</span>
+      </button>
+      <span class="tbl-cdiv" />
+      <div class="tbl-bgwrap">
+        <button :class="['tbl-cbtn', { on: bgOpen }]" title="单元格底色" @click="bgOpen = !bgOpen">
+          <span class="tbl-bgdot" :style="{ background: curBg || 'transparent' }" />
+          <span>底色</span>
+        </button>
+        <div v-if="bgOpen" class="tbl-bgpop" @mousedown.prevent>
+          <button
+            v-for="c in CELL_BACKGROUNDS"
+            :key="c.label"
+            :class="['tbl-bgsw', { on: (curBg || null) === c.value, none: !c.value }]"
+            :style="{ background: c.value || '#fff' }"
+            :title="c.value ? `${c.label}色` : '无填充'"
+            @click="applyCellBg(c.value)"
+          />
+        </div>
+      </div>
+      <span class="tbl-cdiv" />
+      <button
+        v-for="a in CELL_ALIGNS"
+        :key="a.value"
+        :class="['tbl-cbtn', 'tbl-cicon', { on: curAlign === a.value }]"
+        :title="a.label"
+        @click="applyCellAlign(a.value)"
+      >
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+          <path v-for="d in ICONS[ALIGN_ICON[a.value]]" :key="d" :d="d" />
+        </svg>
+      </button>
+      <span class="tbl-cdiv" />
+      <button class="tbl-cbtn tbl-cicon" title="删除表格" @click="deleteTableFromBar">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <path v-for="d in ICONS.trash" :key="d" :d="d" />
+        </svg>
+      </button>
     </div>
   </template>
 </template>
