@@ -42,7 +42,8 @@ page.on('console', (m) => {
   if (m.type() === 'error' && !m.text().includes('Failed to load resource')) errors.push(m.text().slice(0, 200))
 })
 
-await page.goto(`${BASE}?space=2&doc=22`, { waitUntil: 'domcontentloaded' })
+// 562「架构 - 学习资料」：91 个标题、H1/H2/H3/H4 都有，才验得出折叠
+await page.goto(`${BASE}?space=2&doc=562`, { waitUntil: 'domcontentloaded' })
 await page.evaluate((t) => {
   localStorage.setItem('scofendoc.token', t)
   localStorage.setItem(
@@ -72,7 +73,7 @@ const st = await page.evaluate(() => {
 check('新前端已上线：撤销 / 重做按钮已移除（只留快捷键）', st.tools === 0, String(st.tools))
 check('大纲条目已渲染且缩进分级正确', st.itemCount > 3 && st.levels.every((c) => /^lvl-[1-6]$/.test(c)), `${st.itemCount} ${st.levels.slice(0, 6).join('/')}`)
 check('每条都有层级按钮', st.acts === st.itemCount * 2, `${st.acts}/${st.itemCount}`)
-check('带子级的条目有折叠三角', st.carets > 0 && st.carets < st.itemCount, `${st.carets}/${st.itemCount}`)
+check('带子级的条目有折叠三角（不是每条都有）', st.carets > 0 && st.carets < st.itemCount, `${st.carets}/${st.itemCount}`)
 check('大纲条目不超出正文标题数', st.itemCount <= st.headCount, `${st.itemCount}/${st.headCount}`)
 check('没有残留的操作提示', st.hint === 0)
 
