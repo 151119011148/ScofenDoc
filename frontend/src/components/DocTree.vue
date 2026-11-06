@@ -376,14 +376,14 @@ function innerScroller(el: HTMLElement): HTMLElement | null {
  * 完全在视野外就居中放，贴着边缘就按最近方向挪一点 —— 都只动树的滚动容器，
  * 不会把上面的空间列表一起卷走。
  */
-function revealRow(id: number): boolean {
-  const el = rowOf(id)
-  if (!el) return false
+function revealRow(el: HTMLElement): boolean {
   const box = innerScroller(el)
   if (!box) return false
   const pad = 10
   const r = el.getBoundingClientRect()
   const b = box.getBoundingClientRect()
+  // 布局还没算出来（首帧容器高度为 0）时不做判断，否则会把「都是 0」算成需要滚动
+  if (!r.height || !b.height) return false
   if (r.top >= b.top + pad && r.bottom <= b.bottom - pad) return false
   const far = r.bottom < b.top || r.top > b.bottom
   const delta = far
@@ -391,8 +391,10 @@ function revealRow(id: number): boolean {
     : r.top < b.top + pad
       ? r.top - b.top - pad
       : r.bottom - b.bottom + pad
+  const before = box.scrollTop
   box.scrollTop += delta
-  return true
+  // 已经滚到顶/底时 scrollTop 会被夹住不动，这种不算「滚过去了」，别闪
+  return Math.abs(box.scrollTop - before) > 0.5
 }
 
 function flashRow(id: number) {
@@ -412,7 +414,11 @@ async function reveal(id: number | null = props.currentId) {
     expanded.value = new Set([...expanded.value, ...chain])
     await nextTick()
   }
-  if (revealRow(id)) flashRow(id)
+  // 拿不到行说明 DOM 还没落地（首帧 / 组件刚挂载），这次不算定位过，
+  // 留给下一次触发或 onMounted 重试 —— 否则这一篇会被记成「已定位」，再也不动
+  const el = rowOf(id)
+  if (!el) return
+  if (revealRow(el)) flashRow(id)
   revealedId = id
 }
 
@@ -432,6 +438,11 @@ watch(
   },
   { immediate: true, flush: 'post' },
 )
+
+// immediate 那次在 setup 阶段跑，DOM 还没挂上：挂载后再补一次
+onMounted(() => {
+  if (props.currentId !== null && props.currentId !== revealedId) reveal()
+})
 
 defineExpose({ reveal })
 
