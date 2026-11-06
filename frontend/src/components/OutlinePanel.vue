@@ -499,11 +499,10 @@ function spy() {
 watch(
   () => props.editor,
   (ed, prev) => {
+    // 撤销栈只在正文真的变了时才进出，所以跟着 update 走就够了；
+    // 用 transaction 会被「只改选区」的高频事务拖累
     prev?.off?.('update', onEditorUpdate)
-    prev?.off?.('transaction', syncHistory)
     ed?.on?.('update', onEditorUpdate)
-    // 撤销栈进出全靠事务，跟着事务同步按钮可用性
-    ed?.on?.('transaction', syncHistory)
     editable.value = !!ed?.isEditable
     refresh()
     syncHistory()
@@ -562,7 +561,6 @@ watch(
 onBeforeUnmount(() => {
   props.scroller?.removeEventListener('scroll', onScroll)
   props.editor?.off?.('update', onEditorUpdate)
-  props.editor?.off?.('transaction', syncHistory)
   document.removeEventListener('keydown', onKeydown)
   if (spyTimer) cancelAnimationFrame(spyTimer)
   if (hintTimer) window.clearTimeout(hintTimer)
