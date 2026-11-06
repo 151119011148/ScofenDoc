@@ -189,17 +189,43 @@ body {
   color: var(--brand);
 }
 
+/* 折叠三角：与「文章大纲」保持一致 —— 蓝色、悬停才出现、收起后常驻。
+   槽位固定 14px 常占（叶子行是 .placeholder），三角只在里面淡入淡出，
+   所以出现/消失都不会挤动标题、不会让整列抖一下。 */
 .twist {
-  width: 14px;
+  position: relative;
   flex: 0 0 14px;
-  text-align: center;
-  font-size: 10px;
-  color: var(--text-3);
-  transition: transform 0.12s ease;
-  display: inline-block;
+  width: 14px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  border-radius: 3px;
+  transition: opacity 0.12s ease;
 }
-.twist.open { transform: rotate(90deg); }
+/* 未展开：▶（点一下展开）；展开后转成 ▼ */
+.twist::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transition: transform 0.12s ease;
+}
+.twist.open::before { transform: rotate(90deg); }
+.twist:hover { background: #e8efff; }
 .twist.placeholder { visibility: hidden; }
+/* 悬停（或键盘聚焦）才露出三角；收起的常驻，提示「这里还有子文档」 */
+.tree-row:hover > .twist,
+.tree-row:focus-within > .twist,
+.tree-row.collapsed > .twist { opacity: 1; }
 
 .doc-icon { font-size: 12px; opacity: 0.75; }
 
@@ -2701,6 +2727,13 @@ body.resize-cursor * {
   .tree-row.active .actions,
   .tree-row.selected .actions { display: flex; }
   .tree-row .actions button { height: 26px; min-width: 26px; }
+  /* 触屏没有 hover：三角常驻，并用伪元素把可点区域撑到 26px（不占布局，不挤标题） */
+  .tree-row .twist { opacity: 1; }
+  .tree-row .twist::after {
+    content: '';
+    position: absolute;
+    inset: -6px -5px;
+  }
   .nav-collapse { font-size: 15px; padding: 6px 8px; }
   .nav-user-actions button { height: 32px; font-size: 13px; }
 

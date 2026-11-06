@@ -450,6 +450,8 @@ onBeforeUnmount(() => {
           'drop-before': dropId === row.doc.id && dropZone === 'before',
           'drop-after': dropId === row.doc.id && dropZone === 'after',
           'drop-inside': dropId === row.doc.id && dropZone === 'inside',
+          // 收起（还有子文档没展开）：三角常驻，一眼看出这层被收起来了
+          collapsed: row.hasChildren && !expanded.has(row.doc.id),
         },
       ]"
       :style="{ paddingLeft: 8 + row.depth * 14 + 'px' }"
@@ -462,14 +464,20 @@ onBeforeUnmount(() => {
       @dblclick="!readonly && startRename(row.doc)"
       @contextmenu="onRowContextMenu($event, row.doc)"
     >
-      <span
+      <!-- 折叠三角：样式与「文章大纲」一致 —— 蓝色、悬停才出现、收起后常驻。
+           槽位始终占着（叶子行用同宽的 .placeholder），所以出现/消失不会挤动标题 -->
+      <button
         v-if="row.hasChildren"
         class="twist"
         :class="{ open: expanded.has(row.doc.id) }"
+        type="button"
+        :title="expanded.has(row.doc.id) ? `折叠「${row.doc.title}」` : `展开「${row.doc.title}」`"
+        :aria-label="expanded.has(row.doc.id) ? `折叠「${row.doc.title}」` : `展开「${row.doc.title}」`"
+        :aria-expanded="expanded.has(row.doc.id)"
         @click.stop="toggle(row.doc.id)"
-        >▸</span
-      >
-      <span v-else class="twist placeholder" />
+        @dblclick.stop
+      />
+      <span v-else class="twist placeholder" aria-hidden="true" />
 
       <span class="doc-icon">📄</span>
 
