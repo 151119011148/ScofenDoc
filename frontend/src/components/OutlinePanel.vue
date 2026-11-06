@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
+import { Fragment } from '@tiptap/pm/model'
+import type { Node as PMNode, Slice } from '@tiptap/pm/model'
 import { yUndoPluginKey } from 'y-prosemirror'
 import { stickyTopGap } from '../stickyGap'
 
@@ -78,9 +80,18 @@ function scanHeads(): Head[] {
   return els.map((el) => ({ el, level: Number(el.tagName.charAt(1)) }))
 }
 
-/** 标题纯文本：自动编号是伪元素，取 textContent 不会带上，这里只做空白归一化 */
+/**
+ * 标题纯文本。
+ *
+ * 不能直接拿 textContent：正文标题里有一个 HeadingFold 注入的三角 widget
+ * （span.fold-caret，用来折叠正文小节），它是真实 DOM 子节点，textContent 会把它
+ * 一起带进来——大纲里就多出一个不知所以的灰色小三角。先克隆再摘掉它。
+ * 自动编号是 CSS 伪元素，本来就不在 textContent 里。
+ */
 function textOf(el: HTMLElement): string {
-  return (el.textContent || '').replace(/\s+/g, ' ').trim()
+  const copy = el.cloneNode(true) as HTMLElement
+  copy.querySelectorAll('.fold-caret').forEach((n) => n.remove())
+  return (copy.textContent || '').replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -110,8 +121,10 @@ function buildItems(all: Head[]): { list: Item[]; limit: number } {
     const hidden = chain.some((c) => c.folded)
     chain.push({ level: h.level, folded: isFolded(h.el) })
     if (h.level > limit) continue
-    // 祖先被折叠：这条不进大纲（但仍要进 chain，它的子级同样隐藏）
+    // 祖先被折叠（大纲里的折叠，或正文里点了标题三角）：这条不进大纲
     if (hidden) continue
+    // 正文里用标题三角折掉的小节是 display:none，点过去也看不见，同样不列
+    if (h.el.closest('.fold-hidden')) continue
     const raw = textOf(h.el)
     if (!raw) continue
     // 子树 = 紧随其后、每一条都比它深的标题，遇到同级或更浅即止
@@ -470,6 +483,208 @@ function shiftSelected(delta: number) {
   window.requestAnimationFrame(() => refresh())
 }
 
+/* ---------------- 拖拽调整顺序 / 层级 ---------------- */
+
+/**
+ * 拖的根本不是「一条大纲」，而是正文里的「一节」：
+ * 标题 + 它下面的正文（段落、图、表），直到下一个同级或更高级的标题为止。
+ * 只搬标题会把正文留在原地，结构就散了。
+ */
+interface Section {
+  /** 标题节点起始位置 */
+  from: number
+  /** 这一节的结束位置（下一个同级/更高级标题的起点，或文档末尾） */
+  to: number
+  level: number
+}
+
+type Zone = 'before' | 'inside' | 'after'
+
+const dragIdx = ref<number | null>(null)
+const dropIdx = ref<number | null>(null)
+const dropZone = ref<Zone | null>(null)
+
+function dragItem(): Item | null {
+  return dragIdx.value === null ? null : items.value[dragIdx.value] ?? null
+}
+
+/** 某个标题在正文里的整节范围 */
+function sectionOf(el: HTMLElement): Section | null {
+  const view = props.editor?.view
+  if (!view) return null
+  let from: number
+  try {
+    from = view.posAtDOM(el, 0) - 1
+  } catch {
+    return null
+  }
+  const doc = view.state.doc
+  const node = doc.nodeAt(from)
+  if (!node || node.type.name !== 'heading') return null
+  const level = Number(node.attrs.level)
+  let to = doc.content.size
+  let stop = false
+  doc.forEach((child, offset) => {
+    if (stop || offset <= from) return
+    if (child.type.name === 'heading' && Number(child.attrs.level) <= level) {
+      to = offset
+      stop = true
+    }
+  })
+  return { from, to, level }
+}
+
+/** 落点是不是落在被拖的这一节里面（含首尾边界） */
+function insideSection(sec: Section, at: number): boolean {
+  return at >= sec.from && at < sec.to
+}
+
+/** 上/中/下三段：上=插到它前面、中=变成它的子节、下=插到它整节之后 */
+function zoneOf(ev: DragEvent, el: HTMLElement): Zone {
+  const rect = el.getBoundingClientRect()
+  const rel = (ev.clientY - rect.top) / rect.height
+  if (rel < 0.28) return 'before'
+  if (rel > 0.72) return 'after'
+  return 'inside'
+}
+
+/**
+ * 这次落点被拦下的原因（空串 = 可以放）。
+ *
+ * 两条硬约束：
+ * 1) 不能拖进自己（或自己的后代）里——那样等于把一节塞进自己，会成环；
+ * 2) 整节提到新层级后，子树里最深的那条不能超过 H6（升/降都按整节算）。
+ */
+function dropBlockedReason(drag: Item, target: Item, zone: Zone): string {
+  if (!canEdit.value) return '只读，不能移动'
+  const sec = sectionOf(drag.el)
+  const tgt = sectionOf(target.el)
+  if (!sec || !tgt) return '找不到这一节的范围'
+  if (insideSection(sec, tgt.from)) return '不能把一节拖进它自己里面'
+  const delta = (zone === 'inside' ? tgt.level + 1 : tgt.level) - sec.level
+  if (drag.deep + delta > MAX_LEVEL) return `子级已到 H${drag.deep}，再降会超过 H${MAX_LEVEL}`
+  return ''
+}
+
+function canDrop(target: Item, zone: Zone): boolean {
+  const drag = dragItem()
+  return !!drag && !dropBlockedReason(drag, target, zone)
+}
+
+function onDragStart(ev: DragEvent, item: Item, i: number) {
+  if (!canEdit.value) {
+    ev.preventDefault()
+    return
+  }
+  // 拖拽和批量选择是两码事，先清掉选中态，免得到时候只在拖一条却像在拖一批
+  clearSelection()
+  dragIdx.value = i
+  dropIdx.value = null
+  dropZone.value = null
+  if (ev.dataTransfer) {
+    // 用私有 MIME 而不是 text/plain：不写 dataTransfer 时 Firefox 不会开始拖，
+    // 但写成 text/plain 又会被正文编辑器当成「拖进来一段文字」照单收下
+    ev.dataTransfer.setData('application/x-scofen-outline', String(i))
+    ev.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+function onDragOver(ev: DragEvent, item: Item, i: number) {
+  const zone = zoneOf(ev, ev.currentTarget as HTMLElement)
+  if (!canDrop(item, zone)) return
+  ev.preventDefault()
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move'
+  dropIdx.value = i
+  dropZone.value = zone
+}
+
+function onDragLeave(item: Item, i: number) {
+  if (dropIdx.value === i) {
+    dropIdx.value = null
+    dropZone.value = null
+  }
+}
+
+/**
+ * 把一节整体搬到新位置，并把节内所有标题平移同样的层级差。
+ *
+ * 一次 dispatch 完成「删 + 插 + 改层级」：一个撤销步、一个 Yjs update，
+ * 对方看到的是原子操作。
+ */
+function moveSection(drag: Item, target: Item, zone: Zone) {
+  const ed = props.editor
+  const view = ed?.view
+  if (!ed || !view || !ed.isEditable) return
+  const sec = sectionOf(drag.el)
+  const tgt = sectionOf(target.el)
+  if (!sec || !tgt) return
+  if (insideSection(sec, tgt.from)) return
+
+  const newLevel = zone === 'inside' ? tgt.level + 1 : tgt.level
+  const delta = newLevel - sec.level
+  const insertAt = zone === 'before' ? tgt.from : tgt.to
+  // 落在自己原来的位置上、层级也不变 = 白搬一趟。
+  // 注意「拖进紧邻的前一节」时 insertAt 正好等于 sec.from，但层级要变深，
+  // 这种情况必须照做，否则拖进去毫无反应。
+  if (delta === 0 && (insertAt === sec.from || insertAt === sec.to)) return
+
+  const slice = view.state.doc.slice(sec.from, sec.to)
+  const frag = shiftSlice(slice, delta)
+  const tr = view.state.tr
+  tr.delete(sec.from, sec.to)
+  // 删除后位置会左移：让 mapping 算，别手写偏移
+  tr.insert(tr.mapping.map(insertAt, -1), frag)
+  view.dispatch(tr)
+  sealUndoStep()
+
+  // 拖进一个折叠着的节里，新的子节会被折叠藏起来——顺手展开，不然像没落上
+  if (zone === 'inside' && isFolded(target.el)) {
+    const next = new Set(folded.value)
+    next.delete(target.el)
+    folded.value = next
+  }
+
+  const verb = zone === 'inside' ? `移到「${target.raw}」下` : `移到「${target.raw}」${zone === 'before' ? '前' : '后'}`
+  flash(`已${verb}${delta ? `（层级 ${sec.level}→${newLevel}）` : ''}`)
+  window.requestAnimationFrame(() => refresh())
+}
+
+/** 把整节切片里的标题层级整体平移；其余块原样带过去 */
+function shiftSlice(slice: Slice, delta: number): Fragment {
+  if (!delta) return slice.content
+  const out: PMNode[] = []
+  slice.content.forEach((n) => {
+    if (n.type.name !== 'heading') {
+      out.push(n)
+      return
+    }
+    const lv = Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, Number(n.attrs.level) + delta))
+    out.push(n.type.create({ ...n.attrs, level: lv }, n.content, n.marks))
+  })
+  return Fragment.fromArray(out)
+}
+
+function onDrop(ev: DragEvent, target: Item, i: number) {
+  ev.preventDefault()
+  const drag = dragItem()
+  const zone = dropZone.value
+  const hit = dropIdx.value === i
+  resetDrag()
+  if (!drag || !zone || !hit) return
+  const why = dropBlockedReason(drag, target, zone)
+  if (why) {
+    flash(why)
+    return
+  }
+  moveSection(drag, target, zone)
+}
+
+function resetDrag() {
+  dragIdx.value = null
+  dropIdx.value = null
+  dropZone.value = null
+}
+
 function refresh() {
   const all = scanHeads()
   // 正文里被删掉/重建的标题，对应的折叠记录一并清掉，免得 Set 越攒越大
@@ -643,12 +858,29 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="empty" class="outline-empty">本文档暂无标题</div>
-    <ul v-else class="outline-list">
+    <ul v-else class="outline-list" @dragend="resetDrag">
       <li
         v-for="(item, i) in items"
         :key="i"
-        :class="['outline-item', `lvl-${item.level}`, { on: i === activeId, sel: selected.has(i), folded: isFolded(item.el) }]"
-        :title="canEdit ? '点击跳转；Ctrl/⌘ 点击多选，Shift 选连续范围' : ''"
+        :class="[
+          'outline-item',
+          `lvl-${item.level}`,
+          {
+            on: i === activeId,
+            sel: selected.has(i),
+            folded: isFolded(item.el),
+            dragging: dragIdx === i,
+            'drop-before': dropIdx === i && dropZone === 'before',
+            'drop-after': dropIdx === i && dropZone === 'after',
+            'drop-inside': dropIdx === i && dropZone === 'inside',
+          },
+        ]"
+        :title="canEdit ? '点击跳转；Ctrl/⌘ 点击多选，Shift 选连续范围；拖动可调整顺序与层级' : ''"
+        :draggable="canEdit"
+        @dragstart="onDragStart($event, item, i)"
+        @dragover="onDragOver($event, item, i)"
+        @dragleave="onDragLeave(item, i)"
+        @drop="onDrop($event, item, i)"
         @mousedown="onItemMouseDown"
         @click="onItemClick(item, i, $event)"
       >

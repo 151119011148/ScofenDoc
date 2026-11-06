@@ -77,6 +77,14 @@ check('带子级的条目有折叠三角（不是每条都有）', st.carets > 0
 check('大纲条目不超出正文标题数', st.itemCount <= st.headCount, `${st.itemCount}/${st.headCount}`)
 check('没有残留的操作提示', st.hint === 0)
 
+// 正文标题里有个 HeadingFold 注入的折叠三角（span.fold-caret，真实 DOM 子节点），
+// 它不该被 textContent 带进大纲文字里
+const caretLeak = await page.evaluate(() => ({
+  widgets: document.querySelectorAll('.ProseMirror h1 .fold-caret, .ProseMirror h2 .fold-caret, .ProseMirror h3 .fold-caret').length,
+  polluted: [...document.querySelectorAll('.outline-text')].filter((e) => /[▸▾]/.test(e.textContent)).length,
+}))
+check('大纲文字里没有正文折叠三角', caretLeak.widgets > 0 && caretLeak.polluted === 0, `${caretLeak.widgets}/${caretLeak.polluted}`)
+
 // 折叠只改目录、不动正文：展开/收起后正文标题数必须一致
 const foldBefore = await page.evaluate(() => {
   const li = [...document.querySelectorAll('.outline-item')].find((x) => x.querySelector('.outline-caret'))

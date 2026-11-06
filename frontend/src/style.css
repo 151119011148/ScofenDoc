@@ -1657,6 +1657,28 @@ body.resize-cursor * {
 .outline-item.lvl-5 { --ind: 64px; }
 .outline-item.lvl-6 { --ind: 76px; }
 
+/* 拖拽反馈，和文档树同一套语言：上/下边缘画插入线，中间高亮 = 变成它的子节 */
+.outline-item.dragging { opacity: 0.4; }
+.outline-item.drop-before::before,
+.outline-item.drop-after::after {
+  content: '';
+  position: absolute;
+  /* 线从落点那一级的缩进处起画：一眼能看出它会落在哪一层 */
+  left: calc(var(--ind) - 6px);
+  right: 8px;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.outline-item.drop-before::before { top: -1px; }
+.outline-item.drop-after::after { bottom: -1px; }
+.outline-item.drop-inside {
+  background: #eaf1ff;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
 /* 折叠三角：绝对定位在缩进空当里，出现时不挤文字、不触发重排 */
 .outline-caret {
   position: absolute;
