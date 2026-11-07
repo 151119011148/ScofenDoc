@@ -107,7 +107,7 @@ await page.setViewport({ width: 1440, height: 900 })
 await sleep(300)
 
 /* 站内链接 ?h= 锚点走的是另一套落点计算，也要避开工具栏 */
-await page.goto(`${BASE}?space=2&doc=483&h=${encodeURIComponent('哈希索引')}`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}?space=2&doc=483&h=${encodeURIComponent('最左前缀原理与七种情况')}`, { waitUntil: 'domcontentloaded' })
 await page.waitForSelector('.ProseMirror', { timeout: 30000 })
 await page.waitForFunction(() => document.querySelectorAll('.ProseMirror > *').length > 20, { timeout: 30000 })
 // 协同正文异步到达 + alignAnchor 分轮二次校准，等滚动真的发生再量
@@ -118,7 +118,7 @@ await sleep(2600)
 const anchor = await page.evaluate(() => {
   const bar = document.querySelector('.collab .bar')?.getBoundingClientRect()
   const h = [...document.querySelectorAll('.ProseMirror h1, .ProseMirror h2, .ProseMirror h3')]
-    .find((e) => (e.textContent || '').includes('哈希索引'))
+    .find((e) => (e.textContent || '').includes('最左前缀原理与七种情况'))
   return {
     barBottom: bar ? Math.round(bar.bottom) : 0,
     headTop: h ? Math.round(h.getBoundingClientRect().top) : null,

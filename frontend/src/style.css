@@ -739,6 +739,11 @@ body {
 .ProseMirror h5:hover .fold-caret,
 .ProseMirror h6:hover .fold-caret { opacity: 1; }
 .fold-caret:hover { color: var(--brand); }
+/* 折叠隐藏：必须写成「.ProseMirror .fold-hidden」这种两级权重。
+   正文配图是顶层块节点，且 `.ProseMirror img { display: block }` 是「类 + 标签」
+   （0,1,1），单个 `.fold-hidden`（0,1,0）压不住它——折起小节后文字都收进去了，
+   图片却还以 block 留在页面上。 */
+.ProseMirror .fold-hidden,
 .fold-hidden { display: none; }
 
 /* 待办清单 */
