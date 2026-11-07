@@ -761,6 +761,92 @@ async function saveTitle() {
   await renameDoc(doc, title)
 }
 
+/* ---------- 删除后的落点：上一篇 / 下一篇 ---------- */
+
+/**
+ * 整棵树的阅读顺序：父在前、子紧随，然后才是下一个兄弟。
+ * 列表按 sort_order,id 返回，同层顺序就是数组顺序，所以按 parentId 分组做一次
+ * DFS 得到的就是目录树从上到下的顺序 —— 也是「上一篇 / 下一篇」该用的顺序。
+ */
+function readingOrder(list: Doc[]): Doc[] {
+  const byParent = new Map<number | null, Doc[]>()
+  for (const d of list) {
+    const key = d.parentId ?? null
+    const arr = byParent.get(key)
+    if (arr) arr.push(d)
+    else byParent.set(key, [d])
+  }
+  const out: Doc[] = []
+  const seen = new Set<number>()
+  const walk = (pid: number | null) => {
+    for (const d of byParent.get(pid) ?? []) {
+      if (seen.has(d.id)) continue
+      seen.add(d.id)
+      out.push(d)
+      walk(d.id)
+    }
+  }
+  walk(null)
+  // parentId 指向已删父级的孤儿（撤销时可能出现）挂在末尾，别静默丢掉
+  for (const d of list) if (!seen.has(d.id)) out.push(d)
+  return out
+}
+
+/** 被删文档连同整棵子树：后端 deleteDoc 是递归软删，算邻居时范围要对齐 */
+function withSubtrees(list: Doc[], ids: number[]): Set<number> {
+  const kids = new Map<number, number[]>()
+  for (const d of list) {
+    if (d.parentId == null) continue
+    const arr = kids.get(d.parentId)
+    if (arr) arr.push(d.id)
+    else kids.set(d.parentId, [d.id])
+  }
+  const out = new Set<number>()
+  const stack = [...ids]
+  while (stack.length) {
+    const cur = stack.pop()!
+    if (out.has(cur)) continue
+    out.add(cur)
+    for (const k of kids.get(cur) ?? []) stack.push(k)
+  }
+  return out
+}
+
+/**
+ * 删除后停在哪：先找「下一篇」（继续往下读最贴合阅读习惯），没有下一篇再回退
+ * 「上一篇」；整个空间被删空时返回 null，外层回落到空状态。
+ */
+function neighborAfterDelete(list: Doc[], removed: Set<number>): Doc | null {
+  const order = readingOrder(list)
+  const at = order.findIndex((d) => removed.has(d.id))
+  if (at < 0) return null
+  for (let i = at + 1; i < order.length; i++) if (!removed.has(order[i].id)) return order[i]
+  for (let i = at - 1; i >= 0; i--) if (!removed.has(order[i].id)) return order[i]
+  return null
+}
+
+/**
+ * 删除一批文档，并把视图挪到邻居（下一篇优先，其次上一篇）。
+ * 单篇删除 / 批量删除 / 重做删除共用，落点逻辑只写一遍。
+ */
+async function applyDelete(ids: number[]): Promise<{ next: Doc | null }> {
+  const order = readingOrder(docs.value)
+  const removed = withSubtrees(docs.value, ids)
+  // 后端会把子树一起软删，所以「当前是否被删」要按子树范围判断：
+  // 停在子文档上删它的父级时，当前文档同样会消失
+  const hitsCurrent = currentDocId.value != null && removed.has(currentDocId.value)
+  const next = hitsCurrent ? neighborAfterDelete(docs.value, removed) : null
+  // 选中的可能互为父子：先删父会把子一起带走，再删子就报「文档不存在」打断整批。
+  // 按阅读顺序倒序删（深的、靠后的先走），父子同选也不会踩到自己。
+  const idx = new Map(order.map((d, i) => [d.id, i]))
+  const seq = [...ids].sort((a, b) => (idx.get(b) ?? -1) - (idx.get(a) ?? -1))
+  for (const id of seq) {
+    await api.deleteDoc(id)
+  }
+  await loadDocs(currentSpaceId.value!, hitsCurrent ? (next?.id ?? null) : currentDocId.value)
+  return { next: hitsCurrent ? next : null }
+}
+
 async function removeDoc(doc: Doc) {
   if (!canWrite.value) return
   const hasChildren = docs.value.some((d) => d.parentId === doc.id)
@@ -769,9 +855,8 @@ async function removeDoc(doc: Doc) {
     : `确定删除「${doc.title}」吗？`
   if (!confirm(tip)) return
   try {
-    await api.deleteDoc(doc.id)
-    const wasCurrent = currentDocId.value === doc.id
-    await loadDocs(currentSpaceId.value!, wasCurrent ? null : currentDocId.value)
+    const { next } = await applyDelete([doc.id])
+    if (next) flash(`已删除「${doc.title}」，定位到「${next.title}」`)
     // 后端是软删除，撤销就是把 deleted 标记翻回去，正文原样保留
     pushUndo({
       label: `删除「${doc.title}」`,
@@ -792,10 +877,8 @@ async function removeManyDocs(list: Doc[]) {
   moving.value = true
   const ids = list.map((d) => d.id)
   try {
-    for (const id of ids) {
-      await api.deleteDoc(id)
-    }
-    await loadDocs(currentSpaceId.value!, null)
+    const { next } = await applyDelete(ids)
+    if (next) flash(`已删除 ${ids.length} 篇文档，定位到「${next.title}」`)
     pushUndo({
       label: `删除 ${ids.length} 篇文档`,
       undo: () => restoreDocs(ids),
@@ -847,12 +930,13 @@ async function applyMovePlan(plan: { id: number; parentId: number | null; index:
 
 async function restoreDocs(ids: number[]) {
   for (const id of ids) await api.restoreDoc(id)
-  await reloadDocs()
+  // 恢复后直接停在被恢复的那篇：删错了按 Ctrl+Z，就该回到原来的位置接着看，
+  // 而不是留在删除时跳过去的那篇上再手动找回来
+  await loadDocs(currentSpaceId.value!, ids[0] ?? currentDocId.value)
 }
 
 async function deleteDocs(ids: number[]) {
-  for (const id of ids) await api.deleteDoc(id)
-  await reloadDocs()
+  await applyDelete(ids)
 }
 
 /** 拖拽改层级 / 改顺序，支持整批（多选后直接拖） */
