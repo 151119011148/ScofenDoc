@@ -311,6 +311,7 @@ docker compose -f deploy/docker-compose.yml up --build
 cd tools/md-to-collab && npm i
 node md-to-ydoc.mjs a.md /tmp/a.bin --drop-first-h1   # 转换 + 结构统计
 node read-ydoc.mjs /tmp/a.bin                          # 回读校验
+node rebuild-doc.mjs a.bin a.md /tmp/a.new.bin --numbered  # 按新 md 整体重建（补回标题自动编号属性）
 node build-link-manifest.mjs map.tsv link-manifest.json ../技术栈 ../ai学习   # 生成「md → 文档」对照表
 node gen-chapter-index.mjs 00-总索引.md ../技术栈                       # 从总索引切出每章索引页（发布到章节点）
 node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/标题/图/代码/链接数
@@ -353,6 +354,10 @@ node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/�
 7. **shell 里 `$VAR` 后面紧跟中文标点会被当成变量名的一部分**（macOS bash 3.2 直接报
    `unbound variable`）。脚本里一律写 `${VAR}`；另外 `set -e` 下别用 `[ cond ] && cmd` 的短路写法，
    `while read` 里调子脚本要加 `< /dev/null`，否则子脚本吃掉 stdin，循环只跑第一轮。
+8. **加粗不要包着行内代码**。`**` 与反引号挨在一起时会被切成几段 mark：页面上看着是粗的，
+   回读出来的 md 却成了 `` - **`await` 会释放锁，`signal` 不会。** `` 以外的断点形式
+   （`` `await`** 会释放锁，**`signal`** ``），校对时得多花一轮。要么整句不加粗，要么把
+   行内代码挪到加粗范围外面。`rebuild-doc.mjs` 建文档时顺带做过这个检查。
 
 ## 选中文字浮动工具条与批注
 
