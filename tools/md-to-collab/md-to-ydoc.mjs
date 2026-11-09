@@ -20,7 +20,7 @@
 import fs from 'fs'
 import path from 'path'
 import { marked } from 'marked'
-import { getSchema } from '@tiptap/core'
+import { Extension, getSchema } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
@@ -38,7 +38,7 @@ import { prosemirrorJSONToYDoc, prosemirrorJSONToYXmlFragment, yDocToProsemirror
 
 /* ---------------- 与前端完全一致的扩展集 ---------------- */
 
-function buildExtensions() {
+function buildExtensions(numbered = false) {
   return [
     StarterKit.configure({ history: false }),
     TaskList,
@@ -52,7 +52,42 @@ function buildExtensions() {
     Image.configure({ inline: false, allowBase64: false }),
     MermaidBlock,
     PlantUMLBlock,
+    ...(numbered ? [HeadingNumberAttrs()] : []),
   ]
+}
+
+/**
+ * 标题自动编号属性（前端的 HeadingNumber 扩展）。
+ *
+ * 站点里的标题是「纯文字 + numbered 属性」，序号（1 / 1.1 / 1.1.1）由前端装饰派生，
+ * 不落在文字里。离线这条链路没引那个扩展，schema 里就没有这两个属性，
+ * `generateJSON` 会把它们直接丢掉——重建/覆盖出来的文档「标题有文字、没有序号」。
+ * 打开 --numbered 时把同名字段补进 schema，序号就还在。
+ */
+function HeadingNumberAttrs() {
+  return Extension.create({
+    name: 'headingNumberAttrs',
+    addGlobalAttributes() {
+      return [
+        {
+          types: ['heading'],
+          attributes: {
+            numbered: {
+              default: false,
+              parseHTML: (el) => el.getAttribute('data-numbered') === '1',
+              renderHTML: (attrs) => (attrs.numbered ? { 'data-numbered': '1' } : {}),
+            },
+            numberStyle: {
+              default: 'ordered',
+              parseHTML: (el) => (el.getAttribute('data-numbered-style') === 'unordered' ? 'unordered' : 'ordered'),
+              renderHTML: (attrs) =>
+                attrs.numbered && attrs.numberStyle === 'unordered' ? { 'data-numbered-style': 'unordered' } : {},
+            },
+          },
+        },
+      ]
+    },
+  })
 }
 
 /* ---------------- 参数 ---------------- */
@@ -63,6 +98,7 @@ const opts = {
   dropFirstH1: false,
   keepLocalLinks: false,
   quiet: false,
+  numbered: false,
   manifest: '',
   selfDocId: 0,
   spaceId: 0,
@@ -72,6 +108,7 @@ for (let i = 0; i < argv.length; i += 1) {
   const a = argv[i]
   if (a === '--drop-first-h1') opts.dropFirstH1 = true
   else if (a === '--keep-local-links') opts.keepLocalLinks = true
+  else if (a === '--numbered') opts.numbered = true
   else if (a === '--quiet') opts.quiet = true
   else if (a === '--manifest') opts.manifest = argv[++i] || ''
   else if (a === '--merge-into') opts.mergeInto = argv[++i] || ''
@@ -238,9 +275,21 @@ function fixLiteralStrong(input) {
 
 /* ---------------- HTML → ProseMirror JSON ---------------- */
 
-const extensions = buildExtensions()
+const extensions = buildExtensions(opts.numbered)
 const schema = getSchema(extensions)
 const json = generateJSON(html, extensions)
+
+if (opts.numbered) {
+  // 只给顶层遍历即可：标题都是顶层节点，正文里的 heading 不会出现在表格/引用内部
+  let heads = 0
+  for (const node of json.content || []) {
+    if (node.type === 'heading') {
+      node.attrs = { ...(node.attrs || {}), numbered: true }
+      heads += 1
+    }
+  }
+  if (!opts.quiet) console.log(`编号  已给 ${heads} 个标题打开自动编号`)
+}
 
 /* ---------------- ProseMirror JSON → Y.Doc ---------------- */
 

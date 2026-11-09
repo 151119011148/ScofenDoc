@@ -55,6 +55,14 @@ function md(node, depth = 0) {
       return indent + inline(kids)
     case 'codeBlock':
       return '```' + (node.attrs?.language || '') + '\n' + kids.map((c) => c.text || '').join('') + '\n```'
+    // 图块把源码放在 attrs.code 里、没有子节点：漏掉这两个 case 会让整张图
+    // 在导出结果里"凭空消失"，dump → 改 → 重建一轮就把图弄丢了。
+    case 'mermaid':
+    case 'mermaidBlock':
+      return '```mermaid\n' + (node.attrs?.code || '').trimEnd() + '\n```'
+    case 'plantuml':
+    case 'plantumlBlock':
+      return '```plantuml\n' + (node.attrs?.code || '').trimEnd() + '\n```'
     case 'blockquote':
       return kids.map((k) => '> ' + md(k, 0).replace(/\n/g, '\n> ')).join('\n')
     case 'bulletList':

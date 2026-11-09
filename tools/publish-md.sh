@@ -38,6 +38,7 @@ while [ $# -gt 0 ]; do
     --parent) PARENT_ID="$2"; shift 2 ;;
     --manifest) MANIFEST="$2"; shift 2 ;;
     --no-links) NO_LINKS=1; shift ;;
+    --numbered) NUMBERED=1; shift ;;
     --fresh) FRESH=1; shift ;;
     --no-restart) NO_RESTART=1; shift ;;
     --keep-local-links) KEEP_LINKS=1; shift ;;
@@ -119,6 +120,11 @@ echo "    文档 id=$DOC_ID  collabKey=$COLLAB_KEY  空间 #$SPACE_ID  《${TITL
 
 echo "==> 2/4 转换 Markdown → Yjs 状态文件"
 CONVERT_FLAGS=(--drop-first-h1 --self "$DOC_ID" --space "$SPACE_ID")
+if [ "${NUMBERED:-0}" = "1" ]; then
+  # 站点里的序号由前端从 numbered 属性派生，md 正文里的标题不带 "1 " 这种前缀；
+  # 传了 --numbered 就按线上口径重建成「纯文字标题 + 自动编号」。
+  CONVERT_FLAGS+=(--numbered)
+fi
 if [ "$NO_LINKS" = "1" ]; then
   :
 elif [ -z "$MANIFEST" ]; then

@@ -299,9 +299,17 @@ docker compose -f deploy/docker-compose.yml up --build
 # 覆盖某一篇的正文（标题可省略，默认沿用线上标题）
 ./tools/publish-md.sh "../个人履历详解.md" "" --doc-id 13
 
+# 覆盖时保留「标题自动编号」（序号由前端从 numbered 属性派生，md 标题里不写 "1 " 这种前缀）
+./tools/publish-md.sh "../个人履历详解.md" "" --doc-id 13 --numbered
+
 # 整批重发：给所有已发布的 md 补站内跳转链接（标题沿用线上，正文覆盖）
 ./tools/relink-all.sh
 ```
+
+**`--numbered` 解决的是「覆盖一次，序号全丢」**：站点的序号是 `heading` 节点上的 `numbered`
+属性＋前端装饰算出来的，不落在文字里；而离线转换链路的 schema 里没有这个属性，
+`generateJSON` 会把它丢掉。加了 `--numbered` 会补一份同名属性定义再统一置真。
+配套要求：**md 里标题不要再手写 "1 "、"2.1 "**，否则线上会显示成「2.1 2.1 标题」。
 
 脚本做四件事：`marked` 转 HTML → `generateJSON`（与前端同一套扩展）→ 写入 Yjs 状态
 （已有文档走 `--merge-into` 就地替换）→ 建/改 doc 记录 + 上传 `{collabKey}.bin` → 回读校验。
