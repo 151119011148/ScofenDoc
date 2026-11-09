@@ -309,7 +309,8 @@ docker compose -f deploy/docker-compose.yml up --build
 **`--numbered` 解决的是「覆盖一次，序号全丢」**：站点的序号是 `heading` 节点上的 `numbered`
 属性＋前端装饰算出来的，不落在文字里；而离线转换链路的 schema 里没有这个属性，
 `generateJSON` 会把它丢掉。加了 `--numbered` 会补一份同名属性定义再统一置真。
-配套要求：**md 里标题不要再手写 "1 "、"2.1 "**，否则线上会显示成「2.1 2.1 标题」。
+它同时会**摘掉 md 标题里手写的 "3 "、"2.1 " 前缀**（md 为了离线可读常这么写，
+不摘的话线上会显示成「3 3 第七份」）——正文里的「见 10.8」这类交叉引用不动。
 
 脚本做四件事：`marked` 转 HTML → `generateJSON`（与前端同一套扩展）→ 写入 Yjs 状态
 （已有文档走 `--merge-into` 就地替换）→ 建/改 doc 记录 + 上传 `{collabKey}.bin` → 回读校验。

@@ -142,6 +142,20 @@ if (opts.dropFirstH1) {
   // 文档标题已经在列表和页头展示，正文再出现一次一级标题就是重复
   markdown = markdown.replace(/^#\s+.*\r?\n/, '')
 }
+if (opts.numbered) {
+  /*
+   * 序号由前端的 numbered 属性派生，正文里不能再来一份。
+   * 但 md 为了离线可读往往手写了 "## 3 第七份…" / "### 2.1 方法论…"，
+   * 直接发上去会显示成「3 3 第七份」。这里统一摘掉标题里手写的前缀，
+   * 正文交叉引用（"见 10.8"）是普通段落，不碰。
+   */
+  let strippedHeads = 0
+  markdown = markdown.replace(/^(#{1,6})[ \t\u3000]+\d+(?:\.\d+)*[ \t\u3000]+(?=\S)/gm, (m, hashes) => {
+    strippedHeads += 1
+    return `${hashes} `
+  })
+  if (strippedHeads && !opts.quiet) console.log(`编号  去掉 ${strippedHeads} 个标题里手写的序号`)
+}
 
 const manifest = opts.manifest ? JSON.parse(fs.readFileSync(opts.manifest, 'utf8')) : null
 const linkStats = { internal: 0, inDoc: 0, external: 0, stripped: 0, missing: new Set() }
