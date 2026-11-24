@@ -80,6 +80,8 @@ const previewImage = ref<{ src: string; title: string } | null>(null)
 
 /** 粘贴 / 拖入 / 选文件共用的上传状态提示 */
 const imageHint = ref('')
+/** 检测到 WPS/Word 本机图片时，从剪贴板路径里挖出的临时目录，展示给用户一键复制 */
+const localDirHint = ref('')
 const imageInput = ref<HTMLInputElement | null>(null)
 /** 修复 WPS/Word 粘贴的本机图片：选的是「文件夹」，按文件名匹配后批量上传 */
 const folderInput = ref<HTMLInputElement | null>(null)
@@ -1186,6 +1188,42 @@ function localImageName(src: string): string {
   return decodeURIComponent((src.split(/[\\/]/).pop() || '').split(/[?#]/)[0])
 }
 
+/**
+ * 从 file:///C:\...\ksohtml9896\wps122.jpg 里取出「图片所在文件夹」的 Windows 路径。
+ * WPS 剪贴板里的路径可能是反斜杠、正斜杠或 URL 编码，这里统一成资源管理器能直接用的反斜杠形式。
+ * 用户不知道临时目录在哪时，把这个路径复制去文件管理器地址栏（或文件对话框 Ctrl+L）即可直达。
+ */
+function localImageDir(src: string): string {
+  let p = src.replace(/^file:\/\//i, '')
+  try {
+    p = decodeURIComponent(p)
+  } catch {
+    /* 非法百分号编码就按原样处理 */
+  }
+  p = p.replace(/[\\/]+/g, '\\').replace(/[?#].*$/, '')
+  const i = p.lastIndexOf('\\')
+  return i > 2 ? p.slice(0, i) : ''
+}
+
+/** 从一段 HTML 里挖出第一个 file:// 图片所在的目录（粘贴时用来提示用户） */
+function firstLocalDir(html: string): string {
+  const m = /<img[^>]+src=["'](file:[^"']+)["']/i.exec(html)
+  return m ? localImageDir(m[1]) : ''
+}
+
+/** 复制临时目录路径到剪贴板，供用户粘到文件管理器地址栏 */
+async function copyLocalDir() {
+  const text = localDirHint.value
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    showImageHint('临时目录路径已复制，粘贴到文件夹地址栏回车即可打开', 3200)
+  } catch {
+    // 非安全上下文 / 无剪贴板权限时降级：选中文本让用户手动复制
+    window.prompt('复制这个路径，粘贴到文件夹地址栏回车即可打开：', text)
+  }
+}
+
 /** 扫出正文里所有指向本机磁盘的图片（WPS/Word 复制粘贴的典型产物） */
 function findLocalImages(): { pos: number; name: string }[] {
   const ed = editor.value
@@ -1260,6 +1298,7 @@ async function onLocalFolderChange(event: Event) {
     showImageHint(`所选文件夹里没有找到这 ${wanted.size} 张图片，请选 WPS 临时目录`, 5000)
     return
   }
+  localDirHint.value = '' // 目录已选，引导卡可以收起了
   // 只传映射里还没有的；已传过的同名图片直接复用
   const toUpload = all.filter((f) => f.type.startsWith('image/') && !localUrlMap.has(f.name))
   showImageHint(`正在上传 ${toUpload.length} 张本机图片（仅此一次，以后自动识别）…`, 0)
@@ -1469,6 +1508,7 @@ onMounted(() => {
         if (/<img\b/i.test(html)) {
           event.preventDefault()
           void (async () => {
+            localDirHint.value = '' // 每次粘贴先清掉上一次的目录引导
             showImageHint('正在上传正文图片…', 0)
             const result = await resolvePastedImageUrls(html)
             const ed = editor.value
@@ -1484,10 +1524,11 @@ onMounted(() => {
               if (result.missing.length) {
                 parts.push(`${result.missing.length} 张本机图片待补`)
                 pendingLocalNames = new Set(result.missing)
-                // 缓存里没有原件：问一次目录，选完自动替换正文里剩下的 file:// 节点
-                window.setTimeout(() => folderInput.value?.click(), 0)
+                // 不再盲目弹目录框：用户往往不知道 WPS 临时目录在哪。
+                // 把从剪贴板挖出来的路径展示成可复制卡片，用户复制去文件管理器就能直达。
+                localDirHint.value = firstLocalDir(html)
               }
-              showImageHint(parts.length ? parts.join('，') : '已粘贴图文', result.missing.length ? 8000 : 4000)
+              showImageHint(parts.length ? parts.join('，') : '已粘贴图文', result.missing.length ? 0 : 4000)
             } catch (err) {
               console.error('[paste] insert rich html failed', (err as Error)?.stack || err)
               showImageHint('图片已上传，但插入正文失败，请重试', 4000)
@@ -1820,6 +1861,17 @@ function onContentClick(e: MouseEvent) {
 
     <!-- 粘贴 / 拖入 / 选文件共用的上传反馈；上传完成或失败自动消失 -->
     <div v-if="imageHint" class="image-upload-hint">{{ imageHint }}</div>
+
+    <!-- WPS/Word 本机图片待补：把从剪贴板挖出的临时目录展示出来，用户不用自己找 -->
+    <div v-if="localDirHint" class="local-dir-card">
+      <div class="ldc-title">图片在 WPS 临时目录里，浏览器读不到。选一次后以后都不用再选：</div>
+      <div class="ldc-path" :title="localDirHint">{{ localDirHint }}</div>
+      <div class="ldc-actions">
+        <button @click="copyLocalDir">复制路径</button>
+        <button class="ldc-primary" @click="folderInput?.click()">选择该文件夹</button>
+      </div>
+      <div class="ldc-tip">在文件夹地址栏（或选择框 Ctrl+L）粘贴路径回车即可直达</div>
+    </div>
 
     <!-- 本地图片选择框：隐藏，由斜杠菜单 / ＋ 菜单里的「本地图片」触发 -->
     <input

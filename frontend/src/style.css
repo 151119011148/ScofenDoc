@@ -564,6 +564,49 @@ body {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   pointer-events: none;
 }
+/* WPS/Word 本机图片：从剪贴板挖出的临时目录，用户可直接复制路径去打开 */
+.local-dir-card {
+  position: fixed;
+  right: 24px;
+  bottom: 82px;
+  z-index: 61;
+  width: min(420px, calc(100vw - 48px));
+  padding: 14px 16px;
+  border: 1px solid #d7e3ff;
+  border-radius: 10px;
+  background: #fff;
+  color: #2a2f38;
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 8px 28px rgba(30, 60, 130, 0.16);
+}
+.local-dir-card .ldc-title { font-weight: 600; margin-bottom: 8px; }
+.local-dir-card .ldc-path {
+  padding: 7px 9px;
+  border: 1px solid #e3e8f0;
+  border-radius: 6px;
+  background: #f6f8fc;
+  color: #3a4a63;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  word-break: break-all;
+  user-select: all;
+}
+.local-dir-card .ldc-actions { display: flex; gap: 8px; margin-top: 10px; }
+.local-dir-card .ldc-actions button {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #c8d6f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #2f5fd0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.local-dir-card .ldc-actions button:hover { background: #eef3ff; }
+.local-dir-card .ldc-actions button.ldc-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.local-dir-card .ldc-actions button.ldc-primary:hover { filter: brightness(1.06); }
+.local-dir-card .ldc-tip { margin-top: 8px; color: #8a93a3; font-size: 12px; }
 
 /* ============ Tiptap / ProseMirror 正文样式 ============ */
 .ProseMirror {
