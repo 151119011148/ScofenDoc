@@ -81,6 +81,9 @@ const previewImage = ref<{ src: string; title: string } | null>(null)
 /** 粘贴 / 拖入 / 选文件共用的上传状态提示 */
 const imageHint = ref('')
 const imageInput = ref<HTMLInputElement | null>(null)
+/** 修复 WPS/Word 粘贴的本机图片：选的是「文件夹」，按文件名匹配后批量上传 */
+const folderInput = ref<HTMLInputElement | null>(null)
+let pendingLocalNames = new Set<string>()
 let imageHintTimer = 0
 /** 选文件对话框是异步的，先记下图片要插到哪个位置 */
 let pendingImageFrom = 0
@@ -973,6 +976,97 @@ function onImageInputChange(event: Event) {
   if (files.length) void uploadAndInsert(files, pendingImageFrom)
 }
 
+/* ---------------- WPS / Word 本机图片修复 ---------------- */
+
+/** 从 file:///C:\...\wps122.jpg 这类地址里取文件名，兼容正斜杠和反斜杠 */
+function localImageName(src: string): string {
+  return decodeURIComponent((src.split(/[\\/]/).pop() || '').split(/[?#]/)[0])
+}
+
+/** 扫出正文里所有指向本机磁盘的图片（WPS/Word 复制粘贴的典型产物） */
+function findLocalImages(): { pos: number; name: string }[] {
+  const ed = editor.value
+  if (!ed) return []
+  const found: { pos: number; name: string }[] = []
+  ed.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const src = String(node.attrs?.src || '')
+    if (src.startsWith('file:')) found.push({ pos, name: localImageName(src) })
+  })
+  return found
+}
+
+/** 工具栏「修复图片」：先确认文档里确实有本机路径，再让用户选所在文件夹 */
+function openLocalImageRepair() {
+  const ed = editor.value
+  if (!ed || !props.editable) return
+  const locals = findLocalImages()
+  if (!locals.length) {
+    showImageHint('当前文档没有需要修复的本机图片', 3000)
+    return
+  }
+  pendingLocalNames = new Set(locals.map((item) => item.name))
+  folderInput.value?.click()
+}
+
+/**
+ * 选中文件夹后：只上传正文引用到的那些文件（WPS 临时目录常有一两百张，别整目录传），
+ * 成功后用一次性 transaction 把所有 file:// 地址替换成服务器 URL —— 走协同通道，其他客户端同步看到。
+ */
+async function onLocalFolderChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const wanted = pendingLocalNames
+  pendingLocalNames = new Set()
+  const all = Array.from(input.files ?? [])
+  input.value = ''
+  const matched = all.filter((f) => wanted.has(f.name))
+  if (!matched.length) {
+    showImageHint(`所选文件夹里没有找到这 ${wanted.size} 张图片，请选 WPS 临时目录`, 5000)
+    return
+  }
+  showImageHint(`正在上传 ${matched.length} 张图片…`, 0)
+  const results = await Promise.all(matched.map(async (file) => {
+    try {
+      return { name: file.name, url: (await api.uploadImage(file)).url }
+    } catch (err) {
+      console.error('[image] repair upload failed', (err as Error)?.stack || err, file.name)
+      return null
+    }
+  }))
+  const urls = new Map(results.filter((r): r is { name: string; url: string } => !!r).map((r) => [r.name, r.url]))
+  const ed = editor.value
+  if (!ed) return
+  if (!urls.size) {
+    showImageHint('图片上传失败，请检查网络或稍后重试', 4000)
+    return
+  }
+  let replaced = 0
+  try {
+    const tr = ed.state.tr
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'image') return
+      const src = String(node.attrs?.src || '')
+      if (!src.startsWith('file:')) return
+      const url = urls.get(localImageName(src))
+      if (url) {
+        tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url })
+        replaced++
+      }
+    })
+    if (replaced) ed.view.dispatch(tr)
+    const failed = findLocalImages().length
+    showImageHint(
+      failed
+        ? `已修复 ${replaced} 张，还有 ${failed} 张未找到（原件可能已被 WPS 清理）`
+        : `已修复 ${replaced} 张图片`,
+      5000,
+    )
+  } catch (err) {
+    console.error('[image] repair failed', (err as Error)?.stack || err)
+    showImageHint('图片已上传，但替换正文失败，请重试', 4000)
+  }
+}
+
 /** 按图片地址插入：既支持外链，也支持站内路径（存档图由 nginx 托管在 /scofendoc/files/archive/ 下） */
 function insertImageByUrl(source: 'plus' | 'slash', from: number, to: number) {
   const ed = editor.value
@@ -1161,6 +1255,18 @@ onMounted(() => {
           event.preventDefault()
           void uploadAndInsert(dataFiles, view.state.selection.from)
           return true
+        }
+
+        // WPS / Word 复制整篇图文时，剪贴板 HTML 里的 img 只有 file:///C:\... 本机路径，
+        // 浏览器（http 页面）读不到这个文件，也没法自动上传。文字照常粘贴，
+        // 但明确告诉用户点工具栏「修复图片」选一次图片所在文件夹即可批量补齐。
+        if (/<img[^>]+src=["']file:/i.test(html)) {
+          window.setTimeout(() => {
+            const count = findLocalImages().length
+            if (count) {
+              showImageHint(`已粘贴正文；其中 ${count} 张是 WPS 本机图片，请点工具栏「修复图片」并选择原图片文件夹`, 8000)
+            }
+          }, 0)
         }
         return false
       },
@@ -1463,6 +1569,7 @@ function onContentClick(e: MouseEvent) {
 
         <button title="撤销" @click="editor?.chain().focus().undo().run()">↶</button>
         <button title="重做" @click="editor?.chain().focus().redo().run()">↷</button>
+        <button title="修复图片：从 WPS / Word 粘贴的本机图片选一次文件夹即可批量上传" @click="openLocalImageRepair">🖼 修复图片</button>
 
         <span class="slash-tip">输入 / 插入区块</span>
       </template>
@@ -1484,6 +1591,18 @@ function onContentClick(e: MouseEvent) {
       accept="image/*"
       multiple
       @change="onImageInputChange"
+    />
+
+    <!-- 修复 WPS/Word 本机图片：webkitdirectory 让用户选整个图片目录，                 -->
+    <!-- 前端按正文引用的文件名挑出对应图片上传，不会把临时目录里的图全塞进正文。       -->
+    <input
+      ref="folderInput"
+      class="image-file-input"
+      type="file"
+      webkitdirectory
+      directory
+      multiple
+      @change="onLocalFolderChange"
     />
 
     <!-- 单击正文配图放大：全屏预览层，Teleport 到 body，不影响编辑器布局 -->
