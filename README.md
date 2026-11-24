@@ -394,6 +394,21 @@ node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/�
 2. **批注锚点是正文节点的一部分**，仍然遵守「先发前端，再投数据」：旧版编辑器不认识
    `comment` mark，会把锚点洗掉（评论 Map 还在，正文里却再也点不到）。
 
+## 正文图片上传
+
+编辑器支持三种贴图方式：直接 `Ctrl+V` 粘贴截图、把图片拖进正文、斜杠/＋ 菜单里的
+「图片 → 本地图片」（可多选）。图片经 `POST /api/images` 落到服务器后，正文只写入
+返回的 URL —— 不把 base64 塞进 Yjs，避免 `.bin` 随每次编辑成倍膨胀。
+
+- 文件落盘：`scofendoc.files.dir/upload/yyyyMM/<uuid>.<ext>`，默认 `/var/www/scofendoc-files`；
+  通过环境变量 `SCOFENDOC_FILES_DIR` 覆盖。`SCOFENDOC_FILES_URL_PREFIX` 控制返回的 URL 前缀，
+  默认 `/scofendoc/files/`，正好对应 Nginx 已有的静态 alias，无需改 Nginx 配置。
+- 限制：单张 ≤ 10MB，仅 PNG / JPEG / GIF / WEBP / BMP；按文件头识别类型，剪贴板图片
+  没有文件名也能正确落盘。多张一起传时部分失败会保留成功插入的图并给出提示。
+- 本地开发：Vite 把 `/scofendoc/files/**` 重写到 Java 的 `/files/**`，无需起 Nginx；
+  生产由 Nginx 静态托管，该路径不经过 Java。
+- 发布：需要**重新构建前端 + 重启 Java 后端**，并确认后端进程对图片目录有写权限。
+
 ## 已知边界 / 下一步
 
 1. **只读是前端约束，不是服务端硬隔离**：`VIEWER` 拿到的协同 token 与编辑者同构，
@@ -404,7 +419,7 @@ node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/�
    但已经建立着的 WebSocket 不会被踢；协同 token 最长 2 小时，这是有意的取舍（换取不引入回调解耦）。
 3. **账号不能删**：目前只能停用式处理（移出所有空间 + 重置密码）。
    真要删除要考虑其作为 OWNER 的空间如何转移，属独立议题。
-4. 前端：评论侧栏（现在只能点正文里的批注看）、评论通知、历史版本 UI、`@` 提及、图片块。
+4. 前端：评论侧栏（现在只能点正文里的批注看）、评论通知、历史版本 UI、`@` 提及。
 5. 协同：增量持久化 + 定时快照（当前为全量覆盖）、断线重连后的冲突提示。
 6. 部署：域名 + HTTPS（Let's Encrypt）、定期备份 MySQL 与 `collab/data`。
 

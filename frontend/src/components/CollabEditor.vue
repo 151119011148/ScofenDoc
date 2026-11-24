@@ -43,6 +43,7 @@ import { setLastHeading } from '../headingMemory'
 import * as Y from 'yjs'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { COLLAB_URL } from '../config'
+import { api } from '../api'
 
 const props = withDefaults(
   defineProps<{
@@ -74,6 +75,15 @@ let provider: HocuspocusProvider | null = null
 
 /** 当前放大查看的正文配图；关掉即置空，组件自己 Teleport 到 body */
 const previewImage = ref<{ src: string; title: string } | null>(null)
+
+/* ---------------- 图片上传 ---------------- */
+
+/** 粘贴 / 拖入 / 选文件共用的上传状态提示 */
+const imageHint = ref('')
+const imageInput = ref<HTMLInputElement | null>(null)
+let imageHintTimer = 0
+/** 选文件对话框是异步的，先记下图片要插到哪个位置 */
+let pendingImageFrom = 0
 
 /** 顶部格式栏：吸顶后加个投影，让「已经贴上去了」有视觉反馈 */
 const barEl = ref<HTMLElement | null>(null)
@@ -167,8 +177,15 @@ const SLASH_GROUPS: SlashGroup[] = [
       { key: 'quote', label: '引用', hint: '引述一段话', icon: '❝', keywords: 'yinyong quote blockquote', run: (c) => c.toggleBlockquote() },
       { key: 'text', label: '正文', hint: '普通段落', icon: '¶', keywords: 'zhengwen text p paragraph', run: (c) => c.setParagraph() },
       { key: 'divider', label: '分割线', hint: '分隔内容区块', icon: '─', keywords: 'fengexian divider hr line', run: (c) => c.setHorizontalRule() },
-      // run 是空转：图片需要先问地址，由 applySlash 里的 insertImageByUrl 接管
-      { key: 'image', label: '图片', hint: '按图片地址插入', icon: '🖼', keywords: 'tupian image img picture photo', run: (c) => c },
+      // run 是空转：图片的两种插入方式（上传 / 填地址）都由 applySlash 接管
+      {
+        key: 'image', label: '图片', hint: '上传本地图片或填地址', icon: '🖼',
+        keywords: 'tupian image img picture photo shangchuan', run: (c) => c,
+        children: [
+          { key: 'image-upload', label: '本地图片', hint: '从电脑选择，支持多选', icon: '⬆️', keywords: 'shangchuan upload file local', run: (c) => c },
+          { key: 'image-url', label: '图片地址', hint: '外链或站内路径', icon: '🔗', keywords: 'dizhi url link', run: (c) => c },
+        ],
+      },
     ],
   },
   {
@@ -843,9 +860,13 @@ function applySlash(item: SlashItem) {
   const from = source === 'plus' ? plusBlockTo.value : slashFrom.value
   const to = source === 'plus' ? plusBlockTo.value : slashTo.value
   closeSlash()
-  // 图片要现填地址，不能像别的块那样直接 run
-  if (item.key === 'image') {
+  // 图片的两种入口（上传 / 填地址）都要异步处理，不能像别的块那样直接 run
+  if (item.key === 'image-url') {
     insertImageByUrl(source, from, to)
+    return
+  }
+  if (item.key === 'image-upload') {
+    openImagePicker(source, from, to)
     return
   }
   if (source === 'plus') {
@@ -876,11 +897,83 @@ function applySlash(item: SlashItem) {
   }
 }
 
+/** 上传提示：duration=0 表示一直显示，直到下一次调用覆盖它 */
+function showImageHint(text: string, duration = 2600) {
+  imageHint.value = text
+  if (imageHintTimer) window.clearTimeout(imageHintTimer)
+  imageHintTimer = duration > 0 ? window.setTimeout(() => (imageHint.value = ''), duration) : 0
+}
+
+/** 网页里复制的图片常只有 text/html 里的 data URL，转成 File 走同一条上传链路 */
+function dataUrlToFile(dataUrl: string, name: string): File | null {
+  const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(dataUrl)
+  if (!m) return null
+  try {
+    const binary = atob(m[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new File([bytes], name, { type: m[1] })
+  } catch {
+    return null
+  }
+}
+
 /**
- * 插入图片。
- * 目前没有上传接口，所以走「填地址」：既支持外链，也支持站内路径
- * （存档文章那 1892 张图就由 nginx 静态托管在 /scofendoc/files/archive/ 下）。
+ * 上传图片并插入正文。
+ * 图片走 HTTP 落到服务器、正文里只留 URL —— 直接把 base64 写进 Yjs 会让
+ * .bin 每编辑一次就复制一份大字符串，协同同步也会跟着变慢。
  */
+async function uploadAndInsert(files: File[], at: number) {
+  const ed = editor.value
+  if (!ed || !files.length) return
+  showImageHint(`正在上传 ${files.length} 张图片…`, 0)
+  const results = await Promise.all(files.map(async (file) => {
+    try {
+      return (await api.uploadImage(file)).url
+    } catch (err) {
+      console.error('[image] upload failed', (err as Error)?.stack || err, file.name)
+      return null
+    }
+  }))
+  // 上传期间用户可能切走了文档（组件被销毁），这时就不要再往旧 editor 里写
+  if (!editor.value) return
+  const urls = results.filter((url): url is string => !!url)
+  if (!urls.length) {
+    showImageHint('图片上传失败，请检查网络或稍后重试', 4000)
+    return
+  }
+  try {
+    // 上传期间协作者可能改过文档，位置要做一次保护性收拢
+    const pos = Math.min(Math.max(0, at), ed.state.doc.content.size)
+    ed.chain().focus()
+      .insertContentAt(pos, urls.map((src) => ({ type: 'image', attrs: { src } })))
+      .run()
+    const failed = results.length - urls.length
+    showImageHint(failed ? `已插入 ${urls.length} 张，${failed} 张失败` : `已插入 ${urls.length} 张图片`)
+  } catch (err) {
+    console.error('[image] insert failed', (err as Error)?.stack || err, { at })
+    showImageHint('图片已上传，但插入正文失败，请重试', 4000)
+  }
+}
+
+/** 斜杠 / ＋ 菜单的「本地图片」：先删掉 /xxx，再打开文件选择框 */
+function openImagePicker(source: 'plus' | 'slash', from: number, to: number) {
+  const ed = editor.value
+  if (!ed) return
+  if (source === 'slash') ed.chain().focus().deleteRange({ from, to }).run()
+  pendingImageFrom = Math.min(Math.max(0, from), ed.state.doc.content.size)
+  imageInput.value?.click()
+}
+
+function onImageInputChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? []).filter((f) => f.type.startsWith('image/'))
+  // 清空 value，保证连续选同一个文件也能再次触发 change
+  input.value = ''
+  if (files.length) void uploadAndInsert(files, pendingImageFrom)
+}
+
+/** 按图片地址插入：既支持外链，也支持站内路径（存档图由 nginx 托管在 /scofendoc/files/archive/ 下） */
 function insertImageByUrl(source: 'plus' | 'slash', from: number, to: number) {
   const ed = editor.value
   if (!ed) return
@@ -1038,6 +1131,49 @@ onMounted(() => {
         }
         return false
       },
+      /**
+       * 粘贴图片：截图工具（微信/QQ/Snipaste/系统截图）放到剪贴板的是 image/* 文件项，
+       * 浏览器默认不会把它当 <img> 插进正文，必须自己接住并上传。
+       * 返回 true = 阻止 ProseMirror 继续按默认方式处理这次粘贴。
+       */
+      handlePaste: (view, event) => {
+        if (!props.editable) return false
+        const dt = event.clipboardData
+        if (!dt) return false
+
+        const files = Array.from(dt.items)
+          .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+          .map((item) => item.getAsFile())
+          .filter((file): file is File => !!file)
+        if (files.length) {
+          event.preventDefault()
+          void uploadAndInsert(files, view.state.selection.from)
+          return true
+        }
+
+        // 从网页复制的图片有时不带文件项，只在 HTML 里留下 data URL；
+        // Image 扩展 allowBase64:false 会把这种节点过滤掉，所以这里提前转成文件上传
+        const html = dt.getData('text/html') || ''
+        const dataFiles = Array.from(html.matchAll(/<img[^>]+src=["'](data:image\/[^"']+)["']/gi))
+          .map((m, i) => dataUrlToFile(m[1], `pasted-${Date.now()}-${i}.png`))
+          .filter((file): file is File => !!file)
+        if (dataFiles.length) {
+          event.preventDefault()
+          void uploadAndInsert(dataFiles, view.state.selection.from)
+          return true
+        }
+        return false
+      },
+      /** 拖图片进正文：和粘贴走同一条上传链路，插入位置取鼠标落点 */
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved || !props.editable) return false
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'))
+        if (!files.length) return false
+        event.preventDefault()
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from
+        void uploadAndInsert(files, at)
+        return true
+      },
     },
     onUpdate: () => syncSlash(false),
     // 光标搬家（点击 / 方向键 / Tab）→ 把 ＋ 送到新段落；顺带把文字颜色记忆接上
@@ -1084,6 +1220,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onGlobalKey)
   window.removeEventListener('mouseout', onWindowMouseOut)
   cancelPlusHide()
+  if (imageHintTimer) window.clearTimeout(imageHintTimer)
   if (plusRecheckTimer) window.clearTimeout(plusRecheckTimer)
   if (plusRaf) cancelAnimationFrame(plusRaf)
   provider?.destroy()
@@ -1335,6 +1472,19 @@ function onContentClick(e: MouseEvent) {
     </div>
 
     <EditorContent :editor="editor" class="content" @click="onContentClick" />
+
+    <!-- 粘贴 / 拖入 / 选文件共用的上传反馈；上传完成或失败自动消失 -->
+    <div v-if="imageHint" class="image-upload-hint">{{ imageHint }}</div>
+
+    <!-- 本地图片选择框：隐藏，由斜杠菜单 / ＋ 菜单里的「本地图片」触发 -->
+    <input
+      ref="imageInput"
+      class="image-file-input"
+      type="file"
+      accept="image/*"
+      multiple
+      @change="onImageInputChange"
+    />
 
     <!-- 单击正文配图放大：全屏预览层，Teleport 到 body，不影响编辑器布局 -->
     <ImageLightbox

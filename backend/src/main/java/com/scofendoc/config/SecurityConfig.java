@@ -51,6 +51,8 @@ public class SecurityConfig {
                         // 登录注册 + 实例注册策略（登录页要在未登录时就查到能不能注册）
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/config").permitAll()
+                        // 本地开发直出的上传图片（生产由 Nginx 静态托管，不进 Security 链）
+                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                         // 预检请求
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())

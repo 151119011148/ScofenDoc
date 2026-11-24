@@ -108,7 +108,8 @@ export function setUnauthorizedHandler(fn: () => void) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
-  if (init?.body) headers['Content-Type'] = 'application/json'
+  // FormData 必须由浏览器自己带 boundary，手设 Content-Type 会导致上传解析失败
+  if (init?.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json'
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -244,4 +245,11 @@ export const api = {
   /** 协同 token：只对这篇文档有效，前端连 WebSocket 时带上 */
   collabToken: (docId: number) =>
     request<{ token: string; expiresIn: number }>(`/docs/${docId}/collab-token`),
+
+  /** 正文配图：粘贴/拖入的图片先上传，再把返回的 URL 写成 image 节点（避免 base64 撑爆 Yjs） */
+  uploadImage: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<{ url: string }>('/images', { method: 'POST', body: form })
+  },
 }

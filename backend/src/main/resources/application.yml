@@ -21,6 +21,11 @@ spring:
       ddl-auto: validate
     show-sql: false
     open-in-view: false
+  servlet:
+    multipart:
+      # 正文粘贴图片上传：单张上限 10MB（与 ImageController 的校验一致）
+      max-file-size: 10MB
+      max-request-size: 12MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -57,6 +62,10 @@ scofendoc:
   # 协同服务不可用时搜索自动降级为标题匹配，不影响主流程。
   collab:
     search-url: ${COLLAB_SEARCH_URL:http://127.0.0.1:1235/internal/search}
+  # 正文粘贴/拖入的图片：落盘目录与 Nginx 的 /scofendoc/files/ alias 必须一致
+  files:
+    dir: ${SCOFENDOC_FILES_DIR:/var/www/scofendoc-files}
+    url-prefix: ${SCOFENDOC_FILES_URL_PREFIX:/scofendoc/files/}
 
 # 说明：本地无 MySQL 时，可临时改用 H2 以便直接启动后端（仅 Demo）：
 # spring:

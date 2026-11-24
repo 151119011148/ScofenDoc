@@ -37,6 +37,13 @@ public class ApiExceptionHandler {
                 .body(Map.of("error", msg(e, "无权访问该资源")));
     }
 
+    /** 图片落盘失败等服务端异常：也要给前端 JSON，便于 api.ts 直接弹出可读提示 */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", msg(e, "服务器处理失败")));
+    }
+
     private String msg(Exception e, String fallback) {
         return e.getMessage() == null ? fallback : e.getMessage();
     }

@@ -13,6 +13,13 @@ export default defineConfig({
     proxy: {
       // 本地开发时把 /api 转到 Java 后端，避免跨域；生产由 Nginx 反代，不走这里
       '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      // 本地开发看上传的图片：/scofendoc/files/xxx -> Java /files/xxx
+      // 生产由 Nginx alias 到 /var/www/scofendoc-files/，不经过这里
+      '/scofendoc/files': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/scofendoc\/files/, '/files'),
+      },
     },
   },
 })
