@@ -86,6 +86,17 @@ const folderInput = ref<HTMLInputElement | null>(null)
 let pendingLocalNames = new Set<string>()
 /** 选过的文件夹里的图片按文件名缓存，之后粘贴同名本机图可自动匹配，不用重复选目录 */
 const localFileCache = new Map<string, File>()
+/**
+ * WPS/Word 本机图片「文件名 → 服务器 URL」的持久映射。
+ *
+ * 为什么需要它：WPS 复制整篇图文时，剪贴板 HTML 里的 <img> 只有 file:///C:\...\wpsNNN.jpg
+ * 这种本机路径引用，图片字节并不在剪贴板里；浏览器从 http 页面又不能读 file://。
+ * 所以第一次必须让用户选一次目录，但之后不该再问 —— 选完就把整目录图片上传一次，
+ * 映射存 IndexedDB，以后同名图片直接查表替换，刷新页面、WPS 清理临时文件都不受影响。
+ */
+const localUrlMap = new Map<string, string>()
+let localUrlMapPromise: Promise<void> | null = null
+let imageMapDb: IDBDatabase | null = null
 let imageHintTimer = 0
 /** 选文件对话框是异步的，先记下图片要插到哪个位置 */
 let pendingImageFrom = 0
@@ -909,6 +920,102 @@ function showImageHint(text: string, duration = 2600) {
   imageHintTimer = duration > 0 ? window.setTimeout(() => (imageHint.value = ''), duration) : 0
 }
 
+/* ---------------- 本机图片文件名 → 服务器 URL 的持久映射（IndexedDB） ---------------- */
+
+function openImageMapDb(): Promise<IDBDatabase | null> {
+  if (imageMapDb) return Promise.resolve(imageMapDb)
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') {
+      resolve(null)
+      return
+    }
+    let req: IDBOpenDBRequest
+    try {
+      req = indexedDB.open('scofendoc-local-images', 1)
+    } catch {
+      resolve(null)
+      return
+    }
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains('urlByName')) db.createObjectStore('urlByName')
+    }
+    req.onsuccess = () => {
+      imageMapDb = req.result
+      resolve(req.result)
+    }
+    req.onerror = () => resolve(null)
+  })
+}
+
+/** 懒加载一次：把已保存的映射读进内存，之后查表是同步的 */
+function ensureLocalUrlMap(): Promise<void> {
+  if (localUrlMapPromise) return localUrlMapPromise
+  localUrlMapPromise = (async () => {
+    const db = await openImageMapDb()
+    if (!db) return
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction('urlByName', 'readonly')
+        const req = tx.objectStore('urlByName').openCursor()
+        req.onsuccess = () => {
+          const cursor = req.result
+          if (cursor) {
+            localUrlMap.set(String(cursor.key), String(cursor.value))
+            cursor.continue()
+          }
+        }
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => resolve()
+        tx.onabort = () => resolve()
+      } catch {
+        resolve()
+      }
+    })
+  })()
+  return localUrlMapPromise
+}
+
+/** 上传成功后记一笔，下次同名本机图片直接复用 */
+async function rememberImageUrls(entries: { name: string; url: string }[]): Promise<void> {
+  if (!entries.length) return
+  for (const { name, url } of entries) localUrlMap.set(name, url)
+  const db = await openImageMapDb()
+  if (!db) return
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction('urlByName', 'readwrite')
+      const store = tx.objectStore('urlByName')
+      for (const { name, url } of entries) store.put(url, name)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => resolve()
+      tx.onabort = () => resolve()
+    } catch {
+      resolve()
+    }
+  })
+}
+
+/**
+ * 批量上传图片，返回 name → url。并发上传，单个失败不影响其它。
+ * 只传还没映射过的文件，避免重复上传。
+ */
+async function uploadImagesRemember(files: File[]): Promise<{ name: string; url: string }[]> {
+  const todo = files.filter((f) => f.type.startsWith('image/') && !localUrlMap.has(f.name))
+  if (!todo.length) return []
+  const results = await Promise.all(todo.map(async (file) => {
+    try {
+      return { name: file.name, url: (await api.uploadImage(file)).url }
+    } catch (err) {
+      console.error('[image] batch upload failed', (err as Error)?.message, file.name)
+      return null
+    }
+  }))
+  const ok = results.filter((r): r is { name: string; url: string } => !!r)
+  await rememberImageUrls(ok)
+  return ok
+}
+
 /** 网页里复制的图片常只有 text/html 里的 data URL，转成 File 走同一条上传链路 */
 function dataUrlToFile(dataUrl: string, name: string): File | null {
   const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(dataUrl)
@@ -933,7 +1040,7 @@ function dataUrlToFile(dataUrl: string, name: string): File | null {
  * 图片来源分三类：
  *   data: / blob: → 浏览器能直接拿到字节，转 File 上传
  *   http(s):      → 浏览器直抓会撞 CORS / 防盗链，交给后端 from-url 转存
- *   file:         → 浏览器读不到本机文件，从已选目录的缓存里按文件名匹配
+ *   file:         → 浏览器读不到本机文件，先查持久映射 / 已选目录缓存，都没有才让用户选一次目录
  *
  * @returns html=替换后的 HTML, uploaded=成功上传数, missing=缺原件的本机文件名, failed=上传失败数
  */
@@ -943,6 +1050,8 @@ async function resolvePastedImageUrls(html: string): Promise<{
   missing: string[]
   failed: number
 }> {
+  // 首次粘贴时把之前保存的「文件名 → URL」读进内存；之后同名本机图不用再选目录
+  await ensureLocalUrlMap()
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const images = Array.from(doc.querySelectorAll('img'))
   const jobs: Promise<{ img: HTMLImageElement; url: string | null }>[] = []
@@ -978,9 +1087,15 @@ async function resolvePastedImageUrls(html: string): Promise<{
       })())
     } else if (src.startsWith('file:')) {
       const name = localImageName(src)
-      const file = localFileCache.get(name)
-      if (file) jobs.push(uploadOne(file))
-      else missing.add(name)
+      const cachedUrl = localUrlMap.get(name)
+      if (cachedUrl) {
+        // 之前授权目录时已经传过这张，直接用站内 URL，全程无感
+        jobs.push(Promise.resolve({ img, url: cachedUrl }))
+      } else {
+        const file = localFileCache.get(name)
+        if (file) jobs.push(uploadOne(file))
+        else missing.add(name)
+      }
     }
     // 其它相对路径/未知协议保持原样，不擅自改动
 
@@ -1084,8 +1199,8 @@ function findLocalImages(): { pos: number; name: string }[] {
   return found
 }
 
-/** 工具栏「修复图片」：先确认文档里确实有本机路径，再让用户选所在文件夹 */
-function openLocalImageRepair() {
+/** 工具栏「修复图片」：本机图片若已在持久映射里就直接修，否则才让用户选一次目录 */
+async function openLocalImageRepair() {
   const ed = editor.value
   if (!ed || !props.editable) return
   const locals = findLocalImages()
@@ -1093,13 +1208,41 @@ function openLocalImageRepair() {
     showImageHint('当前文档没有需要修复的本机图片', 3000)
     return
   }
+  await ensureLocalUrlMap()
+  // 之前授权过目录、且这些图片都记过 → 静默替换，不再打扰用户
+  if (locals.length && locals.every((item) => localUrlMap.has(item.name))) {
+    let replaced = 0
+    try {
+      const tr = ed.state.tr
+      ed.state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'image') return
+        const src = String(node.attrs?.src || '')
+        if (!src.startsWith('file:')) return
+        const url = localUrlMap.get(localImageName(src))
+        if (url) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url })
+          replaced++
+        }
+      })
+      if (replaced) ed.view.dispatch(tr)
+      showImageHint(`已用记住的图片自动修复 ${replaced} 张`, 3500)
+    } catch (err) {
+      console.error('[image] auto repair failed', (err as Error)?.stack || err)
+      showImageHint('自动修复失败，请重试', 4000)
+    }
+    return
+  }
   pendingLocalNames = new Set(locals.map((item) => item.name))
   folderInput.value?.click()
 }
 
 /**
- * 选中文件夹后：只上传正文引用到的那些文件（WPS 临时目录常有一两百张，别整目录传），
- * 成功后用一次性 transaction 把所有 file:// 地址替换成服务器 URL —— 走协同通道，其他客户端同步看到。
+ * 选中文件夹后：把整个目录的图片一次性上传并记入持久映射（只此一次），
+ * 再用一次性 transaction 把正文里所有 file:// 地址换成服务器 URL。
+ *
+ * 为什么整目录传而不是只传正文引用的几张：WPS 临时目录常有一两百张，这次粘贴只用到一部分，
+ * 但下次从同一篇文档复制就是另一批图。一次传完 + 记住映射，以后同名图片直接查表，不再弹目录。
+ * 走协同通道替换，其他客户端同步看到。
  */
 async function onLocalFolderChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -1107,31 +1250,23 @@ async function onLocalFolderChange(event: Event) {
   pendingLocalNames = new Set()
   const all = Array.from(input.files ?? [])
   input.value = ''
-  // 整个目录都缓存起来：这次粘贴可能只缺几张，但下次从同一篇文档复制就是另一批图了
+  await ensureLocalUrlMap()
+  // 整个目录按文件名缓存（File 对象只在本次会话有效，持久靠下面的 URL 映射）
   for (const file of all) {
     if (file.type.startsWith('image/')) localFileCache.set(file.name, file)
   }
   const matched = all.filter((f) => wanted.has(f.name))
-  if (!matched.length) {
+  if (!matched.length && wanted.size) {
     showImageHint(`所选文件夹里没有找到这 ${wanted.size} 张图片，请选 WPS 临时目录`, 5000)
     return
   }
-  showImageHint(`正在上传 ${matched.length} 张图片…`, 0)
-  const results = await Promise.all(matched.map(async (file) => {
-    try {
-      return { name: file.name, url: (await api.uploadImage(file)).url }
-    } catch (err) {
-      console.error('[image] repair upload failed', (err as Error)?.stack || err, file.name)
-      return null
-    }
-  }))
-  const urls = new Map(results.filter((r): r is { name: string; url: string } => !!r).map((r) => [r.name, r.url]))
+  // 只传映射里还没有的；已传过的同名图片直接复用
+  const toUpload = all.filter((f) => f.type.startsWith('image/') && !localUrlMap.has(f.name))
+  showImageHint(`正在上传 ${toUpload.length} 张本机图片（仅此一次，以后自动识别）…`, 0)
+  await uploadImagesRemember(all)
+
   const ed = editor.value
   if (!ed) return
-  if (!urls.size) {
-    showImageHint('图片上传失败，请检查网络或稍后重试', 4000)
-    return
-  }
   let replaced = 0
   try {
     const tr = ed.state.tr
@@ -1139,7 +1274,7 @@ async function onLocalFolderChange(event: Event) {
       if (node.type.name !== 'image') return
       const src = String(node.attrs?.src || '')
       if (!src.startsWith('file:')) return
-      const url = urls.get(localImageName(src))
+      const url = localUrlMap.get(localImageName(src))
       if (url) {
         tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: url })
         replaced++
@@ -1149,9 +1284,9 @@ async function onLocalFolderChange(event: Event) {
     const failed = findLocalImages().length
     showImageHint(
       failed
-        ? `已修复 ${replaced} 张，还有 ${failed} 张未找到（原件可能已被 WPS 清理）`
-        : `已修复 ${replaced} 张图片`,
-      5000,
+        ? `已记住整目录图片，修复 ${replaced} 张；还有 ${failed} 张未找到（原件可能已被 WPS 清理）`
+        : `已记住整目录图片，修复 ${replaced} 张，以后粘贴不用再选目录`,
+      6000,
     )
   } catch (err) {
     console.error('[image] repair failed', (err as Error)?.stack || err)
