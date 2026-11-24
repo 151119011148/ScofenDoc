@@ -84,6 +84,8 @@ const imageInput = ref<HTMLInputElement | null>(null)
 /** 修复 WPS/Word 粘贴的本机图片：选的是「文件夹」，按文件名匹配后批量上传 */
 const folderInput = ref<HTMLInputElement | null>(null)
 let pendingLocalNames = new Set<string>()
+/** 选过的文件夹里的图片按文件名缓存，之后粘贴同名本机图可自动匹配，不用重复选目录 */
+const localFileCache = new Map<string, File>()
 let imageHintTimer = 0
 /** 选文件对话框是异步的，先记下图片要插到哪个位置 */
 let pendingImageFrom = 0
@@ -922,6 +924,92 @@ function dataUrlToFile(dataUrl: string, name: string): File | null {
 }
 
 /**
+ * 图文粘贴的核心：把一段 HTML 里的所有图片先批量上传，得到服务器 URL，
+ * 再把每个 <img src> 替换成新 URL，返回处理好的 HTML。
+ *
+ * 直接在 HTML 层做替换，而不是先把 HTML 插进正文再逐个改节点——
+ * 这样插入只发生一次，协同历史干净，也不会有「先出现破图再补上」的闪烁。
+ *
+ * 图片来源分三类：
+ *   data: / blob: → 浏览器能直接拿到字节，转 File 上传
+ *   http(s):      → 浏览器直抓会撞 CORS / 防盗链，交给后端 from-url 转存
+ *   file:         → 浏览器读不到本机文件，从已选目录的缓存里按文件名匹配
+ *
+ * @returns html=替换后的 HTML, uploaded=成功上传数, missing=缺原件的本机文件名, failed=上传失败数
+ */
+async function resolvePastedImageUrls(html: string): Promise<{
+  html: string
+  uploaded: number
+  missing: string[]
+  failed: number
+}> {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const images = Array.from(doc.querySelectorAll('img'))
+  const jobs: Promise<{ img: HTMLImageElement; url: string | null }>[] = []
+  const missing = new Set<string>()
+
+  images.forEach((img, i) => {
+    const src = img.getAttribute('src') || ''
+    if (!src) return
+    // 已经是站内地址（存档文章 / 之前传过的图）就不重复上传
+    if (src.startsWith('/scofendoc/files/') || src.startsWith('/files/')) return
+
+    if (src.startsWith('data:image/')) {
+      const file = dataUrlToFile(src, `pasted-${Date.now()}-${i}.png`)
+      jobs.push(uploadOne(file))
+    } else if (src.startsWith('blob:')) {
+      jobs.push((async () => {
+        try {
+          const resp = await fetch(src)
+          const blob = await resp.blob()
+          return { img, url: (await api.uploadImage(new File([blob], `pasted-${Date.now()}-${i}.png`, { type: blob.type }))).url }
+        } catch {
+          return { img, url: null }
+        }
+      })())
+    } else if (/^https?:\/\//i.test(src)) {
+      jobs.push((async () => {
+        try {
+          return { img, url: (await api.importImageByUrl(src)).url }
+        } catch (err) {
+          console.error('[paste] from-url failed', (err as Error)?.message, src.slice(0, 120))
+          return { img, url: null }
+        }
+      })())
+    } else if (src.startsWith('file:')) {
+      const name = localImageName(src)
+      const file = localFileCache.get(name)
+      if (file) jobs.push(uploadOne(file))
+      else missing.add(name)
+    }
+    // 其它相对路径/未知协议保持原样，不擅自改动
+
+    function uploadOne(file: File | null): Promise<{ img: HTMLImageElement; url: string | null }> {
+      if (!file) return Promise.resolve({ img, url: null })
+      return api.uploadImage(file)
+        .then((r) => ({ img, url: r.url }))
+        .catch((err) => {
+          console.error('[paste] upload failed', (err as Error)?.message, file.name)
+          return { img, url: null }
+        })
+    }
+  })
+
+  const results = await Promise.all(jobs)
+  let uploaded = 0
+  let failed = 0
+  for (const { img, url } of results) {
+    if (url) {
+      img.setAttribute('src', url)
+      uploaded++
+    } else {
+      failed++
+    }
+  }
+  return { html: doc.body.innerHTML, uploaded, failed, missing: [...missing] }
+}
+
+/**
  * 上传图片并插入正文。
  * 图片走 HTTP 落到服务器、正文里只留 URL —— 直接把 base64 写进 Yjs 会让
  * .bin 每编辑一次就复制一份大字符串，协同同步也会跟着变慢。
@@ -1019,6 +1107,10 @@ async function onLocalFolderChange(event: Event) {
   pendingLocalNames = new Set()
   const all = Array.from(input.files ?? [])
   input.value = ''
+  // 整个目录都缓存起来：这次粘贴可能只缺几张，但下次从同一篇文档复制就是另一批图了
+  for (const file of all) {
+    if (file.type.startsWith('image/')) localFileCache.set(file.name, file)
+  }
   const matched = all.filter((f) => wanted.has(f.name))
   if (!matched.length) {
     showImageHint(`所选文件夹里没有找到这 ${wanted.size} 张图片，请选 WPS 临时目录`, 5000)
@@ -1226,47 +1318,58 @@ onMounted(() => {
         return false
       },
       /**
-       * 粘贴图片：截图工具（微信/QQ/Snipaste/系统截图）放到剪贴板的是 image/* 文件项，
-       * 浏览器默认不会把它当 <img> 插进正文，必须自己接住并上传。
+       * 粘贴：图文混排走「先上传全部图片 → 替换 URL → 整体插入」的管线，
+       * 保证图片落在原来的排版位置；纯截图或纯文本仍走原路径。
        * 返回 true = 阻止 ProseMirror 继续按默认方式处理这次粘贴。
        */
       handlePaste: (view, event) => {
         if (!props.editable) return false
         const dt = event.clipboardData
         if (!dt) return false
+        const from = view.state.selection.from
+        const to = view.state.selection.to
 
+        const html = dt.getData('text/html') || ''
+        // 图文混排：HTML 里有 <img> 就由我们接管，批量传图后整段插入
+        if (/<img\b/i.test(html)) {
+          event.preventDefault()
+          void (async () => {
+            showImageHint('正在上传正文图片…', 0)
+            const result = await resolvePastedImageUrls(html)
+            const ed = editor.value
+            if (!ed) return // 上传期间切走了文档
+            try {
+              const pos = Math.min(Math.max(0, from), ed.state.doc.content.size)
+              const end = Math.min(Math.max(pos, to), ed.state.doc.content.size)
+              ed.chain().focus().insertContentAt({ from: pos, to: end }, result.html).run()
+
+              const parts: string[] = []
+              if (result.uploaded) parts.push(`已上传 ${result.uploaded} 张`)
+              if (result.failed) parts.push(`${result.failed} 张上传失败（保留原地址）`)
+              if (result.missing.length) {
+                parts.push(`${result.missing.length} 张本机图片待补`)
+                pendingLocalNames = new Set(result.missing)
+                // 缓存里没有原件：问一次目录，选完自动替换正文里剩下的 file:// 节点
+                window.setTimeout(() => folderInput.value?.click(), 0)
+              }
+              showImageHint(parts.length ? parts.join('，') : '已粘贴图文', result.missing.length ? 8000 : 4000)
+            } catch (err) {
+              console.error('[paste] insert rich html failed', (err as Error)?.stack || err)
+              showImageHint('图片已上传，但插入正文失败，请重试', 4000)
+            }
+          })()
+          return true
+        }
+
+        // 纯截图：微信/QQ/Snipaste/系统截图放的是 image/* 文件项
         const files = Array.from(dt.items)
           .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
           .map((item) => item.getAsFile())
           .filter((file): file is File => !!file)
         if (files.length) {
           event.preventDefault()
-          void uploadAndInsert(files, view.state.selection.from)
+          void uploadAndInsert(files, from)
           return true
-        }
-
-        // 从网页复制的图片有时不带文件项，只在 HTML 里留下 data URL；
-        // Image 扩展 allowBase64:false 会把这种节点过滤掉，所以这里提前转成文件上传
-        const html = dt.getData('text/html') || ''
-        const dataFiles = Array.from(html.matchAll(/<img[^>]+src=["'](data:image\/[^"']+)["']/gi))
-          .map((m, i) => dataUrlToFile(m[1], `pasted-${Date.now()}-${i}.png`))
-          .filter((file): file is File => !!file)
-        if (dataFiles.length) {
-          event.preventDefault()
-          void uploadAndInsert(dataFiles, view.state.selection.from)
-          return true
-        }
-
-        // WPS / Word 复制整篇图文时，剪贴板 HTML 里的 img 只有 file:///C:\... 本机路径，
-        // 浏览器（http 页面）读不到这个文件，也没法自动上传。文字照常粘贴，
-        // 但明确告诉用户点工具栏「修复图片」选一次图片所在文件夹即可批量补齐。
-        if (/<img[^>]+src=["']file:/i.test(html)) {
-          window.setTimeout(() => {
-            const count = findLocalImages().length
-            if (count) {
-              showImageHint(`已粘贴正文；其中 ${count} 张是 WPS 本机图片，请点工具栏「修复图片」并选择原图片文件夹`, 8000)
-            }
-          }, 0)
         }
         return false
       },

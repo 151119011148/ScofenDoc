@@ -252,4 +252,11 @@ export const api = {
     form.append('file', file)
     return request<{ url: string }>('/images', { method: 'POST', body: form })
   },
+
+  /** 图文粘贴里的外链图片：由服务端抓回转存成本站地址（浏览器直抓会撞 CORS / 防盗链） */
+  importImageByUrl: (url: string) =>
+    request<{ url: string }>('/images/from-url', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
 }
