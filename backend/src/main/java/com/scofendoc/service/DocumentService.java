@@ -340,6 +340,19 @@ public class DocumentService {
 
     /* ---------------- 内部 ---------------- */
 
+    /**
+     * 供附件等外部模块校验「用户能否访问这篇文档」（只读语义）。
+     * 复用同一套空间角色判定，避免附件下载绕过文档的成员权限。
+     */
+    public Doc requireDocView(Long docId, Long userId) {
+        return requireDoc(docId, userId, false);
+    }
+
+    /** 供附件上传校验「用户能否写这篇文档」 */
+    public Doc requireDocWrite(Long docId, Long userId) {
+        return requireDoc(docId, userId, true);
+    }
+
     /** 取文档并校验对所属空间的角色；write=true 时要求可写 */
     private Doc requireDoc(Long docId, Long userId, boolean write) {
         Doc d = docRepo.findByIdAndDeletedFalse(docId)

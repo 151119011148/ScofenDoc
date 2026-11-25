@@ -1337,6 +1337,7 @@ boot()
               v-else
               :key="currentDoc.collabKey"
               :doc-name="currentDoc.collabKey"
+              :doc-id="currentDoc.id"
               :collab-token="collabToken"
               :user-name="session.user.displayName"
               :user-color="session.user.color"

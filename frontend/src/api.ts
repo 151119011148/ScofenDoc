@@ -259,4 +259,57 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ url }),
     }),
+
+  /** 正文附件：上传到指定文档，返回 id / 原始文件名 / 大小（正文节点只存这些，不存字节） */
+  uploadAttachment: (file: File, docId: number) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('docId', String(docId))
+    return request<{ id: number; name: string; size: number; url: string }>(
+      '/attachments', { method: 'POST', body: form },
+    )
+  },
+
+  /**
+   * 下载附件：下载接口要带 Bearer token，不能用普通 <a href>（不带 header 会被 401）。
+   * 用 fetch 取 blob 再触发浏览器下载，并从 Content-Disposition 里取回服务端给的原始文件名。
+   */
+  downloadAttachment: async (id: number): Promise<void> => {
+    const headers: Record<string, string> = {}
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`${API_BASE}/attachments/${id}/download`, { headers })
+    if (!res.ok) {
+      let message = `下载失败（HTTP ${res.status}）`
+      try {
+        const body = await res.json()
+        if (body?.error) message = body.error
+      } catch { /* 非 JSON 响应就用默认提示 */ }
+      if (res.status === 401) {
+        clearSession()
+        onUnauthorized?.()
+      }
+      throw new Error(message)
+    }
+    const blob = await res.blob()
+    // filename*=UTF-8''xxx（服务端 URLEncoder 编码，+ 已被替换成 %20）
+    const cd = res.headers.get('Content-Disposition') || ''
+    let name = `attachment-${id}`
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd)
+    if (m?.[1]) {
+      try { name = decodeURIComponent(m[1]) } catch { /* 坏编码就退回默认名 */ }
+    }
+    const objectUrl = URL.createObjectURL(blob)
+    try {
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } finally {
+      // 立刻 revoke 在部分浏览器会让下载中断，延迟一拍
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30000)
+    }
+  },
 }

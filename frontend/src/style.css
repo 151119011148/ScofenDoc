@@ -542,6 +542,13 @@ body {
   color: var(--brand);
   border-color: var(--brand);
 }
+/* 修复图片入口只需要图标：文字版会把本已接近满行的格式栏挤到第二行，
+   和之前隐藏 .slash-tip 是同一个原因。完整说明放在 title / aria-label。 */
+.collab .bar button.repair-img {
+  flex: 0 0 auto;
+  min-width: 30px;
+  white-space: nowrap;
+}
 
 .collab .content {
   padding: 32px 48px 64px;
@@ -607,6 +614,53 @@ body {
 .local-dir-card .ldc-actions button.ldc-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
 .local-dir-card .ldc-actions button.ldc-primary:hover { filter: brightness(1.06); }
 .local-dir-card .ldc-tip { margin-top: 8px; color: #8a93a3; font-size: 12px; }
+
+/* 正文附件卡片：文件图标 + 名称 + 大小 + 下载按钮 */
+.attachment-wrap { margin: 10px 0; }
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid #dfe6f2;
+  border-left: 3px solid #9aa8bf;
+  border-radius: 8px;
+  background: #fafbfd;
+  transition: border-color .15s, background .15s;
+}
+.attachment-card:hover { background: #f2f6ff; border-color: #b9cdf5; }
+.attachment-card.kind-pdf { border-left-color: #e34b4b; }
+.attachment-card.kind-word { border-left-color: #2b6cd4; }
+.attachment-card.kind-excel { border-left-color: #1f9d63; }
+.attachment-card.kind-ppt { border-left-color: #e08a1e; }
+.attachment-card.kind-zip { border-left-color: #8b6fc4; }
+.attachment-card.kind-img { border-left-color: #16a085; }
+.att-icon { font-size: 26px; line-height: 1; flex: 0 0 auto; }
+.att-meta { flex: 1 1 auto; min-width: 0; }
+.att-name {
+  font-size: 14px;
+  color: #2a2f38;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-sub { font-size: 12px; color: #8a93a3; margin-top: 2px; }
+.att-err { color: #d9534f; }
+.att-download {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border: 1px solid #c8d6f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #2f5fd0;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.att-download:hover:not(:disabled) { background: #eef3ff; }
+.att-download:disabled { opacity: .55; cursor: default; }
 
 /* ============ Tiptap / ProseMirror 正文样式 ============ */
 .ProseMirror {

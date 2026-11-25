@@ -23,9 +23,10 @@ spring:
     open-in-view: false
   servlet:
     multipart:
-      # 正文粘贴图片上传：单张上限 10MB（与 ImageController 的校验一致）
-      max-file-size: 10MB
-      max-request-size: 12MB
+      # 上限取附件的值（50MB）：图片 10MB 由 ImageController 自己校验，附件 50MB 由 AttachmentController 校验。
+      # 这里必须 >= 两者的最大校验值，否则大附件在进 Controller 前就被容器拒掉。
+      max-file-size: 50MB
+      max-request-size: 55MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -66,6 +67,9 @@ scofendoc:
   files:
     dir: ${SCOFENDOC_FILES_DIR:/var/www/scofendoc-files}
     url-prefix: ${SCOFENDOC_FILES_URL_PREFIX:/scofendoc/files/}
+  # 正文附件：独立目录，不放 Nginx 静态映射下，只能经 /api/attachments/{id}/download 鉴权取回
+  attachments:
+    dir: ${SCOFENDOC_ATTACHMENTS_DIR:/var/lib/scofendoc/attachments}
 
 # 说明：本地无 MySQL 时，可临时改用 H2 以便直接启动后端（仅 Demo）：
 # spring:

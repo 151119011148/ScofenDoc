@@ -20,6 +20,7 @@ import Color from '@tiptap/extension-color'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import MermaidBlock from '../extensions/MermaidBlock'
+import AttachmentBlock from '../extensions/AttachmentBlock'
 import PlantUMLBlock from '../extensions/PlantUMLBlock'
 import DiagramCodeBlock from '../extensions/DiagramCodeBlock'
 import HeadingFold from '../extensions/HeadingFold'
@@ -57,6 +58,8 @@ const props = withDefaults(
     editable?: boolean
     /** 当前空间 id：站内链接没带 space 参数时用它兜底 */
     spaceId?: number
+    /** 当前文档 id：附件上传要绑定文档做写权限校验 */
+    docId?: number
   }>(),
   {
     docName: 'demo-doc',
@@ -66,6 +69,7 @@ const props = withDefaults(
     collabToken: '',
     editable: true,
     spaceId: 0,
+    docId: 0,
   },
 )
 
@@ -102,6 +106,12 @@ let imageMapDb: IDBDatabase | null = null
 let imageHintTimer = 0
 /** 选文件对话框是异步的，先记下图片要插到哪个位置 */
 let pendingImageFrom = 0
+
+/* ---------------- 附件上传 ---------------- */
+/** 附件文件选择框：斜杠/＋ 菜单触发；可多选 */
+const attachmentInput = ref<HTMLInputElement | null>(null)
+/** 选文件对话框异步，先记下附件卡片要插到哪个位置 */
+let pendingAttachmentFrom = 0
 
 /** 顶部格式栏：吸顶后加个投影，让「已经贴上去了」有视觉反馈 */
 const barEl = ref<HTMLElement | null>(null)
@@ -204,6 +214,8 @@ const SLASH_GROUPS: SlashGroup[] = [
           { key: 'image-url', label: '图片地址', hint: '外链或站内路径', icon: '🔗', keywords: 'dizhi url link', run: (c) => c },
         ],
       },
+      // run 空转：由 applySlash 接管，打开文件选择框上传任意文件（上限 50MB）
+      { key: 'attachment', label: '附件', hint: '上传文件作为可下载附件', icon: '📎', keywords: 'fujian attachment file upload download wenjian', run: (c) => c },
     ],
   },
   {
@@ -887,6 +899,10 @@ function applySlash(item: SlashItem) {
     openImagePicker(source, from, to)
     return
   }
+  if (item.key === 'attachment') {
+    openAttachmentPicker(from, to)
+    return
+  }
   if (source === 'plus') {
     // 行内 + 触发：在当前块之后插入新块（列表里插到列表之后，正文里插在当前段之后）
     const chain = ed
@@ -1181,6 +1197,62 @@ function onImageInputChange(event: Event) {
   if (files.length) void uploadAndInsert(files, pendingImageFrom)
 }
 
+/* ---------------- 附件上传 / 插入 ---------------- */
+
+/** 斜杠/＋ 菜单「附件」：先删掉 /xxx，再打开文件选择框 */
+function openAttachmentPicker(from: number, to: number) {
+  const ed = editor.value
+  if (!ed || !props.editable) return
+  ed.chain().focus().deleteRange({ from, to }).run()
+  pendingAttachmentFrom = Math.min(Math.max(0, from), ed.state.doc.content.size)
+  attachmentInput.value?.click()
+}
+
+function onAttachmentInputChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = '' // 允许连续选同一批文件
+  if (files.length) void uploadAndInsertAttachments(files, pendingAttachmentFrom)
+}
+
+/**
+ * 批量上传附件并在光标处插入附件卡片。
+ * 只传元数据进正文（id/name/size），文件字节留在服务器独立目录，避免 Yjs .bin 暴涨。
+ */
+async function uploadAndInsertAttachments(files: File[], at: number) {
+  const docId = props.docId
+  if (!docId) {
+    showImageHint('无法上传附件：文档信息未就绪，请刷新页面重试', 4000)
+    return
+  }
+  showImageHint(`正在上传 ${files.length} 个附件…`, 0)
+  const nodes = await Promise.all(files.map(async (file) => {
+    try {
+      const r = await api.uploadAttachment(file, docId)
+      return { type: 'attachment', attrs: { id: r.id, name: r.name, size: r.size } }
+    } catch (err) {
+      console.error('[attachment] upload failed', (err as Error)?.message, file.name)
+      return null
+    }
+  }))
+  const ok = nodes.filter((n): n is NonNullable<typeof n> => !!n)
+  if (!ok.length) {
+    showImageHint('附件上传失败，请检查网络或文件大小（上限 50MB）', 4000)
+    return
+  }
+  const ed = editor.value
+  if (!ed) return // 上传期间切走了文档
+  try {
+    const pos = Math.min(Math.max(0, at), ed.state.doc.content.size)
+    ed.chain().focus().insertContentAt(pos, ok).run()
+    const failed = files.length - ok.length
+    showImageHint(failed ? `已插入 ${ok.length} 个附件，${failed} 个失败` : `已插入 ${ok.length} 个附件`)
+  } catch (err) {
+    console.error('[attachment] insert failed', (err as Error)?.stack || err)
+    showImageHint('附件已上传，但插入正文失败，请重试', 4000)
+  }
+}
+
 /* ---------------- WPS / Word 本机图片修复 ---------------- */
 
 /** 从 file:///C:\...\wps122.jpg 这类地址里取文件名，兼容正斜杠和反斜杠 */
@@ -1434,6 +1506,7 @@ onMounted(() => {
       // 否则图片会混进行内文本，markdown 导入时层级很容易乱。
       Image.configure({ inline: false, allowBase64: false }),
       MermaidBlock,
+      AttachmentBlock,
       PlantUMLBlock,
       HeadingFold,
       // 标题自动编号：标题块仍属 heading，只是多了 numbered 属性和派生序号
@@ -1549,14 +1622,18 @@ onMounted(() => {
         }
         return false
       },
-      /** 拖图片进正文：和粘贴走同一条上传链路，插入位置取鼠标落点 */
+      /** 拖文件进正文：图片走配图上传，其它文件走附件上传；插入位置取鼠标落点 */
       handleDrop: (view, event, _slice, moved) => {
         if (moved || !props.editable) return false
-        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'))
-        if (!files.length) return false
+        const all = Array.from(event.dataTransfer?.files ?? [])
+        if (!all.length) return false
+        const images = all.filter((f) => f.type.startsWith('image/'))
+        const others = all.filter((f) => !f.type.startsWith('image/'))
+        if (!images.length && !others.length) return false
         event.preventDefault()
         const at = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from
-        void uploadAndInsert(files, at)
+        if (images.length) void uploadAndInsert(images, at)
+        if (others.length) void uploadAndInsertAttachments(others, at)
         return true
       },
     },
@@ -1848,7 +1925,14 @@ function onContentClick(e: MouseEvent) {
 
         <button title="撤销" @click="editor?.chain().focus().undo().run()">↶</button>
         <button title="重做" @click="editor?.chain().focus().redo().run()">↷</button>
-        <button title="修复图片：从 WPS / Word 粘贴的本机图片选一次文件夹即可批量上传" @click="openLocalImageRepair">🖼 修复图片</button>
+        <!-- 文案长了会被 .bar 的 flex-wrap 挤到第二行、把格式栏从 45px 撑到 75px 遮住正文；
+             保留图标 + title/aria-label，鼠标悬停仍有完整说明 -->
+        <button
+          class="repair-img"
+          aria-label="修复图片"
+          title="修复图片：从 WPS / Word 粘贴的本机图片选一次文件夹即可批量上传"
+          @click="openLocalImageRepair"
+        >🖼</button>
 
         <span class="slash-tip">输入 / 插入区块</span>
       </template>
@@ -1881,6 +1965,15 @@ function onContentClick(e: MouseEvent) {
       accept="image/*"
       multiple
       @change="onImageInputChange"
+    />
+
+    <!-- 附件选择框：隐藏，由斜杠/＋ 菜单「附件」触发；接受任意文件类型（危险扩展名由后端挡） -->
+    <input
+      ref="attachmentInput"
+      class="image-file-input"
+      type="file"
+      multiple
+      @change="onAttachmentInputChange"
     />
 
     <!-- 修复 WPS/Word 本机图片：webkitdirectory 让用户选整个图片目录，                 -->
