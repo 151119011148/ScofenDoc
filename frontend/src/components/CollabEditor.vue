@@ -1153,10 +1153,14 @@ async function uploadAndInsert(files: File[], at: number) {
   const ed = editor.value
   if (!ed || !files.length) return
   showImageHint(`正在上传 ${files.length} 张图片…`, 0)
+  // 记下第一条失败原因：笼统的"网络错误"排查成本太高，把后端的话直接说给用户听
+  let firstError = ''
   const results = await Promise.all(files.map(async (file) => {
     try {
       return (await api.uploadImage(file)).url
     } catch (err) {
+      const msg = (err as Error)?.message || ''
+      if (msg && !firstError) firstError = msg
       console.error('[image] upload failed', (err as Error)?.stack || err, file.name)
       return null
     }
@@ -1165,7 +1169,7 @@ async function uploadAndInsert(files: File[], at: number) {
   if (!editor.value) return
   const urls = results.filter((url): url is string => !!url)
   if (!urls.length) {
-    showImageHint('图片上传失败，请检查网络或稍后重试', 4000)
+    showImageHint(firstError ? `图片上传失败：${firstError}` : '图片上传失败，请检查网络或稍后重试', 5000)
     return
   }
   try {

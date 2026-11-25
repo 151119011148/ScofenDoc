@@ -397,14 +397,22 @@ node verify-links.mjs link-manifest.json <bin目录>      # 逐篇比对表格/�
 ## 正文图片上传
 
 编辑器支持三种贴图方式：直接 `Ctrl+V` 粘贴截图、把图片拖进正文、斜杠/＋ 菜单里的
-「图片 → 本地图片」（可多选）。图片经 `POST /api/images` 落到服务器后，正文只写入
-返回的 URL —— 不把 base64 塞进 Yjs，避免 `.bin` 随每次编辑成倍膨胀。
+「图片 → 本地图片」（可多选）。图片上传到服务器后，正文只写入返回的 URL —— 不把 base64
+塞进 Yjs，避免 `.bin` 随每次编辑成倍膨胀。
 
+- **上传用裸二进制 body（`POST /api/images/raw`），不是 multipart**。
+  起因：部分客户端网络环境（企业安全软件 / DLP / 出口设备）会把 multipart 的文件分段
+  直接 RST 掉——浏览器只看到 `ERR_CONNECTION_RESET`，Nginx 日志里是
+  `recv() failed (104: Connection reset by peer)`，而同体积的裸 body 完全正常。
+  改成 `Content-Type: image/png` + 文件字节后上传恢复，顺带省掉 boundary 编码开销。
+  旧的 `POST /api/images`（multipart）保留兼容，两条入口共用同一套校验。
 - 文件落盘：`scofendoc.files.dir/upload/yyyyMM/<uuid>.<ext>`，默认 `/var/www/scofendoc-files`；
   通过环境变量 `SCOFENDOC_FILES_DIR` 覆盖。`SCOFENDOC_FILES_URL_PREFIX` 控制返回的 URL 前缀，
   默认 `/scofendoc/files/`，正好对应 Nginx 已有的静态 alias，无需改 Nginx 配置。
 - 限制：单张 ≤ 10MB，仅 PNG / JPEG / GIF / WEBP / BMP；按文件头识别类型，剪贴板图片
-  没有文件名也能正确落盘。多张一起传时部分失败会保留成功插入的图并给出提示。
+  没有文件名也能正确落盘。多张一起传时部分失败会保留成功插入的图并给出提示（含后端的具体原因）。
+- 附件同理走 `POST /api/attachments/raw?docId=..&name=..`（文件名走 query，
+  前端 `encodeURIComponent`），流式落盘，规则与 multipart 版一致。
 - 本地开发：Vite 把 `/scofendoc/files/**` 重写到 Java 的 `/files/**`，无需起 Nginx；
   生产由 Nginx 静态托管，该路径不经过 Java。
 - 发布：需要**重新构建前端 + 重启 Java 后端**，并确认后端进程对图片目录有写权限。

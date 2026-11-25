@@ -1,8 +1,10 @@
 package com.scofendoc.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -69,10 +71,58 @@ public class ImageController {
         } catch (IOException e) {
             throw new IllegalArgumentException("无法读取上传的图片", e);
         }
+        return saveChecked(bytes, file.getContentType());
+    }
+
+    /**
+     * 原始字节上传（前端默认走这个，不再用 multipart）。
+     *
+     * 起因：部分客户端网络环境（企业安全软件 / DLP / 出口设备）会把 multipart 的
+     * 文件分段直接 RST 掉，表现为浏览器 ERR_CONNECTION_RESET、Nginx 日志里
+     * "recv() failed (104: Connection reset by peer)"，而同样体积的裸二进制 body
+     * 却能正常送达。改成 Content-Type 直接标图片类型的裸 body 后上传恢复，
+     * 顺带省掉 boundary 编码开销。
+     *
+     * multipart 的 /api/images 保留，兼容旧前端与既有调用方。
+     */
+    @PostMapping("/api/images/raw")
+    public Map<String, String> uploadRaw(
+            HttpServletRequest request,
+            @RequestHeader(value = "Content-Type", required = false) String contentType) {
+        byte[] bytes;
+        try {
+            bytes = readLimited(request.getInputStream(), MAX_IMAGE_BYTES);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取上传的图片", e);
+        }
+        return saveChecked(bytes, contentType);
+    }
+
+    /** 读 body 但最多留 MAX+1 字节，避免有人往这个接口灌几百兆把堆打爆 */
+    private static byte[] readLimited(InputStream in, long limit) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        long total = 0;
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            total += n;
+            if (total > limit) {
+                throw new IllegalArgumentException("图片不能超过 10MB");
+            }
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
+    }
+
+    /** 两条上传入口共用的校验：大小、文件头识别、落盘 */
+    private Map<String, String> saveChecked(byte[] bytes, String contentType) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("图片内容为空");
+        }
         if (bytes.length > MAX_IMAGE_BYTES) {
             throw new IllegalArgumentException("图片不能超过 10MB");
         }
-        String ext = detectExtension(bytes, file.getContentType());
+        String ext = detectExtension(bytes, contentType);
         if (ext == null) {
             throw new IllegalArgumentException("仅支持 PNG / JPEG / GIF / WEBP / BMP 图片");
         }

@@ -4,6 +4,7 @@ import com.scofendoc.entity.Attachment;
 import com.scofendoc.repository.AttachmentRepository;
 import com.scofendoc.security.CurrentUser;
 import com.scofendoc.service.DocumentService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -79,7 +80,43 @@ public class AttachmentController {
         if (file.getSize() > maxBytes) {
             throw new IllegalArgumentException("附件不能超过 " + maxSizeMb + "MB");
         }
-        String original = safeFileName(file.getOriginalFilename());
+        try (var in = file.getInputStream()) {
+            return persist(docId, userId, safeFileName(file.getOriginalFilename()),
+                    file.getContentType(), in);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取上传的附件", e);
+        }
+    }
+
+    /**
+     * 裸二进制上传（前端默认走这个，不再用 multipart）。
+     *
+     * 起因：部分客户端网络环境（企业安全软件 / DLP / 出口设备）会把 multipart 的文件分段
+     * 直接 RST 掉，浏览器表现为 ERR_CONNECTION_RESET，Nginx 日志里是
+     * "recv() failed (104: Connection reset by peer)"；换成裸 body 后恢复正常。
+     * 文件名放在 query 上（前端 encodeURIComponent 后传，Spring 自动解码），
+     * 大小上限、危险扩展名、流式落盘等规则与 multipart 版本完全一致。
+     *
+     * multipart 的 /api/attachments 保留，兼容旧前端与既有调用方。
+     */
+    @PostMapping("/api/attachments/raw")
+    public Map<String, Object> uploadRaw(HttpServletRequest request,
+                                         @RequestParam("docId") Long docId,
+                                         @RequestParam("name") String name,
+                                         @RequestHeader(value = "Content-Type", required = false) String contentType) {
+        Long userId = CurrentUser.id();
+        documents.requireDocWrite(docId, userId);
+        try (var in = request.getInputStream()) {
+            return persist(docId, userId, safeFileName(name), contentType, in);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("无法读取上传的附件", e);
+        }
+    }
+
+    /** 两个上传入口共用的落盘 + 入库逻辑；流式复制，绝不把整个文件读进内存 */
+    private Map<String, Object> persist(Long docId, Long userId, String original,
+                                        String contentType, java.io.InputStream in) throws IOException {
+        long maxBytes = maxSizeMb * 1024L * 1024L;
         String ext = extensionOf(original);
         if (BLOCKED_EXT.contains(ext)) {
             throw new IllegalArgumentException("不允许上传 ." + ext + " 类型的文件");
@@ -90,24 +127,27 @@ public class AttachmentController {
         Path dir = Path.of(attachmentsDir, month);
         Path target = dir.resolve(stored);
         Path tmp = dir.resolve(stored + ".part");
-        long written;
+        long written = 0;
         try {
             Files.createDirectories(dir);
-            // 流式落盘，不把整个文件读进内存：500MB 的附件走 getBytes() 会直接把堆打爆。
-            // 先写 .part 再原子改名，避免上传中断留下半截文件被当成正常附件。
-            try (var in = file.getInputStream()) {
-                written = Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+            // 先写 .part 再原子改名，避免上传中断留下半截文件被当成正常附件
+            try (var out = Files.newOutputStream(tmp)) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    written += n;
+                    if (written > maxBytes) {
+                        throw new IllegalArgumentException("附件不能超过 " + maxSizeMb + "MB");
+                    }
+                    out.write(buf, 0, n);
+                }
             }
             if (written == 0) {
-                Files.deleteIfExists(tmp);
                 throw new IllegalArgumentException("附件内容为空");
-            }
-            if (written > maxBytes) {
-                Files.deleteIfExists(tmp);
-                throw new IllegalArgumentException("附件不能超过 " + maxSizeMb + "MB");
             }
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IllegalArgumentException e) {
+            Files.deleteIfExists(tmp);
             throw e;
         } catch (IOException e) {
             try {
@@ -122,7 +162,7 @@ public class AttachmentController {
         a.setDocId(docId);
         a.setStoredName(month + "/" + stored);
         a.setOriginalName(original);
-        a.setContentType(file.getContentType());
+        a.setContentType(contentType);
         a.setSizeBytes(written);
         a.setUploadedBy(userId);
         a = repo.save(a);

@@ -108,8 +108,14 @@ export function setUnauthorizedHandler(fn: () => void) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
-  // FormData 必须由浏览器自己带 boundary，手设 Content-Type 会导致上传解析失败
-  if (init?.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json'
+  // FormData 必须由浏览器自己带 boundary，手设 Content-Type 会导致上传解析失败；
+  // Blob/File（裸二进制上传）则要用文件自己的 MIME，后端靠它 + 文件头识别格式
+  if (init?.body && !(init.body instanceof FormData)) {
+    const isBlob = init.body instanceof Blob
+    headers['Content-Type'] = isBlob
+      ? ((init.body as Blob).type || 'application/octet-stream')
+      : 'application/json'
+  }
   const token = getToken()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -248,12 +254,14 @@ export const api = {
   collabToken: (docId: number) =>
     request<{ token: string; expiresIn: number }>(`/docs/${docId}/collab-token`),
 
-  /** 正文配图：粘贴/拖入的图片先上传，再把返回的 URL 写成 image 节点（避免 base64 撑爆 Yjs） */
-  uploadImage: (file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return request<{ url: string }>('/images', { method: 'POST', body: form })
-  },
+  /**
+   * 正文配图：粘贴/拖入的图片先上传，再把返回的 URL 写成 image 节点（避免 base64 撑爆 Yjs）。
+   *
+   * 走裸二进制而不是 multipart：部分客户端网络环境（企业安全软件 / DLP / 出口设备）
+   * 会把 multipart 的文件分段 RST 掉，浏览器只看到 ERR_CONNECTION_RESET。裸 body 无此问题。
+   */
+  uploadImage: (file: File) =>
+    request<{ url: string }>('/images/raw', { method: 'POST', body: file }),
 
   /** 图文粘贴里的外链图片：由服务端抓回转存成本站地址（浏览器直抓会撞 CORS / 防盗链） */
   importImageByUrl: (url: string) =>
@@ -262,15 +270,15 @@ export const api = {
       body: JSON.stringify({ url }),
     }),
 
-  /** 正文附件：上传到指定文档，返回 id / 原始文件名 / 大小（正文节点只存这些，不存字节） */
-  uploadAttachment: (file: File, docId: number) => {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('docId', String(docId))
-    return request<{ id: number; name: string; size: number; url: string }>(
-      '/attachments', { method: 'POST', body: form },
-    )
-  },
+  /**
+   * 正文附件：上传到指定文档，返回 id / 原始文件名 / 大小（正文节点只存这些，不存字节）。
+   * 同样走裸二进制：multipart 在部分网络环境下会被中途 RST。文件名放 query（encodeURIComponent）。
+   */
+  uploadAttachment: (file: File, docId: number) =>
+    request<{ id: number; name: string; size: number; url: string }>(
+      `/attachments/raw?docId=${docId}&name=${encodeURIComponent(file.name)}`,
+      { method: 'POST', body: file },
+    ),
 
   /**
    * 下载附件：下载接口要带 Bearer token，不能用普通 <a href>（不带 header 会被 401）。
