@@ -24,7 +24,8 @@ log() { printf '\n\033[1;36m==> %s\033[0m\n' "$1"; }
 
 deploy_frontend() {
   log "构建前端（base=${PUBLIC_BASE}）"
-  ( cd frontend && VITE_BASE="${PUBLIC_BASE}" npm run build )
+  # MSYS_NO_PATHCONV=1：在 Git Bash 下避免把 /scofendoc/ 误转成 Windows 路径（会生成错误的 /C:/... 资源地址）
+  ( cd frontend && MSYS_NO_PATHCONV=1 VITE_BASE="${PUBLIC_BASE}" npm run build )
 
   log "上传静态产物到 /var/www/scofendoc"
   rsync -az --delete -e "$SSH" frontend/dist/ "$HOST:/var/www/scofendoc/"
