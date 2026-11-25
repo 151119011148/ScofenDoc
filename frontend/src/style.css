@@ -544,10 +544,31 @@ body {
 }
 /* 修复图片入口只需要图标：文字版会把本已接近满行的格式栏挤到第二行，
    和之前隐藏 .slash-tip 是同一个原因。完整说明放在 title / aria-label。 */
-.collab .bar button.repair-img {
+.collab .bar button.repair-img,
+.collab .bar button.attach-file {
   flex: 0 0 auto;
   min-width: 30px;
   white-space: nowrap;
+}
+
+.collab .content-host {
+  position: relative;
+}
+
+/* 空白文档的入口提示：绝对定位在正文起点上方，不参与排版、不吃点击 */
+.collab .content-empty-tip {
+  position: absolute;
+  left: 48px;
+  top: 34px;
+  color: #b3b9c6;
+  font-size: 14px;
+  line-height: 1.8;
+  pointer-events: none;
+  user-select: none;
+}
+.collab .content-empty-tip b {
+  color: #8d94a3;
+  font-weight: 600;
 }
 
 .collab .content {
@@ -3086,6 +3107,7 @@ body.resize-cursor * {
   .collab .bar .bar-sep { flex: 0 0 auto; }
   .collab .bar .slash-tip { display: none; } /* 手机没有键盘，「输入 / 」的提示没意义 */
   .collab .content { padding: 16px 14px 56px; }
+  .collab .content-empty-tip { left: 14px; top: 18px; font-size: 13px; }
 
   /* 正文排版：手机上 16px 起步，标题收一档，长内容一律可横向滚动 */
   .ProseMirror {

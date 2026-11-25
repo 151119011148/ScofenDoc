@@ -74,6 +74,8 @@ const props = withDefaults(
 )
 
 const editor = ref<Editor>()
+/** 正文是否为空：空白文档里没有可见入口，用它显示「/ 插入 / 拖文件」提示 */
+const docEmpty = ref(true)
 const toolbarRef = ref<InstanceType<typeof SelectionToolbar> | null>(null)
 let provider: HocuspocusProvider | null = null
 
@@ -1208,6 +1210,14 @@ function openAttachmentPicker(from: number, to: number) {
   attachmentInput.value?.click()
 }
 
+/** 工具栏「附件」按钮：插到当前光标处（from==to 时 deleteRange 是空操作） */
+function pickAttachmentAtCursor() {
+  const ed = editor.value
+  if (!ed || !props.editable) return
+  const at = ed.state.selection.from
+  openAttachmentPicker(at, at)
+}
+
 function onAttachmentInputChange(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
@@ -1461,6 +1471,10 @@ onMounted(() => {
       // states 包含本地 + 远端，减去自己即为在线协作者数
       peers.value = Math.max(0, states.length - 1)
     },
+    // 文档初次同步完成后才知道真实内容量：有内容的文档不能显示空白提示
+    onSynced: () => {
+      docEmpty.value = editor.value?.isEmpty ?? false
+    },
   })
 
   editor.value = new Editor({
@@ -1637,7 +1651,10 @@ onMounted(() => {
         return true
       },
     },
-    onUpdate: () => syncSlash(false),
+    onUpdate: () => {
+      syncSlash(false)
+      docEmpty.value = editor.value?.isEmpty ?? false
+    },
     // 光标搬家（点击 / 方向键 / Tab）→ 把 ＋ 送到新段落；顺带把文字颜色记忆接上
     onSelectionUpdate: () => {
       syncSlash(true)
@@ -1928,6 +1945,13 @@ function onContentClick(e: MouseEvent) {
         <!-- 文案长了会被 .bar 的 flex-wrap 挤到第二行、把格式栏从 45px 撑到 75px 遮住正文；
              保留图标 + title/aria-label，鼠标悬停仍有完整说明 -->
         <button
+          class="attach-file"
+          aria-label="上传附件"
+          title="上传附件（≤50MB）：选文件后插入可下载的卡片；也可以直接把文件拖进正文"
+          @mousedown.prevent
+          @click="pickAttachmentAtCursor"
+        >📎</button>
+        <button
           class="repair-img"
           aria-label="修复图片"
           title="修复图片：从 WPS / Word 粘贴的本机图片选一次文件夹即可批量上传"
@@ -1941,7 +1965,13 @@ function onContentClick(e: MouseEvent) {
       <span v-else class="readonly-badge">👁 仅查看 · 你没有编辑权限</span>
     </div>
 
-    <EditorContent :editor="editor" class="content" @click="onContentClick" />
+    <div class="content-host">
+      <EditorContent :editor="editor" class="content" @click="onContentClick" />
+      <!-- 空白文档时把入口写出来：否则用户看不到从哪加图片、附件 -->
+      <div v-if="docEmpty && editable" class="content-empty-tip">
+        输入 <b>/</b> 插入图片、附件、表格等，也可以把文件直接拖进来
+      </div>
+    </div>
 
     <!-- 粘贴 / 拖入 / 选文件共用的上传反馈；上传完成或失败自动消失 -->
     <div v-if="imageHint" class="image-upload-hint">{{ imageHint }}</div>
