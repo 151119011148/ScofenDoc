@@ -49,7 +49,13 @@ location /scofendoc/api/ {
     proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
     proxy_set_header    X-Forwarded-Proto $scheme;
     proxy_connect_timeout 5s;
-    proxy_read_timeout    30s;
+    # 附件上传/下载：server 块里有个全局 client_max_body_size 20m，会先于 Java 拒掉大文件，
+    # 所以这里必须单独放开。数值要与 spring.servlet.multipart.max-request-size、
+    # scofendoc.attachments.max-size-mb 同步（当前 500MB 附件 + 余量）。
+    client_max_body_size 520m;
+    # 大文件传输要给足时间，默认 30s 在慢网络上会中途 504
+    proxy_read_timeout    300s;
+    proxy_send_timeout    300s;
 }
 
 # Yjs 协同：WebSocket 升级 + 长连接（read_timeout 必须放大，否则空闲即断）

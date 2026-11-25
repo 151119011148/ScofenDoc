@@ -5,7 +5,7 @@ import com.scofendoc.repository.AttachmentRepository;
 import com.scofendoc.security.CurrentUser;
 import com.scofendoc.service.DocumentService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +16,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -35,9 +35,9 @@ import java.util.UUID;
 @RestController
 public class AttachmentController {
 
-    /** 单个附件上限：50MB，覆盖绝大多数文档附件；再多走网盘更合适 */
-    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
-    /** 危险扩展名：即使只以 attachment 下载，也不留可执行/可渲染的脚本文件 */
+    /**
+     * 危险扩展名：即使只以 attachment 下载，也不留可执行/可渲染的脚本文件
+     */
     private static final Set<String> BLOCKED_EXT = Set.of(
             "html", "htm", "xhtml", "svg", "js", "mjs", "jsp", "jspx", "php",
             "asp", "aspx", "exe", "dll", "sh", "bat", "cmd", "ps1", "vbs", "jar");
@@ -47,6 +47,14 @@ public class AttachmentController {
 
     @Value("${scofendoc.attachments.dir:/var/lib/scofendoc/attachments}")
     private String attachmentsDir;
+
+    /**
+     * 单个附件上限（MB），默认 500。
+     * 与 spring.servlet.multipart.max-file-size、Nginx 的 client_max_body_size 三处要一起调，
+     * 任何一处小都会被提前拒掉（Nginx 会直接 413，连 Controller 都进不来）。
+     */
+    @Value("${scofendoc.attachments.max-size-mb:500}")
+    private long maxSizeMb;
 
     public AttachmentController(AttachmentRepository repo, DocumentService documents) {
         this.repo = repo;
@@ -67,8 +75,9 @@ public class AttachmentController {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("附件内容为空");
         }
-        if (file.getSize() > MAX_FILE_BYTES) {
-            throw new IllegalArgumentException("附件不能超过 50MB");
+        long maxBytes = maxSizeMb * 1024L * 1024L;
+        if (file.getSize() > maxBytes) {
+            throw new IllegalArgumentException("附件不能超过 " + maxSizeMb + "MB");
         }
         String original = safeFileName(file.getOriginalFilename());
         String ext = extensionOf(original);
@@ -76,27 +85,36 @@ public class AttachmentController {
             throw new IllegalArgumentException("不允许上传 ." + ext + " 类型的文件");
         }
 
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException e) {
-            throw new IllegalArgumentException("无法读取上传的附件", e);
-        }
-        if (bytes.length > MAX_FILE_BYTES) {
-            throw new IllegalArgumentException("附件不能超过 50MB");
-        }
-        if (bytes.length == 0) {
-            throw new IllegalArgumentException("附件内容为空");
-        }
-
         String month = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
         String stored = UUID.randomUUID().toString().replace("-", "");
         Path dir = Path.of(attachmentsDir, month);
         Path target = dir.resolve(stored);
+        Path tmp = dir.resolve(stored + ".part");
+        long written;
         try {
             Files.createDirectories(dir);
-            Files.write(target, bytes, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+            // 流式落盘，不把整个文件读进内存：500MB 的附件走 getBytes() 会直接把堆打爆。
+            // 先写 .part 再原子改名，避免上传中断留下半截文件被当成正常附件。
+            try (var in = file.getInputStream()) {
+                written = Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+            }
+            if (written == 0) {
+                Files.deleteIfExists(tmp);
+                throw new IllegalArgumentException("附件内容为空");
+            }
+            if (written > maxBytes) {
+                Files.deleteIfExists(tmp);
+                throw new IllegalArgumentException("附件不能超过 " + maxSizeMb + "MB");
+            }
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (IOException e) {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException ignored) {
+                // 清理失败不影响主流程：残留的 .part 不会被当作附件读取
+            }
             throw new IllegalStateException("附件保存失败，请检查服务器存储目录权限", e);
         }
 
@@ -105,14 +123,14 @@ public class AttachmentController {
         a.setStoredName(month + "/" + stored);
         a.setOriginalName(original);
         a.setContentType(file.getContentType());
-        a.setSizeBytes(bytes.length);
+        a.setSizeBytes(written);
         a.setUploadedBy(userId);
         a = repo.save(a);
 
         return Map.of(
                 "id", a.getId(),
                 "name", original,
-                "size", bytes.length,
+                "size", written,
                 "url", "/api/attachments/" + a.getId() + "/download");
     }
 
@@ -130,18 +148,22 @@ public class AttachmentController {
         documents.requireDocView(a.getDocId(), userId);
 
         Path file = Path.of(attachmentsDir, a.getStoredName());
-        byte[] bytes;
+        long length;
         try {
-            bytes = Files.readAllBytes(file);
+            if (!Files.isReadable(file)) {
+                throw new IllegalStateException("附件文件已丢失或无法读取");
+            }
+            length = Files.size(file);
         } catch (IOException e) {
             throw new IllegalStateException("附件文件已丢失或无法读取", e);
         }
-        ByteArrayResource resource = new ByteArrayResource(bytes);
+        // FileSystemResource 走流式输出并支持 Range，大附件不会整份读进内存
+        Resource resource = new FileSystemResource(file);
         String encoded = URLEncoder.encode(a.getOriginalName(), StandardCharsets.UTF_8).replace("+", "%20");
         String disposition = "attachment; filename*=UTF-8''" + encoded;
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .contentLength(bytes.length)
+                .contentLength(length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
                 .body(resource);
     }

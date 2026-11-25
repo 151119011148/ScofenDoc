@@ -2,6 +2,10 @@ server:
   # 生产由 systemd 传 SERVER_PORT=8081（8080 已被同机另一个服务占用）
   port: ${SERVER_PORT:8080}
   shutdown: graceful
+  tomcat:
+    # 请求体超过 multipart 上限时，Tomcat 默认只吞 2MB 就断连，浏览器只会显示「连接被重置」，
+    # 看不到我们返回的 413 文案。放宽到和 max-request-size 一致，让用户能收到明确提示。
+    max-swallow-size: 520MB
 
 spring:
   application:
@@ -23,10 +27,12 @@ spring:
     open-in-view: false
   servlet:
     multipart:
-      # 上限取附件的值（50MB）：图片 10MB 由 ImageController 自己校验，附件 50MB 由 AttachmentController 校验。
+      # 上限取附件的值（默认 500MB）：图片 10MB 由 ImageController 自己校验，
+      # 附件由 AttachmentController 按 scofendoc.attachments.max-size-mb 校验。
       # 这里必须 >= 两者的最大校验值，否则大附件在进 Controller 前就被容器拒掉。
-      max-file-size: 50MB
-      max-request-size: 55MB
+      # 注意还有第三层：Nginx 的 client_max_body_size 也要同步放开。
+      max-file-size: 500MB
+      max-request-size: 520MB
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -70,6 +76,8 @@ scofendoc:
   # 正文附件：独立目录，不放 Nginx 静态映射下，只能经 /api/attachments/{id}/download 鉴权取回
   attachments:
     dir: ${SCOFENDOC_ATTACHMENTS_DIR:/var/lib/scofendoc/attachments}
+    # 单个附件上限（MB）。改动时必须同步：spring.servlet.multipart.*、Nginx client_max_body_size
+    max-size-mb: ${SCOFENDOC_ATTACHMENT_MAX_MB:500}
 
 # 说明：本地无 MySQL 时，可临时改用 H2 以便直接启动后端（仅 Demo）：
 # spring:

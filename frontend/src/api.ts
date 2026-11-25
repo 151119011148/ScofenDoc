@@ -123,6 +123,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* 响应体不是 JSON 时忽略 */
     }
+    // 413 常来自 Nginx / Tomcat 的纯 HTML 错误页，解析不出 error 字段，这里兜一句人话
+    if (res.status === 413) msg = '文件太大，超过服务器允许的上传上限'
     // 登录接口的 401 是"账号密码错"，不能当成会话过期处理，否则会误清空并跳转
     if (res.status === 401 && !path.startsWith('/auth/')) {
       clearSession()

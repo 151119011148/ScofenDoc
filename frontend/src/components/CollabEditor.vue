@@ -216,7 +216,7 @@ const SLASH_GROUPS: SlashGroup[] = [
           { key: 'image-url', label: '图片地址', hint: '外链或站内路径', icon: '🔗', keywords: 'dizhi url link', run: (c) => c },
         ],
       },
-      // run 空转：由 applySlash 接管，打开文件选择框上传任意文件（上限 50MB）
+      // run 空转：由 applySlash 接管，打开文件选择框上传任意文件（上限 500MB）
       { key: 'attachment', label: '附件', hint: '上传文件作为可下载附件', icon: '📎', keywords: 'fujian attachment file upload download wenjian', run: (c) => c },
     ],
   },
@@ -1226,8 +1226,25 @@ function onAttachmentInputChange(event: Event) {
 }
 
 /**
+ * 单附件上限（MB）。必须与后端 scofendoc.attachments.max-size-mb、
+ * spring.servlet.multipart.max-file-size、Nginx client_max_body_size 三处一致，
+ * 否则会出现「前端放行但服务器 413」或「前端白挡」。
+ */
+const ATTACHMENT_MAX_MB = 500
+/** 同传并发数：一次拖进 13 个大文件时全并发会互相抢带宽，还容易触发连接超时 */
+const ATTACHMENT_CONCURRENCY = 3
+
+function fileSizeText(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+/**
  * 批量上传附件并在光标处插入附件卡片。
  * 只传元数据进正文（id/name/size），文件字节留在服务器独立目录，避免 Yjs .bin 暴涨。
+ * 超限文件在前端先挡掉（省一次白传），其余按固定并发上传并实时刷新进度。
  */
 async function uploadAndInsertAttachments(files: File[], at: number) {
   const docId = props.docId
@@ -1235,19 +1252,58 @@ async function uploadAndInsertAttachments(files: File[], at: number) {
     showImageHint('无法上传附件：文档信息未就绪，请刷新页面重试', 4000)
     return
   }
-  showImageHint(`正在上传 ${files.length} 个附件…`, 0)
-  const nodes = await Promise.all(files.map(async (file) => {
-    try {
-      const r = await api.uploadAttachment(file, docId)
-      return { type: 'attachment', attrs: { id: r.id, name: r.name, size: r.size } }
-    } catch (err) {
-      console.error('[attachment] upload failed', (err as Error)?.message, file.name)
-      return null
+
+  const maxBytes = ATTACHMENT_MAX_MB * 1024 * 1024
+  const tooBig = files.filter((f) => f.size > maxBytes)
+  const usable = files.filter((f) => f.size <= maxBytes)
+  if (!usable.length) {
+    const first = tooBig[0]
+    showImageHint(
+      first
+        ? `「${first.name}」有 ${fileSizeText(first.size)}，超过单个附件 ${ATTACHMENT_MAX_MB}MB 上限`
+        : '附件上传失败，请重试',
+      6000,
+    )
+    return
+  }
+  if (tooBig.length) {
+    showImageHint(
+      `${tooBig.length} 个文件超过 ${ATTACHMENT_MAX_MB}MB 已跳过，正在上传其余 ${usable.length} 个…`,
+      0,
+    )
+  } else {
+    showImageHint(usable.length > 1 ? `正在上传 1/${usable.length} 个附件…` : '正在上传附件…', 0)
+  }
+
+  const nodes: Array<{ type: string; attrs: { id: number; name: string; size: number } } | null> =
+    new Array(usable.length).fill(null)
+  let done = 0
+  let cursor = 0
+  let firstError = ''
+  const worker = async () => {
+    while (cursor < usable.length) {
+      const index = cursor++
+      const file = usable[index]
+      try {
+        const r = await api.uploadAttachment(file, docId)
+        nodes[index] = { type: 'attachment', attrs: { id: r.id, name: r.name, size: r.size } }
+      } catch (err) {
+        firstError = firstError || (err instanceof Error ? err.message : '')
+        console.error('[attachment] upload failed', (err as Error)?.message, file.name, fileSizeText(file.size))
+      } finally {
+        done++
+        // 单个文件时不必刷进度，避免提示条闪一下又消失
+        if (usable.length > 1) showImageHint(`正在上传 ${done}/${usable.length} 个附件…`, 0)
+      }
     }
-  }))
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(ATTACHMENT_CONCURRENCY, usable.length) }, () => worker()),
+  )
+
   const ok = nodes.filter((n): n is NonNullable<typeof n> => !!n)
   if (!ok.length) {
-    showImageHint('附件上传失败，请检查网络或文件大小（上限 50MB）', 4000)
+    showImageHint(`附件上传失败${firstError ? `：${firstError}` : '，请检查网络后重试'}`, 6000)
     return
   }
   const ed = editor.value
@@ -1256,7 +1312,9 @@ async function uploadAndInsertAttachments(files: File[], at: number) {
     const pos = Math.min(Math.max(0, at), ed.state.doc.content.size)
     ed.chain().focus().insertContentAt(pos, ok).run()
     const failed = files.length - ok.length
-    showImageHint(failed ? `已插入 ${ok.length} 个附件，${failed} 个失败` : `已插入 ${ok.length} 个附件`)
+    const parts = [`已插入 ${ok.length} 个附件`]
+    if (failed) parts.push(`${failed} 个失败${firstError ? `（${firstError}）` : ''}`)
+    showImageHint(parts.join('，'), failed ? 6000 : 4000)
   } catch (err) {
     console.error('[attachment] insert failed', (err as Error)?.stack || err)
     showImageHint('附件已上传，但插入正文失败，请重试', 4000)
@@ -1947,7 +2005,7 @@ function onContentClick(e: MouseEvent) {
         <button
           class="attach-file"
           aria-label="上传附件"
-          title="上传附件（≤50MB）：选文件后插入可下载的卡片；也可以直接把文件拖进正文"
+          title="上传附件（≤500MB）：选文件后插入可下载的卡片；也可以直接把文件拖进正文"
           @mousedown.prevent
           @click="pickAttachmentAtCursor"
         >📎</button>

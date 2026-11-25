@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Map;
 
@@ -42,6 +43,13 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", msg(e, "服务器处理失败")));
+    }
+
+    /** 请求体超过容器上限（spring.servlet.multipart.max-request-size）：给出 413 而不是 500 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleTooLarge(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(Map.of("error", "文件太大，超过服务器允许的上传上限"));
     }
 
     private String msg(Exception e, String fallback) {
