@@ -1000,8 +1000,8 @@ body {
   background: var(--brand);
   box-shadow: 0 0 0 2px #fff;
 }
-body.resize-cursor,
-body.resize-cursor * {
+.ProseMirror.resize-cursor,
+.ProseMirror.resize-cursor * {
   cursor: col-resize !important;
 }
 /* 只读文档不该能拖列宽 */
@@ -3267,6 +3267,8 @@ body.resize-cursor * {
   cursor: pointer;
 }
 .dcb-btn:hover { color: var(--brand); border-color: #bcd4ff; }
+.dcb-btn + .dcb-btn { margin-left: 0; }
+.dcb-box-table { overflow-x: auto; }
 
 .dcb-canvas {
   padding: 14px 10px;

@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import Table from '@tiptap/extension-table'
+import Table from './extensions/ResizableTable'
 import TableRow from '@tiptap/extension-table-row'
 import { StyledTableCell as TableCell, StyledTableHeader as TableHeader } from './extensions/TableCellStyle'
 import HeadingNumber from './extensions/HeadingNumber'
@@ -11,15 +11,18 @@ import ListItemHeading from './extensions/ListItemHeading'
 import TableTools from './components/TableTools.vue'
 import { CellDragSelect } from './extensions/CellDragSelect'
 import { ParagraphStyle } from './extensions/ParagraphStyle'
+import DiagramCodeBlock from './extensions/DiagramCodeBlock'
 
 const editor = ref<Editor>()
 let instance: Editor | null = null
 
 onMounted(() => {
   instance = new Editor({
+    editable: !new URLSearchParams(location.search).has('readonly'),
     extensions: [
-      StarterKit.configure({ history: false, listItem: false }),
+      StarterKit.configure({ history: false, listItem: false, codeBlock: false }),
       ListItemHeading,
+      DiagramCodeBlock,
       HeadingFold,
       HeadingNumber,
       // 与生产一致：列宽可拖、块手柄可选中整表

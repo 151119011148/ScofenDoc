@@ -30,7 +30,7 @@ const check = (name, ok, detail = '') => {
 }
 
 const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: 'new',
   args: ['--no-sandbox', '--no-proxy-server', '--disable-dev-shm-usage'],
   defaultViewport: { width: 1440, height: 900 },
@@ -257,8 +257,8 @@ const even = (await geom()).widths
 const spread = Math.max(...even) - Math.min(...even)
 check('「均分列宽」把各列拉平', spread <= 3, `${uneven.join('/')} → ${even.join('/')}`)
 
-/* ---------- 7. 拖列宽 ---------- */
-await page.goto(LOCAL, { waitUntil: 'domcontentloaded' })
+/* ---------- 7. 模拟协同授权：先只读挂载，再允许拖列宽 ---------- */
+await page.goto(`${LOCAL}?readonly`, { waitUntil: 'domcontentloaded' })
 await page.waitForSelector('.ProseMirror table', { timeout: 30000 })
 await sleep(900)
 g = await geom()
@@ -268,6 +268,9 @@ const cell0 = await page.evaluate(() => {
   return { right: r.right, top: r.top }
 })
 await page.mouse.move(cell0.right - 2, cell0.top + 24)
+check('只读时没有列宽拖拽手柄', !(await page.$('.column-resize-handle')))
+await page.evaluate(() => window.ed.setEditable(true))
+await page.mouse.move(cell0.right - 1, cell0.top + 24)
 await sleep(320)
 const hasHandle = await page.evaluate(() => {
   const h = document.querySelector('.column-resize-handle')
@@ -281,6 +284,11 @@ await sleep(500)
 const w1 = (await geom()).widths[0]
 check('鼠标靠近列边界出现拖拽手柄', hasHandle)
 check('拖动列边界改变首列宽度', Math.abs(w1 - w0) >= 20, `${w0}px → ${w1}px`)
+const widths = await page.evaluate(() => {
+  const table = window.ed.getJSON().content.find(node => node.type === 'table')
+  return table.content.map(row => row.content[0].attrs.colwidth?.[0])
+})
+check('拖动把宽度写到正文中每一行的首列', widths.every(width => width === widths[0] && width >= w0 + 20))
 
 /* ---------- 8. 右键菜单 ---------- */
 await page.goto(LOCAL, { waitUntil: 'domcontentloaded' })
@@ -292,6 +300,51 @@ await sleep(320)
 const ctx = await menuInfo()
 check('右键单元格在鼠标处打开同一份菜单', !!ctx, ctx && `left ${ctx.left} top ${ctx.top}`)
 check('右键时页面没有弹出系统菜单', await page.evaluate(() => !!document.querySelector('.tbl-menu')))
+
+/* ---------- 9. 历史代码块中的 Unicode 字符表格 ---------- */
+await page.evaluate(() => {
+  window.ed.commands.setContent({
+    type: 'doc',
+    content: [
+      { type: 'paragraph' },
+      { type: 'codeBlock', content: [{ type: 'text', text: [
+        '┌─────────────┐',
+        '│ 第一层：机制层       │',
+        '│ 损失厌恶 × 选项过载   │',
+        '├─────────────┤',
+        '│ 第二层：成本层       │',
+        '│ 时间成本 + 机会成本   │',
+        '└─────────────┘',
+      ].join('\n') }] },
+      { type: 'codeBlock', content: [{ type: 'text', text: 'const a = 1 | 2' }] },
+    ],
+  })
+  window.ed.setEditable(false)
+})
+await page.waitForSelector('.dcb-box-table table')
+check('旧字符框线显示为真实表格预览，普通代码块仍是源码', await page.evaluate(() => {
+  const preview = document.querySelector('.dcb-box-table table')
+  return preview.rows.length === 2 && preview.rows[0].cells[0].querySelectorAll('p').length === 2
+    && document.querySelector('.diagram-code[data-diagram=""] code').textContent === 'const a = 1 | 2'
+    && window.ed.getJSON().content[1].type === 'codeBlock'
+}))
+check('只读时没有转换入口', await page.evaluate(() => !document.querySelector('.dcb-head')?.textContent.includes('转换为表格')))
+await page.click('.diagram-code[data-diagram="box-table"] .dcb-btn')
+await page.waitForSelector('.diagram-code[data-diagram="box-table"] .dcb-src', { visible: true })
+check('可以查看原始字符框线', await page.$eval('.diagram-code[data-diagram="box-table"] .dcb-src', el => el.textContent.includes('┌─────────────┐')))
+await page.click('.diagram-code[data-diagram="box-table"] .dcb-btn')
+await page.waitForSelector('.dcb-box-table table', { visible: true })
+await page.evaluate(() => window.ed.setEditable(true))
+await page.click('.diagram-code[data-diagram="box-table"] .dcb-btn')
+await page.waitForSelector('.tableWrapper table')
+check('转换后正文中保存原生表格，保留单元格内多行文字', await page.evaluate(() => {
+  const table = window.ed.getJSON().content.find(node => node.type === 'table')
+  const cells = table?.content.map(row => row.content[0].content.map(p => p.content?.[0]?.text))
+  return JSON.stringify(cells) === JSON.stringify([
+    ['第一层：机制层', '损失厌恶 × 选项过载'],
+    ['第二层：成本层', '时间成本 + 机会成本'],
+  ])
+}))
 
 check('本地页面无 JS 报错', errors.length === 0, errors.slice(0, 3).join(' | '))
 

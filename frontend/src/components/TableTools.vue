@@ -642,7 +642,8 @@ function onContextMenu(ev: MouseEvent) {
   if (!e || !props.editable) return
   const t = ev.target as HTMLElement | null
   const table = t?.closest?.('.ProseMirror table') as HTMLTableElement | null
-  if (!table) return
+  const ref = tableRefOf(table)
+  if (!ref) return
   ev.preventDefault()
   try {
     const hit = e.view.posAtCoords({ left: ev.clientX, top: ev.clientY })
@@ -658,7 +659,7 @@ function onContextMenu(ev: MouseEvent) {
     /* 坐标落在表格边框上时 posAtCoords 可能失效，沿用当前选区 */
   }
   hoverEl = table
-  hoverTable = tableRefOf(table)
+  hoverTable = ref
   updateHandle()
   openMenuAt(ev.clientX, ev.clientY, hoverTable)
 }

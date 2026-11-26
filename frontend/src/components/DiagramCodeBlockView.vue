@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue'
 import { NodeViewContent, NodeViewWrapper, type NodeViewProps } from '@tiptap/vue-3'
+import { TextSelection } from '@tiptap/pm/state'
 import mermaid from 'mermaid'
 import plantumlEncoder from 'plantuml-encoder'
 import DiagramLightbox from './DiagramLightbox.vue'
+import { parseBoxTable } from '../extensions/boxTable'
 
 /**
  * 代码块的「能画就画」视图。
@@ -54,19 +56,27 @@ const kind = computed<'mermaid' | 'plantuml' | null>(() => {
   return null
 })
 
+const boxRows = computed(() => {
+  if (kind.value || !['', 'text', 'plain', 'plaintext', 'txt'].includes(declaredLang.value)) return null
+  return parseBoxTable(code.value)
+})
+
 /* ---------------- 源码 / 图 两种形态 ---------------- */
 
 /** 手动切到源码态（点按钮），优先级高于光标位置 */
 const manualSource = ref(false)
 /** 光标是否在这个代码块内部 */
 const cursorInside = ref(false)
+const editable = ref(props.editor.isEditable)
 
 const showSource = computed(() => manualSource.value || cursorInside.value)
 const showDiagram = computed(() => !!kind.value && !showSource.value)
+const showTable = computed(() => !!boxRows.value && !showSource.value)
 
 function syncCursor() {
   const ed = props.editor
-  if (!ed || ed.isDestroyed) {
+  editable.value = ed.isEditable
+  if (ed.isDestroyed || !editable.value || !ed.isFocused) {
     cursorInside.value = false
     return
   }
@@ -83,7 +93,7 @@ function syncCursor() {
 function editSource() {
   manualSource.value = true
   const pos = props.getPos?.()
-  if (typeof pos === 'number') {
+  if (editable.value && typeof pos === 'number') {
     nextTick(() => props.editor.chain().setTextSelection(pos + 1).focus().run())
   }
 }
@@ -91,6 +101,29 @@ function editSource() {
 function showPreview() {
   manualSource.value = false
   props.editor.commands.blur()
+}
+
+function convertToTable() {
+  const { editor } = props
+  const rows = boxRows.value
+  if (!editor.isEditable || !rows) return
+  const pos = props.getPos()
+  if (typeof pos !== 'number') return
+  const { state, view } = editor
+  const current = state.doc.nodeAt(pos)
+  const { table, tableRow, tableCell, paragraph } = state.schema.nodes
+  if (!current?.eq(toRaw(props.node)) || !table || !tableRow || !tableCell || !paragraph) return
+  const $pos = state.doc.resolve(pos)
+  if (!$pos.parent.canReplaceWith($pos.index(), $pos.index() + 1, table)) return
+
+  const replacement = table.create(null, rows.map(row => tableRow.create(null,
+    row.map(cell => tableCell.create(null, cell.map(line =>
+      paragraph.create(null, line ? state.schema.text(line) : undefined),
+    ))),
+  )))
+  const tr = state.tr.replaceWith(pos, pos + current.nodeSize, replacement)
+  view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(pos + 1))).scrollIntoView())
+  view.focus()
 }
 
 /* ---------------- 渲染 ---------------- */
@@ -187,6 +220,7 @@ onMounted(() => {
   ed.on('selectionUpdate', syncCursor)
   ed.on('focus', syncCursor)
   ed.on('blur', syncCursor)
+  ed.on('update', syncCursor)
   syncCursor()
 })
 
@@ -197,6 +231,7 @@ onBeforeUnmount(() => {
   ed.off('selectionUpdate', syncCursor)
   ed.off('focus', syncCursor)
   ed.off('blur', syncCursor)
+  ed.off('update', syncCursor)
 })
 
 function openLightbox() {
@@ -208,7 +243,7 @@ function openLightbox() {
   <NodeViewWrapper
     class="diagram-code"
     :class="{ 'as-diagram': showDiagram, 'as-source': !showDiagram }"
-    :data-diagram="kind || ''"
+    :data-diagram="kind || (boxRows ? 'box-table' : '')"
   >
     <!-- 图态才有顶栏：来源标记 + 切回源码 -->
     <div v-if="kind && !showSource" class="dcb-head">
@@ -217,7 +252,7 @@ function openLightbox() {
     </div>
 
     <!-- 源码态：真正可编辑的代码块 -->
-    <pre v-show="showSource || !kind" class="dcb-src"><NodeViewContent as="code" /></pre>
+    <pre v-show="!showDiagram && !showTable" class="dcb-src"><NodeViewContent as="code" /></pre>
 
     <!-- 图态 -->
     <div v-if="kind && !showSource" class="dcb-canvas">
@@ -239,6 +274,27 @@ function openLightbox() {
       <span class="dcb-lang">{{ kind === 'mermaid' ? 'Mermaid' : 'PlantUML' }}</span>
       <button class="dcb-btn" type="button" title="渲染成图" @click="showPreview">预览图</button>
     </div>
+
+    <template v-if="boxRows">
+      <div class="dcb-head" contenteditable="false">
+        <span class="dcb-lang">字符表格</span>
+        <button v-if="editable" class="dcb-btn" type="button" @mousedown.prevent @click="convertToTable">转换为表格</button>
+        <button class="dcb-btn" type="button" @mousedown.prevent @click="showTable ? editSource() : showPreview()">
+          {{ showTable ? '查看原文' : '预览表格' }}
+        </button>
+      </div>
+      <div v-if="showTable" class="dcb-box-table" contenteditable="false">
+        <table>
+          <tbody>
+            <tr v-for="(row, rowIndex) in boxRows" :key="rowIndex">
+              <td v-for="(cell, cellIndex) in row" :key="cellIndex">
+                <p v-for="(line, lineIndex) in cell" :key="lineIndex">{{ line || '\u00a0' }}</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
 
     <DiagramLightbox
       v-if="lightbox"
