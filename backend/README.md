@@ -20,7 +20,7 @@
 | 权限隔离 | 权限一律查 `workspace_member`；非成员一律 403；文档继承所属空间的角色 |
 | 文档树 | 任意层级父子文档、同级排序、行内重命名、级联软删除、拖拽改层级（带防环） |
 | 协同身份 | 每切一篇文档签发一个 2 小时有效的单文档协同 token；无效 / 越权 token 直接被协同服务拒绝 |
-| 只读体验 | `VIEWER` 在前端被收敛为不可编辑；服务端协同时长约束见「已知边界」 |
+| 只读体验 | `VIEWER` 前端为只读，Hocuspocus 服务端拒绝写入 |
 
 **技术决策（已确认）**：Spring Boot 3.3.4 + Java 17；MySQL 8；数据访问用 JPA（Spring Data）；鉴权用 JWT（HS256），区分 auth / collab 两类 token。
 
@@ -273,6 +273,6 @@ mvn -B -DskipTests clean package   # 产出 target/scofen-doc-backend-0.1.0.jar
 
 ## 9. 已知边界（接口侧）
 
-- 只读是前端约束，服务端协同未做硬隔离（VIEWER 拿到的 token 与编辑者同构）。彻底隔离需在 Node 侧解析 Yjs 更新按角色丢弃，或加「只读房间」机制。
+- 文档级授权由 `DocumentAccess` 汇总空间、协作者和分享链接权限。`/internal/collab-access` 验证协同 token、用户状态和当前房间授权，供协同服务定期复查。
 - 账号不可删除，只能停用式处理（移出所有空间 + 重置密码）。
-- 撤销是「下一次连接生效」：移除成员后其已建立的 WebSocket 不会被立即踢，协同 token 最长 2 小时有效（有意的取舍）。
+- 新协同连接即时校验权限，已建立连接每 10 秒复查。

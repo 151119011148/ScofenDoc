@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
  * parentId 为 null 表示根文档；非 null 表示是某文档的子文档，从而形成任意深度的父子树。
  */
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "doc", indexes = {
         @Index(name = "idx_doc_workspace", columnList = "workspace_id"),
         @Index(name = "idx_doc_parent", columnList = "parent_id"),
@@ -47,6 +48,12 @@ public class Doc {
     @Column(nullable = false)
     private boolean deleted = false;
 
+    @Column(name = "delete_batch", length = 36)
+    private String deleteBatch;
+
+    @Column(nullable = false)
+    private boolean purged;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -76,6 +83,11 @@ public class Doc {
 
     public boolean isDeleted() { return deleted; }
     public void setDeleted(boolean deleted) { this.deleted = deleted; }
+
+    public String getDeleteBatch() { return deleteBatch; }
+    public void setDeleteBatch(String deleteBatch) { this.deleteBatch = deleteBatch; }
+    public boolean isPurged() { return purged; }
+    public void setPurged(boolean purged) { this.purged = purged; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

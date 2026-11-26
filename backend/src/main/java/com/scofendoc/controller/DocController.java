@@ -8,6 +8,7 @@ import com.scofendoc.entity.Workspace;
 import com.scofendoc.security.AuthUser;
 import com.scofendoc.security.CurrentUser;
 import com.scofendoc.service.DocumentService;
+import com.scofendoc.service.DocumentTrash;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,9 +26,11 @@ import java.util.Map;
 public class DocController {
 
     private final DocumentService service;
+    private final DocumentTrash trash;
 
-    public DocController(DocumentService service) {
+    public DocController(DocumentService service, DocumentTrash trash) {
         this.service = service;
+        this.trash = trash;
     }
 
     /* ---------------- 空间 ---------------- */
@@ -100,6 +103,16 @@ public class DocController {
     public Map<String, Object> restore(@PathVariable Long id) {
         int n = service.restoreDoc(id, CurrentUser.id());
         return Map.of("restored", n);
+    }
+
+    @GetMapping("/workspaces/{workspaceId}/trash")
+    public List<DocumentTrash.Entry> trash(@PathVariable Long workspaceId) {
+        return trash.list(workspaceId, CurrentUser.id());
+    }
+
+    @DeleteMapping("/docs/{id}/purge")
+    public Map<String, Integer> purge(@PathVariable Long id) {
+        return Map.of("purged", trash.purge(id, CurrentUser.id()));
     }
 
     /** 协同 token：前端拿它连 WebSocket，只对本篇文档有效 */

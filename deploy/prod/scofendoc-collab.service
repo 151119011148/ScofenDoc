@@ -10,6 +10,7 @@ WorkingDirectory=/opt/scofendoc/collab
 Environment=NODE_ENV=production
 Environment=COLLAB_PORT=1234
 Environment=COLLAB_HOST=127.0.0.1
+Environment=COLLAB_ACCESS_URL=http://127.0.0.1:8081/internal/collab-access
 # JWT_SECRET 必须与 Java 后端一致（两边都用 SHA-256 派生 HS256 密钥校验协同 token）
 EnvironmentFile=-/opt/scofendoc/collab/collab.env
 ExecStart=/usr/bin/node /opt/scofendoc/collab/server.js

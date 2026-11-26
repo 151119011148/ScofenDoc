@@ -57,7 +57,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     // 用户已删除，或 token 是改密前签发的 → 一律按未登录处理
                     if (u != null && pv != null && pv == u.getTokenVersion()) {
                         AuthUser principal = new AuthUser(
-                                u.getId(), u.getUsername(), u.getDisplayName(), u.getColor(), u.isAdmin());
+                                u.getId(), u.getUsername(), u.getDisplayName(), u.getColor(), u.isAdmin(), u.getTokenVersion());
                         var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     } else {

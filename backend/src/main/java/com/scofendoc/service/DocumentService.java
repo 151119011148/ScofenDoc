@@ -15,12 +15,14 @@ import com.scofendoc.security.ForbiddenException;
 import com.scofendoc.security.JwtService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,13 +31,7 @@ import java.util.UUID;
 /**
  * 空间与文档元数据服务。
  *
- * 权限模型（相比上一版的关键变化）：
- *   上一版是 workspace.owner_id == 当前用户，天生不支持共享。
- *   现在所有判定都走 MembershipService 查 workspace_member 表：
- *     - 查看：OWNER / EDITOR / VIEWER 都可以
- *     - 写（建/改/移/删）：OWNER / EDITOR
- *     - 管成员：OWNER
- *   文档不单独授权，一律继承所属空间的角色——层级越简单，越不容易出现漏判。
+ * 空间目录与树结构由空间成员角色管理，单篇内容授权统一走 DocumentAccess。
  *
  * 查不到记录时统一抛 403 而不是 404：不区分"不存在"和"不是你的"，
  * 避免被用来探测别人有哪些文档。
@@ -49,19 +45,21 @@ public class DocumentService {
     private final MembershipService membership;
     private final JwtService jwtService;
     private final CollabSearchClient collabSearch;
+    private final DocumentAccess access;
 
     public DocumentService(WorkspaceRepository workspaceRepo,
                            WorkspaceMemberRepository memberRepo,
                            DocRepository docRepo,
                            MembershipService membership,
                            JwtService jwtService,
-                           CollabSearchClient collabSearch) {
+                           CollabSearchClient collabSearch, DocumentAccess access) {
         this.workspaceRepo = workspaceRepo;
         this.memberRepo = memberRepo;
         this.docRepo = docRepo;
         this.membership = membership;
         this.jwtService = jwtService;
         this.collabSearch = collabSearch;
+        this.access = access;
     }
 
     /* ---------------- 空间 ---------------- */
@@ -113,7 +111,16 @@ public class DocumentService {
     }
 
     public DocDto getDoc(Long id, Long userId) {
-        return toDto(requireDoc(id, userId, false));
+        return visibleDto(requireDoc(id, userId, false), userId);
+    }
+
+    private DocDto visibleDto(Doc doc, Long userId) {
+        // A direct share must not expose position or parent ID in a private tree.
+        if (membership.roleOf(doc.getWorkspaceId(), userId) == null) {
+            return new DocDto(doc.getId(), doc.getWorkspaceId(), null, doc.getTitle(), null,
+                    doc.getCollabKey(), 0, doc.getUpdatedAt());
+        }
+        return toDto(doc);
     }
 
     /**
@@ -194,11 +201,12 @@ public class DocumentService {
      * 新建文档。parentId 非空即为「子文档」，从而支持任意层级。
      * collabKey 用 UUID，作为 Yjs 房间名与落盘文件名。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DocDto createDoc(Long workspaceId, Long parentId, String title, Long userId) {
+        lockTree(workspaceId);
         membership.requireWrite(workspaceId, userId);
         if (parentId != null) {
-            Doc parent = requireDoc(parentId, userId, true);
+            Doc parent = requireDoc(parentId, userId, false);
             if (!parent.getWorkspaceId().equals(workspaceId)) {
                 throw new IllegalArgumentException("父文档不属于该空间");
             }
@@ -215,13 +223,15 @@ public class DocumentService {
 
     @Transactional
     public DocDto renameDoc(Long id, String title, Long userId) {
-        Doc d = requireDoc(id, userId, true);
+        Doc d = docRepo.lockById(id).filter(doc -> !doc.isDeleted())
+                .orElseThrow(() -> new ForbiddenException("文档不存在或无权访问"));
+        if (!access.require(d, userId).canWrite()) throw new ForbiddenException("文档仅可查看");
         if (title != null && !title.isBlank()) {
             d.setTitle(title.trim());
         }
         d.setUpdatedAt(LocalDateTime.now());
         docRepo.save(d);
-        return toDto(d);
+        return visibleDto(d, userId);
     }
 
     /**
@@ -231,9 +241,11 @@ public class DocumentService {
      * 落库时把目标父节点下的兄弟整体重新编号 1..n，这样前端拖拽只关心"插到第几个"，
      * 不需要自己算中间值，插入 N 次后 sortOrder 也不会膨胀。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DocDto moveDoc(Long id, Long parentId, Integer index, Long userId) {
+        lockTree(workspaceOf(id));
         Doc d = requireDoc(id, userId, true);
+        membership.requireWrite(d.getWorkspaceId(), userId);
         if (parentId != null) {
             if (parentId.equals(id)) {
                 throw new IllegalArgumentException("不能把文档挂到自己下面");
@@ -266,22 +278,26 @@ public class DocumentService {
     }
 
     /** 软删除整棵子树：元数据标记 deleted，协同二进制文件保留，便于恢复 */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public int deleteDoc(Long id, Long userId) {
-        Doc root = requireDoc(id, userId, true);
+        lockTree(workspaceOf(id));
+        Doc root = docRepo.lockById(id).filter(d -> !d.isDeleted())
+                .orElseThrow(() -> new ForbiddenException("文档不存在或无权访问"));
+        membership.requireWrite(root.getWorkspaceId(), userId);
         List<Doc> all = docRepo.findByWorkspaceIdAndDeletedFalse(root.getWorkspaceId());
-        List<Long> toDelete = new ArrayList<>();
+        var toDelete = new HashSet<Long>();
         Deque<Long> queue = new ArrayDeque<>();
         queue.add(id);
         while (!queue.isEmpty()) {
             Long cur = queue.poll();
-            toDelete.add(cur);
+            if (!toDelete.add(cur)) continue;
             all.stream().filter(x -> cur.equals(x.getParentId())).forEach(x -> queue.add(x.getId()));
         }
         LocalDateTime now = LocalDateTime.now();
+        String batch = UUID.randomUUID().toString();
         all.stream()
                 .filter(x -> toDelete.contains(x.getId()))
-                .forEach(x -> { x.setDeleted(true); x.setUpdatedAt(now); });
+                .forEach(x -> { x.setDeleted(true); x.setDeleteBatch(batch); x.setUpdatedAt(now); });
         docRepo.saveAll(all);
         return toDelete.size();
     }
@@ -293,35 +309,42 @@ public class DocumentService {
      * 唯一要处理的是「父级也被删了」的情况：那时挂回根节点，避免出现孤儿文档
      * ——挂着的父 id 找不到，前端会把它当成根节点渲染，位置会莫名其妙。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public int restoreDoc(Long id, Long userId) {
-        Doc root = docRepo.findById(id).orElseThrow(() -> new ForbiddenException("文档不存在：" + id));
+        lockTree(workspaceOf(id));
+        Doc root = docRepo.lockById(id).filter(d -> !d.isPurged())
+                .orElseThrow(() -> new ForbiddenException("文档不存在或无法恢复"));
         membership.requireWrite(root.getWorkspaceId(), userId);
+        if (!root.isDeleted()) return 0;
 
         List<Doc> all = docRepo.findByWorkspaceId(root.getWorkspaceId());
-        List<Long> subtree = new ArrayList<>();
+        var subtree = new HashSet<Long>();
         Deque<Long> queue = new ArrayDeque<>();
         queue.add(id);
         while (!queue.isEmpty()) {
             Long cur = queue.poll();
-            subtree.add(cur);
+            if (!subtree.add(cur)) continue;
             all.stream().filter(x -> cur.equals(x.getParentId())).forEach(x -> queue.add(x.getId()));
         }
 
         List<Doc> hit = all.stream()
-                .filter(x -> subtree.contains(x.getId()) && x.isDeleted())
+                .filter(x -> subtree.contains(x.getId()) && x.isDeleted() && !x.isPurged()
+                        && (x.getId().equals(id) || root.getDeleteBatch() != null
+                            && Objects.equals(x.getDeleteBatch(), root.getDeleteBatch())))
                 .toList();
 
-        LocalDateTime now = LocalDateTime.now();
-        for (Doc d : hit) {
-            d.setDeleted(false);
-            d.setUpdatedAt(now);
-        }
-        if (root.isDeleted() && root.getParentId() != null) {
+        if (root.getParentId() != null) {
             Doc parent = docRepo.findById(root.getParentId()).orElse(null);
             if (parent == null || parent.isDeleted()) {
                 root.setParentId(null);
+                root.setSortOrder(nextSortOrder(root.getWorkspaceId(), null));
             }
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (Doc d : hit) {
+            d.setDeleted(false);
+            d.setDeleteBatch(null);
+            d.setUpdatedAt(now);
         }
         docRepo.saveAll(hit);
         return hit.size();
@@ -329,16 +352,25 @@ public class DocumentService {
 
     /**
      * 签发协同 token：只能用于这一个文档房间，且默认 2 小时过期。
-     * 查看者同样能拿到——只读是在前端约束的，服务端没有强制拦截 Yjs 更新，
-     * 这点在 README 里如实写明，不假装它是硬隔离。
+     * 查看者也能连接，由协同服务按后端实时权限设置只读模式。
      */
     public CollabTokenDto issueCollabToken(Long docId, AuthUser user) {
         Doc d = requireDoc(docId, user.id(), false);
-        return new CollabTokenDto(jwtService.issueCollabToken(user, d.getCollabKey()),
-                jwtService.collabTtlSeconds());
+        boolean canWrite = access.require(d, user.id()).canWrite();
+        return new CollabTokenDto(jwtService.issueCollabToken(user, d.getCollabKey(), canWrite, user.tokenVersion()),
+                jwtService.collabTtlSeconds(), canWrite);
     }
 
     /* ---------------- 内部 ---------------- */
+
+    private Long workspaceOf(Long docId) {
+        return docRepo.workspaceIdOf(docId).orElseThrow(() -> new ForbiddenException("文档不存在或无权访问"));
+    }
+
+    private void lockTree(Long workspaceId) {
+        if (workspaceId == null) throw new IllegalArgumentException("需要指定空间");
+        workspaceRepo.lockById(workspaceId).orElseThrow(() -> new ForbiddenException("空间不存在或无权访问"));
+    }
 
     /**
      * 供附件等外部模块校验「用户能否访问这篇文档」（只读语义）。
@@ -353,15 +385,20 @@ public class DocumentService {
         return requireDoc(docId, userId, true);
     }
 
-    /** 取文档并校验对所属空间的角色；write=true 时要求可写 */
+    /** 附件上传结束后再加锁确认，避免删除与上传完成交叉。 */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void lockDocWrite(Long docId, Long userId) {
+        Doc doc = docRepo.lockById(docId).filter(d -> !d.isDeleted())
+                .orElseThrow(() -> new ForbiddenException("文档不存在或无权访问"));
+        if (!access.require(doc, userId).canWrite()) throw new ForbiddenException("文档仅可查看");
+    }
+
+    /** 校验单篇文档的有效权限 */
     private Doc requireDoc(Long docId, Long userId, boolean write) {
         Doc d = docRepo.findByIdAndDeletedFalse(docId)
                 .orElseThrow(() -> new ForbiddenException("文档不存在或无权访问：" + docId));
-        if (write) {
-            membership.requireWrite(d.getWorkspaceId(), userId);
-        } else {
-            membership.requireView(d.getWorkspaceId(), userId);
-        }
+        var role = access.require(d, userId);
+        if (write && !role.canWrite()) throw new ForbiddenException("文档仅可查看");
         return d;
     }
 
@@ -375,9 +412,9 @@ public class DocumentService {
     /** candidate 是否在 ancestorId 的子树内（用于防止移动成环） */
     private boolean isDescendant(Long candidateId, Long ancestorId) {
         Long cur = candidateId;
-        int guard = 0;
-        while (cur != null && guard++ < 200) {
-            if (cur.equals(ancestorId)) return true;
+        var visited = new HashSet<Long>();
+        while (cur != null) {
+            if (cur.equals(ancestorId) || !visited.add(cur)) return true;
             Doc d = docRepo.findById(cur).orElse(null);
             cur = d == null ? null : d.getParentId();
         }

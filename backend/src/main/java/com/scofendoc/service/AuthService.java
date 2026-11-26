@@ -208,7 +208,7 @@ public class AuthService {
 
     private AuthResponse buildResponse(User u) {
         AuthUser principal = new AuthUser(
-                u.getId(), u.getUsername(), u.getDisplayName(), u.getColor(), u.isAdmin());
+                u.getId(), u.getUsername(), u.getDisplayName(), u.getColor(), u.isAdmin(), u.getTokenVersion());
         return new AuthResponse(jwtService.issueAuthToken(principal, u.getTokenVersion()), toDto(principal));
     }
 

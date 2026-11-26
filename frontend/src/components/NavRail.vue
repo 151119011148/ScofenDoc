@@ -29,6 +29,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', target: NavKey): void
+  (e: 'shared'): void
   (e: 'select-space', space: Workspace): void
   (e: 'new-space', kind: 'DOC' | 'KB'): void
   (e: 'open-members', space: Workspace): void
@@ -111,6 +112,10 @@ const shownSpaces = computed(() => (shownKind.value === 'KB' ? kbSpaces.value : 
         >
           ＋
         </span>
+      </button>
+      <button class="nav-item" title="分享给我的文档" @click="emit('shared')">
+        <span class="nav-item-icon">↗</span>
+        <span class="nav-item-label">分享给我</span>
       </button>
     </nav>
 

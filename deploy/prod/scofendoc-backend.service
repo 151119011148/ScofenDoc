@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/scofendoc/app
+Environment=SERVER_ADDRESS=127.0.0.1
 EnvironmentFile=/opt/scofendoc/app/backend.env
 ExecStart=/usr/lib/jvm/java-17-openjdk-17.0.20.0.8-1.1.0.2.1.al8.x86_64/bin/java \
   -Xms128m -Xmx320m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC \

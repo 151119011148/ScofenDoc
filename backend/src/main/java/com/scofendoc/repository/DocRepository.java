@@ -14,6 +14,15 @@ public interface DocRepository extends JpaRepository<Doc, Long> {
 
     Optional<Doc> findByIdAndDeletedFalse(Long id);
 
+    Optional<Doc> findByCollabKeyAndDeletedFalse(String collabKey);
+
+    @org.springframework.data.jpa.repository.Query("select d.workspaceId from Doc d where d.id = :id")
+    Optional<Long> workspaceIdOf(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select d from Doc d where d.id = :id")
+    Optional<Doc> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
     boolean existsByWorkspaceIdAndDeletedFalse(Long workspaceId);
 
     List<Doc> findByWorkspaceIdAndDeletedFalse(Long workspaceId);

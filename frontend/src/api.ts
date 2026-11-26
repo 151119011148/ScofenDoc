@@ -26,6 +26,16 @@ export interface Doc {
   updatedAt: string
 }
 
+export type DocShareRole = 'VIEWER' | 'EDITOR' | 'MANAGER'
+export interface DocPermissions { canWrite: boolean; canManage: boolean }
+export interface DocVersion { id: string; name: string; kind: string; createdAt: string }
+export interface SharedDoc { id: number; title: string; role: DocShareRole | 'OWNER' }
+export interface TrashEntry { id: number; parentId: number | null; title: string; deletedAt: string; cleanupPending: boolean }
+export interface DocSharing {
+  collaborators: { userId: number; username: string; role: DocShareRole }[]
+  links: { id: number; expiresAt: string; passwordRequired: boolean }[]
+}
+
 /** 搜索结果 / 最近文档条目：比 Doc 多带空间名，方便跨空间展示 */
 export interface DocHit {
   id: number
@@ -252,7 +262,30 @@ export const api = {
 
   /** 协同 token：只对这篇文档有效，前端连 WebSocket 时带上 */
   collabToken: (docId: number) =>
-    request<{ token: string; expiresIn: number }>(`/docs/${docId}/collab-token`),
+    request<{ token: string; expiresIn: number; canWrite: boolean }>(`/docs/${docId}/collab-token`, { cache: 'no-store' }),
+
+  docPermissions: (id: number) => request<DocPermissions>(`/docs/${id}/permissions`),
+  sharedDocs: () => request<SharedDoc[]>('/docs/shared'),
+  docSharing: (id: number) => request<DocSharing>(`/docs/${id}/sharing`),
+  grantDoc: (id: number, username: string, role: DocShareRole) =>
+    request<void>(`/docs/${id}/collaborators`, { method: 'POST', body: JSON.stringify({ username, role }) }),
+  revokeDoc: (id: number, user: number) =>
+    request<void>(`/docs/${id}/collaborators/${user}`, { method: 'DELETE' }),
+  createDocLink: (id: number, hours: number, password: string) =>
+    request<{ token: string }>(`/docs/${id}/share-links`, { method: 'POST', body: JSON.stringify({ hours, password }) }),
+  revokeDocLink: (id: number, link: number) =>
+    request<void>(`/docs/${id}/share-links/${link}`, { method: 'DELETE' }),
+  redeemDocLink: (token: string, password: string) =>
+    request<{ id: number }>('/docs/redeem-share', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  docVersions: (id: number) => request<DocVersion[]>(`/docs/${id}/versions`),
+  snapshotDoc: (id: number, name: string) =>
+    request<DocVersion>(`/docs/${id}/versions`, { method: 'POST', body: JSON.stringify({ name }) }),
+  previewVersion: (id: number, version: string) =>
+    request<{ text: string; truncated: boolean }>(`/docs/${id}/versions/${version}`),
+  restoreVersion: (id: number, version: string) =>
+    request<{ collabKey: string }>(`/docs/${id}/versions/${version}/restore`, { method: 'POST' }),
+  trash: (space: number) => request<TrashEntry[]>(`/workspaces/${space}/trash`),
+  purgeDoc: (id: number) => request<{ purged: number }>(`/docs/${id}/purge`, { method: 'DELETE' }),
 
   /**
    * 正文配图：粘贴/拖入的图片先上传，再把返回的 URL 写成 image 节点（避免 base64 撑爆 Yjs）。

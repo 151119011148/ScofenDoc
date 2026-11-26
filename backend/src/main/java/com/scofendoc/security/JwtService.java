@@ -62,12 +62,14 @@ public class JwtService {
     }
 
     /** 协同 token：只对单个文档房间有效，短期，可随时靠过期收敛 */
-    public String issueCollabToken(AuthUser user, String collabKey) {
+    public String issueCollabToken(AuthUser user, String collabKey, boolean canWrite, int tokenVersion) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(user.id()))
                 .claim("typ", TYP_COLLAB)
                 .claim("doc", collabKey)
+                .claim("write", canWrite)
+                .claim("pv", tokenVersion)
                 .claim("dn", user.displayName())
                 .claim("color", user.color())
                 .issuedAt(Date.from(now))

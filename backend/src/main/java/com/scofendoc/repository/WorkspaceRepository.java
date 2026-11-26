@@ -8,6 +8,10 @@ import java.util.Optional;
 
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select w from Workspace w where w.id = :id")
+    Optional<Workspace> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
     List<Workspace> findAllByOrderBySortOrderAscIdAsc();
 
     /** 某用户名下的空间（个人空间 + 他建的团队空间） */

@@ -12,6 +12,7 @@ public record AuthUser(
         String username,
         String displayName,
         String color,
-        boolean admin
+        boolean admin,
+        int tokenVersion
 ) {
 }

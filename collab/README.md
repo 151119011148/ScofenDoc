@@ -172,6 +172,6 @@ COLLAB_PORT=1234 COLLAB_HOST=127.0.0.1 NODE_ENV=production \
 
 ## 8. 已知边界
 
-- **只读非服务端硬隔离**：OSS 版 Hocuspocus 无文档级 readOnly。VIEWER 拿到的 token 与编辑者同构，理论上知道 token 者可自造 Yjs 更新发上来；UI 层已拦正常路径，彻底隔离需在 Node 侧解析 Yjs 更新按角色丢弃，或引入「只读房间」。
-- **全量落盘**：当前 `onStoreDocument` 覆盖写整篇全量态；增量持久化 + 定时快照为待办。
-- **账号删除 ≠ 协同清理**：用户被删除后其已建立的 WebSocket 不会被立即踢，协同 token 最长 2 小时有效（有意的取舍，换取不引入回调解耦）。
+- **只读隔离**：鉴权时使用 Hocuspocus 2.15.3 的 `connection.readOnly`。协同服务通过 `COLLAB_ACCESS_URL` 查询后端，给每个已连接的房间定期复查权限。
+- **存储**：`onStoreDocument` 原子写入正文全量态。版本位于数据目录下的 `versions/<docId>/`。备份应包含整个数据目录。
+- **连接撤销**：已建立连接每 10 秒复查一次，后端请求超时上限 2.5 秒。权限失效或超时会关闭房间连接。

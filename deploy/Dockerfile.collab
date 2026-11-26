@@ -1,7 +1,7 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY collab/package.json ./
-RUN npm install
-COPY collab/ ./
+COPY collab/package.json collab/package-lock.json ./
+RUN npm ci --omit=dev
+COPY collab/*.js ./
 EXPOSE 1234
 CMD ["node", "server.js"]

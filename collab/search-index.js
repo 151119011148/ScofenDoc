@@ -24,6 +24,10 @@ import * as Y from 'yjs'
 /** collabKey -> { text, lower, mtimeMs } */
 const index = new Map()
 
+export function forgetDocument(key) {
+  index.delete(key)
+}
+
 let dataDir = ''
 let builtAt = 0
 

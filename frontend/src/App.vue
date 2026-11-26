@@ -12,6 +12,7 @@ import ChangePasswordModal from './components/ChangePasswordModal.vue'
 import CreateSpaceModal from './components/CreateSpaceModal.vue'
 import MembersModal from './components/MembersModal.vue'
 import FindReplacePanel from './components/FindReplacePanel.vue'
+import DocumentGovernanceModal, { type GovernanceMode } from './components/DocumentGovernanceModal.vue'
 import type { Editor } from '@tiptap/core'
 import {
   api,
@@ -20,6 +21,7 @@ import {
   setUnauthorizedHandler,
   type Doc,
   type DocHit,
+  type DocPermissions,
   type Session,
   type Workspace,
 } from './api'
@@ -48,6 +50,15 @@ const moving = ref(false)
 /** 协同 token：每次切文档重新申请，只对当前这篇有效 */
 const collabToken = ref('')
 const collabKeyOfToken = ref('')
+const collabWrite = ref(false)
+const collabDenied = ref(false)
+const docPermissions = ref<DocPermissions | null>(null)
+const sharedMode = ref(false)
+const shareToken = ref(new URLSearchParams(location.hash.slice(1)).get('share') || '')
+const governance = ref<GovernanceMode>()
+let collabRequest = 0
+let lastAccessRefresh = 0
+let lastAccessDoc: number | null = null
 
 /* 弹窗 */
 const showCreateSpace = ref(false)
@@ -276,7 +287,9 @@ async function onNavigate(payload: { spaceId: number; docId: number; anchor: str
   searchResults.value = []
   closeNav()
 
-  if (payload.spaceId && payload.spaceId !== currentSpaceId.value) {
+  if (payload.spaceId && payload.spaceId !== currentSpaceId.value
+      && workspaces.value.some(space => space.id === payload.spaceId)) {
+    sharedMode.value = false
     currentSpaceId.value = payload.spaceId
     currentDocId.value = payload.docId > 0 ? payload.docId : null
     collabToken.value = ''
@@ -292,7 +305,7 @@ async function onNavigate(payload: { spaceId: number; docId: number; anchor: str
   // 链接上的 space 标错、或干脆没带（有些老文档只写了 ?doc=）：
   // 按 docId 反查真实空间再切一次，别静默停在当前空间的根文档
   if (payload.docId > 0 && !docs.value.some((d) => d.id === payload.docId)) {
-    await switchToDocSpace(payload.docId)
+    if (!await switchToDocSpace(payload.docId)) await openSharedDoc(payload.docId)
   }
 
   // selectDoc 会清掉锚点（用户手动选文档时不该带着旧锚点），所以放在它之后设置
@@ -424,7 +437,8 @@ function resetOutlineWidth() {
  *   OWNER / EDITOR 可写；只有 OWNER 能管成员。
  * 前端只做体验层的收敛，真正的拦截在后端 Service 层。
  */
-const canWrite = computed(() => currentSpace.value?.role !== 'VIEWER')
+const canWrite = computed(() => currentSpace.value?.role === 'OWNER' || currentSpace.value?.role === 'EDITOR')
+const canEditDoc = computed(() => collabReady.value && collabWrite.value)
 const canManageMembers = computed(() => currentSpace.value?.role === 'OWNER')
 const isTeam = computed(() => currentSpace.value?.type === 'TEAM')
 
@@ -446,6 +460,9 @@ const breadcrumb = computed(() => {
 })
 
 function resetState() {
+  ++collabRequest
+  governance.value = undefined
+  sharedMode.value = false
   workspaces.value = []
   docs.value = []
   currentSpaceId.value = null
@@ -518,6 +535,7 @@ async function resolveDocSpace(docId: number): Promise<number | null> {
 async function switchToDocSpace(docId: number): Promise<boolean> {
   const spaceId = await resolveDocSpace(docId)
   if (!spaceId || spaceId === currentSpaceId.value) return false
+  sharedMode.value = false
   currentSpaceId.value = spaceId
   currentDocId.value = null
   collabToken.value = ''
@@ -550,36 +568,101 @@ async function refreshHits() {
 /* ---------- URL 同步（可分享、可刷新） ---------- */
 function syncUrl() {
   const params = new URLSearchParams()
+  if (sharedMode.value && currentDocId.value && view.value === 'doc') params.set('shared', String(currentDocId.value))
   if (currentSpaceId.value) params.set('space', String(currentSpaceId.value))
   // 主页不带 doc 参数：否则刷新一下就又跳回某篇文档，回不到主页
-  if (currentDocId.value && view.value !== 'home') params.set('doc', String(currentDocId.value))
+  if (!sharedMode.value && currentDocId.value && view.value !== 'home') params.set('doc', String(currentDocId.value))
   // 锚点只在「从别处跳进来」时带上，方便把定位结果整条链接发出去
   if (pendingAnchor.value && view.value !== 'home') params.set('h', pendingAnchor.value)
   const qs = params.toString()
-  history.replaceState(null, '', qs ? `?${qs}` : location.pathname)
+  const hash = shareToken.value ? `#${new URLSearchParams({ share: shareToken.value })}` : ''
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : '') + hash)
 }
 
 /* ---------- 协同 token ---------- */
 async function ensureCollabToken(doc: Doc | null) {
-  if (!doc) {
-    collabToken.value = ''
-    collabKeyOfToken.value = ''
-    return
-  }
-  if (collabKeyOfToken.value === doc.collabKey && collabToken.value) return
+  if (doc && collabKeyOfToken.value === doc.collabKey && collabToken.value) return
+  const request = ++collabRequest
+  collabToken.value = ''
+  collabKeyOfToken.value = ''
+  collabWrite.value = false
+  collabDenied.value = false
+  docPermissions.value = null
+  if (!doc) return
   try {
-    const res = await api.collabToken(doc.id)
-    // 期间可能已切到别的文档，丢弃过期结果
-    if (currentDoc.value?.id !== doc.id) return
+    const [res, permissions] = await Promise.all([api.collabToken(doc.id), api.docPermissions(doc.id)])
+    if (request !== collabRequest || currentDoc.value?.collabKey !== doc.collabKey) return
     collabToken.value = res.token
     collabKeyOfToken.value = doc.collabKey
+    docPermissions.value = permissions
+  } catch (e) {
+    if (request === collabRequest) {
+      collabDenied.value = true
+      showError(e)
+    }
+  }
+}
+
+async function refreshCurrentDoc() {
+  const id = currentDocId.value
+  const request = ++collabRequest
+  collabToken.value = ''
+  collabKeyOfToken.value = ''
+  collabWrite.value = false
+  docPermissions.value = null
+  collabDenied.value = false
+  if (!id) return
+  try {
+    const doc = await api.getDoc(id)
+    if (request !== collabRequest || currentDocId.value !== id) return
+    docs.value = docs.value.map(item => item.id === id ? doc : item)
+  } catch (e) {
+    if (request === collabRequest) {
+      collabDenied.value = true
+      showError(e)
+    }
+  }
+}
+
+function onCollabAccessLost() {
+  collabWrite.value = false
+  if (governance.value === 'sharing' || governance.value === 'versions') governance.value = undefined
+  const now = Date.now()
+  if (lastAccessDoc === currentDocId.value && now - lastAccessRefresh < 5000) {
+    collabToken.value = ''
+    collabDenied.value = true
+    docPermissions.value = null
+    return
+  }
+  lastAccessDoc = currentDocId.value
+  lastAccessRefresh = now
+  void refreshCurrentDoc()
+}
+
+async function openSharedDoc(id: number) {
+  try {
+    const doc = await api.getDoc(id)
+    shareToken.value = ''
+    governance.value = undefined
+    sharedMode.value = true
+    currentSpaceId.value = null
+    docs.value = [doc]
+    clearUndo()
+    selectDoc(doc)
   } catch (e) {
     showError(e)
   }
 }
 
+async function onGovernanceChanged(id: number) {
+  if (governance.value === 'trash') {
+    if (currentSpaceId.value) await loadDocs(currentSpaceId.value, id).catch(showError)
+  } else if (currentDocId.value === id) await refreshCurrentDoc()
+}
+
 /* ---------- 交互 ---------- */
 function selectSpace(id: number) {
+  sharedMode.value = false
   closeNav()
   view.value = 'doc'
   searchQuery.value = ''
@@ -609,6 +692,11 @@ function selectDoc(doc: Doc) {
 /* ---------- 导航切换 ---------- */
 
 function goNav(target: NavKey) {
+  if (sharedMode.value) {
+    sharedMode.value = false
+    docs.value = []
+    currentDocId.value = null
+  }
   closeNav()
   searchQuery.value = ''
   searchResults.value = []
@@ -678,6 +766,7 @@ async function loadRecent() {
 
 /** 从搜索结果 / 最近更新打开一篇文档 */
 async function openHit(hit: DocHit) {
+  sharedMode.value = false
   closeNav()
   view.value = 'doc'
   searchQuery.value = ''
@@ -754,7 +843,7 @@ async function applyRename(id: number, title: string) {
 async function saveTitle() {
   const doc = currentDoc.value
   const title = titleDraft.value.trim()
-  if (!doc || !canWrite.value || !title || title === doc.title) {
+  if (!doc || !canEditDoc.value || !title || title === doc.title) {
     titleDraft.value = doc?.title ?? ''
     return
   }
@@ -875,12 +964,24 @@ async function removeManyDocs(list: Doc[]) {
   const suffix = list.length > 8 ? ` 等 ${list.length} 篇` : ''
   if (!confirm(`确定删除选中的 ${list.length} 篇文档吗？（${names}${suffix}）\n其中含子文档的会连同子文档一起删除。删错了可以按 Ctrl+Z 撤销。`)) return
   moving.value = true
-  const ids = list.map((d) => d.id)
+  // One delete batch per selected root keeps the original tree intact on undo.
+  const selected = new Set(list.map(d => d.id))
+  const byId = new Map(docs.value.map(d => [d.id, d]))
+  const ids = list.filter(doc => {
+    let parent = doc.parentId
+    const visited = new Set<number>()
+    while (parent != null && !visited.has(parent)) {
+      if (selected.has(parent)) return false
+      visited.add(parent)
+      parent = byId.get(parent)?.parentId ?? null
+    }
+    return true
+  }).map(doc => doc.id)
   try {
     const { next } = await applyDelete(ids)
-    if (next) flash(`已删除 ${ids.length} 篇文档，定位到「${next.title}」`)
+    if (next) flash(`已删除所选文档，定位到「${next.title}」`)
     pushUndo({
-      label: `删除 ${ids.length} 篇文档`,
+      label: `删除 ${list.length} 篇所选文档`,
       undo: () => restoreDocs(ids),
       redo: () => deleteDocs(ids),
     })
@@ -1055,6 +1156,7 @@ function onPasswordChanged(next: Session) {
   session.value = next
   showChangePwd.value = false
   error.value = '密码已修改，其它设备需要重新登录'
+  void refreshCurrentDoc()
 }
 
 function logout() {
@@ -1079,6 +1181,16 @@ async function boot() {
     // 校验本地 token 是否还有效，同时拿到最新用户信息（含 admin 标识）
     session.value = { ...session.value, user: await api.me() }
     await loadWorkspaces()
+    if (shareToken.value) {
+      if (currentSpaceId.value) await loadDocs(currentSpaceId.value)
+      governance.value = 'redeem'
+      return
+    }
+    const sharedId = Number(bootParams.get('shared'))
+    if (sharedId > 0) {
+      await openSharedDoc(sharedId)
+      return
+    }
     const urlDocId = Number(new URLSearchParams(location.search).get('doc'))
     if (currentSpaceId.value) await loadDocs(currentSpaceId.value)
     // 分享链接里的文档不在当前空间：反查它真正的空间，切过去再加载一次。
@@ -1086,7 +1198,7 @@ async function boot() {
     if (wantsDoc && urlDocId && !docs.value.some((d) => d.id === urlDocId)) {
       await switchToDocSpace(urlDocId)
       if (!docs.value.some((d) => d.id === urlDocId)) {
-        error.value = '这篇文档不存在，或你已不在它所属的空间'
+        await openSharedDoc(urlDocId)
       }
     }
     if (!wantsDoc) {
@@ -1117,6 +1229,7 @@ watch(
 // 切文档 / 切视图时收起面板：命中位置属于上一份正文，留着会跳到错误的地方
 watch([currentDocId, view], () => {
   findOpen.value = false
+  if (governance.value === 'versions' || governance.value === 'sharing') governance.value = undefined
 })
 
 watch(error, (v) => {
@@ -1171,6 +1284,7 @@ boot()
         :collapsed="railCollapsed"
         :drawer="isMobile"
         @navigate="goNav"
+        @shared="closeNav(); governance = 'shared'"
         @select-space="selectSpace($event.id)"
         @new-space="newSpace"
         @open-members="openMembers"
@@ -1183,6 +1297,7 @@ boot()
         <template #tree>
           <div class="tree-head">
             <span>文档</span>
+            <button v-if="canWrite && currentSpace" class="mini" @click="governance = 'trash'">回收站</button>
             <button
               v-if="canWrite && currentSpace"
               class="mini"
@@ -1304,7 +1419,7 @@ boot()
                     <span v-if="node.number" class="doc-no crumb-no">{{ node.number }}</span>{{ node.title }}
                   </button>
                 </template>
-                <span v-if="!canWrite" class="crumb-ro">仅查看</span>
+                <span v-if="!canEditDoc" class="crumb-ro">仅查看</span>
               </div>
               <div class="title-line">
                 <span v-if="currentDoc.number" class="doc-no doc-no-lg">{{ currentDoc.number }}</span>
@@ -1312,7 +1427,7 @@ boot()
                   v-model="titleDraft"
                   class="title-input"
                   placeholder="无标题文档"
-                  :disabled="!canWrite"
+                  :disabled="!canEditDoc"
                   @blur="saveTitle"
                   @keyup.enter="($event.target as HTMLInputElement).blur()"
                 />
@@ -1327,11 +1442,16 @@ boot()
                   👥 成员 {{ currentSpace?.memberCount ?? 0 }}
                 </button>
                 <button v-if="canWrite" @click="createDoc(currentDoc.id)">＋ 子文档</button>
+                <button v-if="docPermissions?.canManage" @click="governance = 'sharing'">分享</button>
+                <button v-if="canEditDoc" @click="governance = 'versions'">版本历史</button>
               </div>
             </div>
 
             <!-- 拿到协同 token 后才挂载编辑器：provider 需要它完成握手 -->
-            <div v-if="!collabReady" class="collab-skeleton">正在申请协同权限…</div>
+            <div v-if="collabDenied" class="collab-skeleton">
+              无法连接此文档。<button @click="refreshCurrentDoc">重试</button>
+            </div>
+            <div v-else-if="!collabReady" class="collab-skeleton">正在申请协同权限…</div>
             <!-- key 用 collabKey：切文档时销毁旧 provider，接入新房间 -->
             <CollabEditor
               v-else
@@ -1341,10 +1461,12 @@ boot()
               :collab-token="collabToken"
               :user-name="session.user.displayName"
               :user-color="session.user.color"
-              :editable="canWrite"
+              :editable="canEditDoc"
               :space-id="currentSpaceId ?? 0"
               @editor-ready="onEditorReady"
               @navigate="onNavigate"
+              @access-lost="onCollabAccessLost"
+              @authorized="collabWrite = $event"
             />
           </template>
 
@@ -1363,6 +1485,18 @@ boot()
     </div>
 
     <!-- 弹窗 -->
+    <DocumentGovernanceModal
+      v-if="governance"
+      :key="governance + ':' + currentDocId"
+      :mode="governance"
+      :doc-id="currentDocId ?? undefined"
+      :workspace-id="currentSpaceId ?? undefined"
+      :can-manage="governance === 'trash' ? currentSpace?.role === 'OWNER' : docPermissions?.canManage"
+      :link-token="shareToken"
+      @open="openSharedDoc"
+      @changed="onGovernanceChanged"
+      @close="governance = undefined"
+    />
     <CreateSpaceModal
       v-if="showCreateSpace"
       :default-kind="spaceKindDraft"

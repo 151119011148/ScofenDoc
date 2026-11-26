@@ -1,4 +1,4 @@
-import { Server } from '@hocuspocus/server'
+import { IncomingMessage, MessageType, Server } from '@hocuspocus/server'
 import * as Y from 'yjs'
 import fs from 'fs'
 import path from 'path'
@@ -6,10 +6,12 @@ import crypto from 'crypto'
 import http from 'http'
 import { fileURLToPath } from 'url'
 import jwt from 'jsonwebtoken'
+import { messageYjsSyncStep2, messageYjsUpdate } from 'y-protocols/sync'
 import * as searchIndex from './search-index.js'
+import { createCollabFiles } from './versions.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = path.join(__dirname, 'data')
+const DATA_DIR = process.env.COLLAB_DATA_DIR || path.join(__dirname, 'data')
 fs.mkdirSync(DATA_DIR, { recursive: true })
 
 const PORT = process.env.COLLAB_PORT || 1234
@@ -30,6 +32,74 @@ const JWT_KEY = crypto.createHash('sha256').update(JWT_SECRET).digest()
 const SEARCH_PORT = Number(process.env.COLLAB_SEARCH_PORT || 1235)
 const SEARCH_HOST = process.env.COLLAB_SEARCH_HOST || '127.0.0.1'
 const SEARCH_TOKEN = crypto.createHash('sha256').update(JWT_SECRET + ':search').digest('hex')
+const ACCESS_URL = process.env.COLLAB_ACCESS_URL || 'http://127.0.0.1:8080/internal/collab-access'
+const ACCESS_TOKEN = crypto.createHash('sha256').update(JWT_SECRET + ':collab-access').digest('hex')
+const LEASE_MS = 10_000
+const connections = new Map()
+
+class AccessDenied extends Error {}
+
+async function checkAccess(token, room) {
+  const response = await fetch(ACCESS_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-internal-token': ACCESS_TOKEN },
+    body: JSON.stringify({ token, room }),
+    signal: AbortSignal.timeout(2500),
+  })
+  if (response.status === 401 || response.status === 403) throw new AccessDenied('协同授权已失效')
+  if (!response.ok) throw new Error('协同授权服务不可用')
+  const lease = await response.json()
+  if (!/^[1-9][0-9]*$/.test(lease.docId) || typeof lease.canWrite !== 'boolean') {
+    throw new Error('协同授权响应无效')
+  }
+  return lease
+}
+
+function stopSession(connection, session, reason, code = 4403) {
+  if (session.closed) return
+  session.closed = true
+  connections.delete(connection)
+  connection.readOnly = true
+  console.info('[access closed]', session.docId, session.userId, reason)
+  connection.close({ code, reason })
+}
+
+async function renew(connection, session) {
+  if (session.closed) throw new Error('协同连接已关闭')
+  if (Date.now() >= session.expiry || files.isBlocked(session.room)) {
+    stopSession(connection, session, 'room-or-token-expired')
+    throw new Error('协同连接已失效')
+  }
+  if (Date.now() < session.checkAfter) return
+  session.pending ??= checkAccess(session.token, session.room)
+    .then(lease => {
+      if (lease.canWrite !== session.canWrite) throw new AccessDenied('权限已变化')
+      session.checkAfter = Date.now() + LEASE_MS
+    })
+    .catch(error => {
+      if (error instanceof AccessDenied) stopSession(connection, session, 'access-changed')
+      else stopSession(connection, session, 'access-unavailable', 1013)
+      throw error
+    })
+    .finally(() => { session.pending = null })
+  await session.pending
+}
+
+function auditReadonlyWrite(document, packet, session) {
+  const now = Date.now()
+  if (session.canWrite || now < (session.auditAfter ?? 0)) return
+  const message = new IncomingMessage(packet)
+  message.readVarString()
+  const type = message.readVarUint()
+  if (type !== MessageType.Sync && type !== MessageType.SyncReply) return
+  const step = message.readVarUint()
+  const changed = step === messageYjsUpdate || (step === messageYjsSyncStep2
+    && !Y.snapshotContainsUpdate(Y.snapshot(document), message.readVarUint8Array()))
+  if (changed) {
+    session.auditAfter = now + 30_000
+    console.warn('[readonly write rejected]', session.docId, session.userId)
+  }
+}
 
 /**
  * 校验协同 token。
@@ -61,14 +131,36 @@ const server = Server.configure({
   address: HOST,
 
   // 连接鉴权：不通过就直接断开，文档内容不会被下发
-  async onAuthenticate({ token, documentName }) {
+  async onAuthenticate({ token, documentName, connection }) {
     if (!token) {
       throw new Error('缺少协同 token')
     }
     const payload = verifyCollabToken(token, documentName)
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(documentName) || !Number.isFinite(payload.exp)
+        || files.isBlocked(documentName)) throw new Error('房间已失效')
+    const lease = await checkAccess(token, documentName)
+    if (files.isBlocked(documentName)) throw new Error('房间已失效')
+    connection.readOnly = !lease.canWrite
+    console.info('[access granted]', lease.docId, payload.sub, lease.canWrite ? 'read-write' : 'readonly')
     return {
       user: { id: payload.sub, name: payload.dn || `用户${payload.sub}`, color: payload.color || '#3370ff' },
+      session: { ...lease, token, room: documentName, userId: payload.sub,
+        expiry: payload.exp * 1000, checkAfter: Date.now() + LEASE_MS },
     }
+  },
+
+  async beforeHandleMessage({ connection, context, document, update }) {
+    if (!context?.session) throw new Error('缺少协同授权')
+    await renew(connection, context.session)
+    if (context.session.closed || files.isBlocked(context.session.room)) throw new Error('协同房间已关闭')
+    // 只记录审计。真正写入控制仍由 Hocuspocus 的 readOnly 执行。
+    auditReadonlyWrite(document, update, context.session)
+  },
+
+  async connected({ connectionInstance, context }) {
+    if (!context?.session || context.session.closed) return
+    context.session.connection = connectionInstance
+    connections.set(connectionInstance, context.session)
   },
 
   // 加载文档：存在则读取本地 ydoc 二进制，否则新建空文档
@@ -85,20 +177,25 @@ const server = Server.configure({
   },
 
   // 保存文档：将 ydoc 全量态落盘（生产可改为增量 + 定时）
-  async onStoreDocument({ document, documentName }) {
-    const file = path.join(DATA_DIR, `${documentName}.bin`)
-    fs.writeFileSync(file, Y.encodeStateAsUpdate(document))
-    // 正文索引跟着落盘一起更新：这里握着最新的 Y.Doc，不用重新读文件
-    searchIndex.updateFromDoc(documentName, document, file)
+  async onStoreDocument({ document, documentName, context }) {
+    files.store(documentName, document, context?.session?.docId)
   },
 
   onConnect() {
     console.log('[connect] client connected')
   },
-  onDisconnect() {
+  onDisconnect({ context }) {
+    if (context?.session?.connection) connections.delete(context.session.connection)
     console.log('[disconnect] client disconnected')
   },
 })
+
+const files = createCollabFiles(DATA_DIR, server)
+setInterval(() => {
+  for (const [connection, session] of connections) {
+    renew(connection, session).catch(() => {})
+  }
+}, 1000).unref()
 
 server.listen()
 console.log(`Hocuspocus collab server listening on ws://${HOST}:${PORT}`)
@@ -149,6 +246,8 @@ const searchHttp = http.createServer((req, res) => {
         return send(200, { hits, ...searchIndex.stats() })
       }
       if (req.url === '/internal/stats') return send(200, searchIndex.stats())
+      const operation = files.handle(req.url, payload)
+      if (operation) return send(operation.status, operation.result)
       return send(404, { error: 'not found' })
     } catch (e) {
       return send(400, { error: e.message })

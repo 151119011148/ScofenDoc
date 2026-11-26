@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -45,6 +46,7 @@ public class AttachmentController {
 
     private final AttachmentRepository repo;
     private final DocumentService documents;
+    private final TransactionTemplate transactions;
 
     @Value("${scofendoc.attachments.dir:/var/lib/scofendoc/attachments}")
     private String attachmentsDir;
@@ -57,9 +59,10 @@ public class AttachmentController {
     @Value("${scofendoc.attachments.max-size-mb:500}")
     private long maxSizeMb;
 
-    public AttachmentController(AttachmentRepository repo, DocumentService documents) {
+    public AttachmentController(AttachmentRepository repo, DocumentService documents, TransactionTemplate transactions) {
         this.repo = repo;
         this.documents = documents;
+        this.transactions = transactions;
     }
 
     /**
@@ -165,13 +168,22 @@ public class AttachmentController {
         a.setContentType(contentType);
         a.setSizeBytes(written);
         a.setUploadedBy(userId);
-        a = repo.save(a);
+        Long attachmentId;
+        try {
+            attachmentId = transactions.execute(status -> {
+                documents.lockDocWrite(docId, userId);
+                return repo.save(a).getId();
+            });
+        } catch (RuntimeException e) {
+            try { Files.deleteIfExists(target); } catch (IOException cleanup) { e.addSuppressed(cleanup); }
+            throw e;
+        }
 
         return Map.of(
-                "id", a.getId(),
+                "id", attachmentId,
                 "name", original,
                 "size", written,
-                "url", "/api/attachments/" + a.getId() + "/download");
+                "url", "/api/attachments/" + attachmentId + "/download");
     }
 
     /**

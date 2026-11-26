@@ -98,7 +98,7 @@ install_units_and_restart() {
   log "安装 systemd 单元与 Nginx 片段"  # -I（--ignore-times）：配置文件必须每次强制覆盖。
   # 默认 rsync 只比 size+mtime，曾出现过改了单元文件却没同步过去、
   # 导致协同服务拿不到 JWT_SECRET 的事故。
-  rsync -azI -e "$SSH" deploy/prod/scofendoc-backend.service deploy/prod/scofendoc-collab.service deploy/prod/scofendoc.locations "$HOST:/opt/scofendoc/deploy/"
+  rsync -azI -e "$SSH" deploy/prod/scofendoc-backend.service deploy/prod/scofendoc-collab.service deploy/prod/scofendoc.locations deploy/prod/backup.sh "$HOST:/opt/scofendoc/deploy/"
 
   $SSH "$HOST" 'bash -s' <<'EOS'
 set -e

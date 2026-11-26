@@ -147,6 +147,8 @@ const emit = defineEmits<{
   (e: 'editor-ready', editor: Editor): void
   /** 点了站内链接：交给外层切换文档并滚到锚点，不整页刷新 */
   (e: 'navigate', payload: { spaceId: number; docId: number; anchor: string }): void
+  (e: 'access-lost'): void
+  (e: 'authorized', canWrite: boolean): void
 }>()
 const connected = ref(false)
 const peers = ref(0)
@@ -1522,12 +1524,18 @@ onMounted(() => {
     name: props.docName,
     document: ydoc,
     token: props.collabToken,
+    broadcast: false,
     onStatus: ({ status }) => {
       connected.value = status === 'connected'
     },
     onAuthenticationFailed: () => {
-      authError.value = '协同鉴权失败，请刷新页面重新登录'
+      authError.value = '协同授权已失效'
       connected.value = false
+      emit('access-lost')
+    },
+    onAuthenticated: () => emit('authorized', provider?.authorizedScope === 'read-write'),
+    onClose: ({ event }) => {
+      if (event.code === 4403) emit('access-lost')
     },
     onAwarenessChange: ({ states }) => {
       // states 包含本地 + 远端，减去自己即为在线协作者数

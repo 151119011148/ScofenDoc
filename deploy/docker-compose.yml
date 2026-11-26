@@ -20,7 +20,14 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.backend
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/scofen_doc?allowPublicKeyRetrieval=true&useSSL=false
+      COLLAB_SEARCH_URL: http://collab:1235/internal/search
+      JWT_SECRET: ${JWT_SECRET:-scofendoc-dev-only-secret-change-me}
+    volumes:
+      - image_data:/var/www/scofendoc-files
+      - attachment_data:/var/lib/scofendoc/attachments
     depends_on:
       mysql:
         condition: service_healthy
@@ -31,6 +38,13 @@ services:
       dockerfile: deploy/Dockerfile.collab
     ports:
       - "1234:1234"
+    environment:
+      COLLAB_HOST: 0.0.0.0
+      COLLAB_SEARCH_HOST: 0.0.0.0
+      COLLAB_ACCESS_URL: http://backend:8080/internal/collab-access
+      JWT_SECRET: ${JWT_SECRET:-scofendoc-dev-only-secret-change-me}
+    volumes:
+      - collab_data:/app/data
 
   frontend:
     build:
@@ -44,3 +58,6 @@ services:
 
 volumes:
   mysql_data:
+  collab_data:
+  image_data:
+  attachment_data:
